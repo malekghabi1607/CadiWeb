@@ -203,13 +203,29 @@ class FichierExcel:
             self._nb_lignesData_tableau = self._nb_lignes_tableau - header_count
 
         def _initialiser_dimensions_tableau_normal(self) -> None:
-            # Suppose que le tableau commence juste après nbLignes_avantET et en colonne 1
+            # Première ligne de données du tableau (juste après les lignes d'entête)
             self._min_row = self._nbLignes_avantET + 1
             self._max_row = self._ws.max_row
-            self._min_col = 1
-            self._max_col = self._ws.max_column
+
+            min_col, max_col = None, 0
+
+            # Parcours de la zone supposée du tableau pour trouver les vraies bornes
+            for row in self._ws.iter_rows(min_row=self._min_row, max_row=self._max_row):
+                for cell in row:
+                    if cell.value not in (None, ""):
+                        if min_col is None or cell.column < min_col:
+                            min_col = cell.column
+                        if cell.column > max_col:
+                            max_col = cell.column
+
+            # Si aucun contenu trouvé → on garde 1 par défaut
+            self._min_col = min_col if min_col is not None else 1
+            self._max_col = max_col if max_col > 0 else 1
+
+            # Définir la référence Excel (par ex. "A5:AU20")
             self._ref_tableau = self.definir_rangeExcel()
 
+            # Nombre de lignes total et de lignes de données
             self._nb_lignes_tableau = self._max_row - self._min_row + 1
             self._nb_lignesData_tableau = max(0, self._nb_lignes_tableau - 1)  # 1 ligne header approx.
 
@@ -810,7 +826,7 @@ class FichierExcel:
         if not chemin_fichier:
             chemin_fichier = cls.choisirFichiers_filedialog()
 
-        instance = cls.depuis_repertoire(os.path.dirname(chemin_fichier))  # Proposition qui semble fausse : instance = cls(depuis_repertoire := os.path.dirname(chemin_fichier))
+        instance = cls.depuis_repertoire(os.path.dirname(chemin_fichier))
         instance._chemin_fichier = chemin_fichier
 
         if avec_ouverture_wb:
