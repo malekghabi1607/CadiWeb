@@ -1,0 +1,10 @@
+README.md
+pyproject.toml
+vte/__init__.py
+vte/instn.py
+vte/office.py
+vte/utils.py
+vte.egg-info/PKG-INFO
+vte.egg-info/SOURCES.txt
+vte.egg-info/dependency_links.txt
+vte.egg-info/top_level.txt

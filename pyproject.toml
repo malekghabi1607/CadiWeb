@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vte"
+version = "0.1.0"
+description = "Librairie perso pour Excel, Word, mails Outlook et autres outils"
+authors = [
+    { name = "TESTARD Vincent", email = "vincent.testard@cea.fr" }
+]
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["vte*"]

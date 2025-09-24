@@ -1,0 +1,991 @@
+from __future__ import annotations
+
+from typing import Dict, List, Tuple, Optional, Union
+
+import pandas as pd
+
+from openpyxl import load_workbook
+from openpyxl.utils.cell import range_boundaries, get_column_letter
+
+import xlwings as xw
+
+import inspect
+import os
+import platform
+import subprocess
+import re
+import time
+import copy
+import ctypes
+from ctypes import wintypes
+
+from datetime import date, datetime, time
+
+from tqdm import tqdm
+import colorama
+from colorama import Fore, Style
+
+import tkinter as tk
+from tkinter import filedialog
+
+### --------------------------------------------------------------------
+#  Tests (log et timer)
+### --------------------------------------------------------------------
+
+class Timer:
+    """
+    Classe Timer simple pour mesurer et afficher la durée de traitements dans un script.
+
+    Fonctionnalités :
+    -----------------
+    - Affiche un message au début d'un traitement : "⏳ Traitement de <description>..."
+    - Remplace ce message à la fin (automatique ou manuelle) par : "✅ <description> terminé en X min Y s."
+    - Gère automatiquement la fin du chrono précédent à chaque nouvel appel de `debut(...)`.
+
+    Utilisation :
+    ------------
+    >>> timer = Timer()
+    >>> timer.debut("Chargement des données")
+    >>> # ... traitement ...
+    >>> timer.debut("Traitement des résultats")
+    >>> # ... autre traitement ...
+    >>> timer.fin()  # Optionnel si on veut terminer explicitement le dernier chrono
+
+    Méthodes :
+    ----------
+    - debut(description: str): démarre un nouveau chronomètre et affiche un message.
+                                Termine automatiquement le précédent s'il est en cours.
+    - fin(): termine le chronomètre en cours et affiche la durée du traitement.
+
+    Remarques :
+    -----------
+    - Aucun module externe requis (comme tqdm).
+    - L'affichage est propre dans la console grâce à l'effacement dynamique de la ligne.
+    - Conçu pour les scripts où l'on veut chronométrer plusieurs étapes sans se répéter.
+    """
+    def __init__(self, description=""):
+        self.__debut = None
+        self.__fin = None
+        self.__duree = 0
+        self.__description = description
+        self.__timer_en_cours = False
+        self.__last_message = ""
+
+    def debut(self, description=""):
+        # Si un timer est déjà en cours, on le termine proprement
+        if self.__timer_en_cours:
+            self.fin()
+
+        self.__description = description
+        self.__debut = time.time()
+        self.__timer_en_cours = True
+
+        self.__last_message = f"⏳ Traitement de {self.__description}..."
+        print(self.__last_message, end='', flush=True)
+
+    def fin(self):
+        if not self.__timer_en_cours:
+            return  # Rien à terminer
+
+        self.__fin = time.time()
+        self.__duree = self.__fin - self.__debut
+        minutes, secondes = divmod(int(self.__duree), 60)
+
+        message_final = f"✅ {self.__description} terminé en {minutes} min {secondes} s."
+
+        # Nettoyer la ligne précédente et afficher le nouveau message
+        clean_line = '\r' + ' ' * len(self.__last_message) + '\r'
+        print(clean_line + message_final)
+
+        self.__timer_en_cours = False
+
+class Vlog:
+    """
+    Classe de journalisation visuelle (Visual Logger).
+
+    Permet de centraliser les messages d'information, d'erreur, d'exclusion, etc.
+    Affichage possible en console, en popup Tkinter, et export vers un fichier.
+
+    Exemple :
+        vlog = Vlog()
+        vlog.ajouter_message("Infos", "Traitement terminé", style=["vert"])
+        vlog.log_erreur("Impossible de lire le fichier")
+        print(vlog)
+        vlog.afficher_popup("Résultat du traitement")
+    """
+
+    def __init__(self):
+        self._dict_messages: Dict[str, List[Tuple[str, List[str]]]] = {}
+
+        # Définition des styles disponibles pour le widget Tkinter
+        self._styles: Dict[str, Dict] = {
+            "normal": {"font": ("TkDefaultFont", 10)},
+            "gras": {"font": ("TkDefaultFont", 10, "bold")},
+            "italique": {"font": ("TkDefaultFont", 10, "italic")},
+            "souligne": {"underline": True},
+            "rouge": {"foreground": "#cc0000"},
+            "rouge clair": {"foreground": "#ff6666"},
+            "bleu": {"foreground": "#0000cc"},
+            "bleu clair": {"foreground": "#66b3ff"},
+            "vert": {"foreground": "#009933"},
+            "vert clair": {"foreground": "#66ff99"},
+            "jaune": {"foreground": "#e6b800"},
+            "orange": {"foreground": "#ff9933"},
+        }
+
+    def ajouter_message(self, categorie: str, texte: str, style: Union[str, List[str]] = "normal") -> None:
+        """
+        Ajoute un message dans une catégorie avec un style donné.
+
+        :param categorie: Nom de la catégorie (ex. : "Erreurs", "Exclusions")
+        :param texte: Contenu du message
+        :param style: Style (ou liste de styles) appliqué au texte
+
+        :Example:
+
+        >>> # Cas avec un seul style
+        >>> vlog.ajouter_message("CSV traités", "fichier_X.csv", style=["vert"])
+
+        >>> # Cas avec styles combinés
+        >>> vlog.ajouter_message("Traitement", "Le fichier a été ajouté avec succès", style=["gras", "vert"])
+
+
+        """
+        if isinstance(style, str):
+            style = [style]
+        if categorie not in self._dict_messages:
+            self._dict_messages[categorie] = []
+        self._dict_messages[categorie].append((texte, style))
+
+    def reinitialiser_messages(self) -> None:
+        """
+        Vide complètement les messages enregistrés.
+        """
+        self._dict_messages.clear()
+
+    def log_erreur(self, message: str, continuer: bool = False) -> None:
+        """
+        Affiche une erreur enrichie en console et l'enregistre dans les messages.
+
+        :param message: Le message d'erreur
+        :param continuer: Si False, appelle `exit()` après affichage
+
+        :Example:
+
+        >>> vlog.log_erreur("Une erreur est survenue.")
+        """
+        #import colorama
+        #from colorama import Fore, Style
+        #colorama.init()
+        colorama.init(autoreset=True)
+
+        stack = inspect.stack()
+        frame = stack[1].frame
+        nom_fonction = stack[1].function
+        cls_name = None
+        if 'self' in frame.f_locals:
+            cls_name = type(frame.f_locals['self']).__name__
+        location = f"{cls_name + '.' if cls_name else ''}{nom_fonction}()"
+
+        prefix = f"{Fore.YELLOW}❌ "
+        suffix = " → On ignore la règle et on continue." if continuer else ""
+        message_console = f"{prefix}Erreur dans {location} : {message}{suffix}{Style.RESET_ALL}"
+        print(message_console)
+
+        # Ajout dans le logger visuel
+        self.ajouter_message("Erreurs", f"{location} : {message}", style=["gras", "rouge clair"])
+
+        if not continuer:
+            print("=== exit() ===")
+            exit()
+
+    def copier_dans_presse_papiers(self) -> None:
+        """
+        Copie le contenu du log (version texte brut) dans le presse-papiers.
+        """
+        r = tk.Tk()
+        r.withdraw()
+        r.clipboard_clear()
+        r.clipboard_append(str(self))
+        r.update()
+        r.destroy()
+
+    def sauvegarder_vers_fichier(self, chemin: Optional[str] = None) -> None:
+        """
+        Sauvegarde le contenu du log dans un fichier texte.
+
+        :param chemin: Chemin du fichier. Si None, un nom par défaut est généré.
+        """
+        if chemin is None:
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            chemin = f"log_{timestamp}.txt"
+        with open(chemin, "w", encoding="utf-8") as f:
+            f.write(str(self))
+
+    def afficher_popup(self, titre: str = "Information", reinitialiser_messages=True) -> None:
+        """
+        Affiche une popup enrichie avec les messages du log.
+
+        :param titre: Titre de la fenêtre popup
+
+        :Example:
+
+        >>> vlog.afficher_popup("Rapport d'import")
+        """
+        popup = tk.Toplevel()
+        popup.title(titre)
+        popup.resizable(True, True)
+
+        # Calcul de la largeur optimale selon le message le plus long
+        largeur_min = 60
+        largeur_max = 400
+        largeur_calculee = largeur_min
+
+        for categorie, messages in self.dict_messages.items():
+            for texte, _ in messages:
+                ligne = f"{categorie} :\n\t• {texte}"
+                largeur_calculee = max(largeur_calculee, len(ligne))
+
+        # Ajuster pour ne pas dépasser une largeur raisonnable
+        print(largeur_calculee)
+        largeur_calculee = min(largeur_calculee, largeur_max)
+        print(largeur_calculee)
+
+        text_widget = tk.Text(popup, wrap="word", height=25, width=largeur_calculee)
+        text_widget.pack(expand=True, fill="both", padx=10, pady=10)
+
+        # Configurer tous les styles
+        for style_nom, style_conf in self._styles.items():
+            text_widget.tag_configure(style_nom, **style_conf)
+
+        # Insérer les messages formatés
+        for categorie, messages in self._dict_messages.items():
+            text_widget.insert("end", f"\n{categorie} :\n", ("gras", "souligne"))
+            for texte, styles in messages:
+                if not styles:
+                    styles = ["normal"]
+                text_widget.insert("end", "\t• ", tuple(styles))
+                text_widget.insert("end", texte + "\n", tuple(styles))
+
+        text_widget.config(state="disabled")
+
+        bouton_frame = tk.Frame(popup)
+        bouton_frame.pack(pady=(0, 10))
+
+        tk.Button(bouton_frame, text="Copier dans presse-papiers", command=self.copier_dans_presse_papiers).pack(side="left", padx=5)
+        tk.Button(bouton_frame, text="Fermer", command=popup.destroy).pack(side="right", padx=5)
+
+        # Centrer la popup
+        popup.update_idletasks()
+        w = popup.winfo_width()
+        h = popup.winfo_height()
+        x = (popup.winfo_screenwidth() // 2) - (w // 2)
+        y = (popup.winfo_screenheight() // 2) - (h // 2)
+        popup.geometry(f"+{x}+{y}")
+
+        # Si demandé, on réinitialise les messages
+        if reinitialiser_messages:
+            self.reinitialiser_messages()
+
+    @property
+    def dict_messages(self) -> Dict[str, List[Tuple[str, List[str]]]]:
+        """
+        Retourne le dictionnaire complet des messages.
+        """
+        return self._dict_messages
+
+    def __str__(self) -> str:
+        """
+        Affichage texte brut pour la console, structuré par catégorie.
+        """
+        sortie = ""
+        for categorie, messages in self._dict_messages.items():
+            sortie += f"{categorie} :\n"
+            for texte, _ in messages:
+                sortie += f"\t• {texte}\n"
+        return sortie
+
+def log_erreur(message: str, continuer:bool = False) -> None:
+    """
+    Permet de print un log avec la location du message (fonction d'appel) avec option de continuer (warning) ou d'arrêter le code (erreur)
+    """
+    # Récupérer le frame d’appel (un cran au-dessus dans la stack)
+    stack = inspect.stack()
+    frame = stack[1].frame
+
+    # Nom de la fonction ou méthode appelante
+    nom_fonction = stack[1].function
+
+    # Essayer d’obtenir la classe via le premier argument (souvent self)
+    cls_name = None
+    if 'self' in frame.f_locals:
+        cls_name = type(frame.f_locals['self']).__name__
+
+    # Construction de l'en-tête d'erreur
+    prefix = f"{Fore.YELLOW}❌ "
+    location = f"{cls_name + '.' if cls_name else ''}{nom_fonction}()"
+    
+
+    # Affichage de l'erreur
+    
+    if continuer:
+        suffix = " → On ignore la règle et on continue."
+        print(f"{prefix}Erreur dans {location} : {message}{suffix}{Style.RESET_ALL}")
+    else:
+        print(f"{prefix}Erreur dans {location} : {message}{Style.RESET_ALL}")
+        print("=== exit() ===")
+        exit()
+
+
+
+### --------------------------------------------------------------------
+#  Dossiers
+### --------------------------------------------------------------------
+
+def optimiseCheminRepertoire(path_in) -> str:
+    """
+        Tout le monde n'emploie pas les noms de la GED miroir comme ils devraient.
+        Ainsi pour faciliter l'utilisateur, je teste l'existance du repertoire qui devrait fonctionner.
+        Si ce n'est pas le cas, je remonte d'un cran d'an l'arborescence.
+        Je m'arrête si la longueur du chemin complet est nulle (chemin completement bidon). 
+ 
+        :param path_in: Chemin du repertoire a tester
+        :type path_in: string
+        :return: un chemin optimal (i.e. avec la plus longue arborescence) qui est fonctionnel
+        :rtype: string
+ 
+        :Example:
+ 
+        >>> string chemin = optimiseCheminRepertoire("C:\\Users\\fichier.xlsx")
+
+ 
+        .. seealso:: Rien du tout.
+        .. warning:: Rien du tout.
+        .. note:: Rien du tout.
+        .. todo:: Rien du tout.
+    """
+    
+
+    path_out = path_in
+
+    # On boucle de manière incrémentale vers la racine du répertoire donné en paramètre d'entrée jusqu'à ce qu'un répertoire soit ok
+    while not(os.path.exists(path_out)):
+        path_out = path_out[:-len(path_out.split("\\")[-1])-1]
+        if len(path_out)==0 :
+            path_out = "."
+        #print(path_out)
+
+    return(path_out)
+
+def ouvrir_dossier(path) -> str:
+    if platform.system() == "Windows":
+        os.startfile(os.path.realpath(path))
+    elif platform.system() == "Darwin":  # macOS
+        subprocess.run(["open", path])
+    else:  # Linux
+        subprocess.run(["xdg-open", path])
+
+
+### --------------------------------------------------------------------
+#  Réseau
+### --------------------------------------------------------------------
+
+def chemin_vers_unc(path) -> str:
+    """
+    Permet d'obtenir le chemin réseau complet même si l'utilisateur a défini un lecteur réseau (i.e. lettre de raccourci)
+    """
+    class UNIVERSAL_NAME_INFO(ctypes.Structure):
+        _fields_ = [("lpUniversalName", wintypes.LPWSTR)]
+
+    path = os.path.normpath(path)
+
+    if not os.path.isabs(path):
+        path = os.path.abspath(path)
+
+    if not path[1:3] == ':\\':
+        return path
+
+    buf = ctypes.create_string_buffer(1024)  # buffer brut pour la structure
+    size = ctypes.c_ulong(ctypes.sizeof(buf))
+
+    # Appel à WNetGetUniversalNameW
+    result = ctypes.windll.mpr.WNetGetUniversalNameW(
+        path,
+        0x00000001,  # UNIVERSAL_NAME_INFO_LEVEL
+        buf,
+        ctypes.byref(size)
+    )
+
+    if result == 0:
+        # Cast du buffer en pointeur vers UNIVERSAL_NAME_INFO
+        uni_name_info = ctypes.cast(buf, ctypes.POINTER(UNIVERSAL_NAME_INFO)).contents
+        return uni_name_info.lpUniversalName
+    else:
+        print("Marche pas, code erreur :", result)
+        return path
+
+
+### --------------------------------------------------------------------
+#  Divers
+### --------------------------------------------------------------------
+
+def trouve_encodage_csv(chemin_fichier: str) -> str:
+    """
+    Détecte l'encodage d'un fichier CSV.
+
+    Args:
+        chemin_fichier (str): Chemin vers le fichier CSV.
+
+    Returns:
+        str: L'encodage détecté (ex: 'utf-8', 'cp1252', etc.).
+    """
+    import chardet
+
+    try:
+        with open(chemin_fichier, 'rb') as f:
+            result = chardet.detect(f.read())
+        return result['encoding']
+    except Exception as e:
+        print(f"Erreur lors de la détection de l'encodage : {e}")
+        return 'utf-8'  # Valeur par défaut en cas d'erreur
+
+def nettoyer_nom_colonne(nom:str) -> str:
+    """
+    Nettoie un nom de colonne Excel :
+    - Remplace les retours à la ligne (\n, \r) par des espaces
+    - Supprime les espaces en début et fin de chaîne
+    - Conserve les espaces successifs à l'intérieur
+
+    Gestion spécifique des colonnes 'Commentaires' suivies d'espaces (cas des CSV où il y a des colonnes qui feintent le nom des colonnes des tableaux structurés "Commentaires", "Commentaires ", "Commenatires  "...)
+    - Si nom commence par 'Commentaires' suivi d'au moins un espace : nom distinct préservé et rendu unique si nécessaire.
+    - Sinon : nettoyage standard (retours ligne, espaces multiples, strip).
+    """
+    
+    if not re.match(r'^Commentaires\s+$', nom):  # Match exact "Commentaires" + espaces
+        # Supprime les retours à la ligne, espaces au début/fin et caractères spéciaux invisibles
+        nom = nom.replace('\n', ' ').replace('\r', ' ')
+        nom = re.sub(r'\s+', ' ', nom)  # remplace plusieurs espaces par un seul
+        #nom = nom.strip()  # Enlève les espaces doublés
+
+    return nom
+
+def convertir_si_possible(valeur) -> str|int|float:
+    if isinstance(valeur, str):
+        valeur = valeur.strip().replace(',', '.')
+        try:
+            return int(valeur) if valeur.isdigit() else float(valeur)
+        except ValueError:
+            return valeur
+    return valeur
+
+def tuple_vers_liste_de_listes(t):
+    """
+    Permet de transformer un tuple (2, 4) en liste de listes [[2], [4]]
+    C'est la forme qu'il nous faut pour ajouter efficacement des lignes dans un tableau avec xlwings
+
+    donnees = [
+        ['Jean', 'Durand', 'jean@example.com', 42],
+        ['Claire', 'Martin', 'claire@example.com', 35]
+    ]
+    donnees = [[2], [4]]
+
+
+    :param t: le tuple
+    :type donnees: Tuple
+    :type nom_tableau: str
+    :return: Liste de listes
+    :rtype: List
+
+    :Example:
+    >>> tuple_vers_liste_de_listes((2, 4))
+
+
+    .. seealso:: Rien du tout.
+    .. warning:: Rien du tout.
+    .. note:: Rien du tout.
+    .. todo:: Rien du tout.
+    """
+    return [[elem] for elem in t]
+
+
+
+
+
+
+### --------------------------------------------------------------------
+#  TOUT CE QUI EST EN DESSOUS N'A PLUS ÉTÉ TESTÉ DEPUIS LONGTEMPS : CE SONT DES BASES DE REFLEXION
+### --------------------------------------------------------------------
+
+### --------------------------------------------------------------------
+#  openpyxl
+### --------------------------------------------------------------------
+
+def writeDataFrameInStructuredRef_openpyxl(df, wb, nom_ws, nom_table = "", supprimeDonneesEtRemplace = False) -> None:
+    """
+    Ecrit un DataFrame dans un tableau structure d'une feuille de calcul  
+
+    :param df: DataFrame à integrer dans le tableau structure
+    :type df: DataFrame
+    :param wb: classeur a lire 
+    :type df: openpyxl.workbook
+    :param nom_ws: nom de la feuille dans laquelle est le tableau structure
+    :type nom_ws: string
+    :param nom_table: nom du tableau structure. Si non renseigné, alors ce sera le même nom que l'onglet
+    :type nom_table: string
+    :param supprimeDonneesEtRemplace: Pour savoir si l'on ajoute les données du DataFrame à l'existant (False) ou si l'on supprime les données existantes et qu'on les remplace avec celles du DataFrame
+    :type supprimeDonneesEtRemplace: Boolean
+    :return: rien (on écrit/sauve un fichier excel)
+    :rtype: None
+
+    :Example:
+
+    >>> writeDataFrameInStructuredRef(df_output, wb, nom_ws, nom_table = "Sessions", supprimeDonneesEtRemplace = False)
+
+
+    .. seealso:: Rien du tout.
+    .. warning:: Rien du tout.
+    .. note:: Pour rajouter des lignes, on le fait à la suite de la feuille (worksheet) . Il en résulte qu'on gruge un peu : 1) on vire le tableau structuré, 2) on colle toutes les nouvelles lignes, 3) on supprime la ligne 1 du tableau, 4) on redéfinit les dimensions du tableau structuré (car l'ajout de nouvbelles lignes ne l'étend pas automatiquement)
+    .. todo:: Rien du tout.
+    """
+    # Si nom_Table n'est pas défini en argument, c'est que par défaut c'est le même que nom_ws 
+    if nom_table == "": nom_table = nom_ws
+
+    # On ouvre la feuille et le tableau structuré
+    ws = wb[nom_ws]
+    #print(ws)
+    table = ws._tables[nom_table] #Tableau structuré nommé
+
+    # Infos de longueurs de mon tableau
+    min_col, min_row, max_col, max_row = range_boundaries(table.ref)
+    total_rows = max_row - min_row + 1
+    data_rows = total_rows - table.headerRowCount
+    #print(table.ref, total_rows, data_rows, min_col, min_row, max_col, max_row)
+    
+    # On écrit toutes les autres lignes une par une (on garde les lignes initiales pour garder le format qu'on copiera)
+    # Méthode 1 qui marche
+    #for il in tqdm(df.itertuples(), desc="Ecriture output Excel"):
+    total_lignes = len(df)
+    with tqdm(total=total_lignes, unit=' ligne', desc=Fore.CYAN + f"Écriture des lignes dans l'output {nom_table}" + Style.RESET_ALL) as pbar:
+        for i, il in enumerate(df.itertuples(), 1):
+            pbar.set_postfix(progress=f"{i}/{len(df)}")
+            row = [val if pd.notna(val) else None for val in il[1:]] #Je dois rajouter cette ligne car il faut tester si je n'ai pas de valeurs <NA> qu'il faut retravailler sinon ça plante
+            ws.append(row)
+            pbar.update(1)
+    
+    # Méthode 2 - Bug
+    #for r in dataframe_to_rows(df, index=False, header=False):
+    #    ws.append(r)
+    
+    # On redéfinit le dimensionnement du tableau (/!\ +1 ligne pour récupérer le format de la dernière ligne)
+    table.ref = f"{ws.cell(row=min_row, column=min_col).coordinate}:{ws.cell(row=max_row + len(df), column=max_col).coordinate}" #On saut le nb de ligens avant l'en-tête, puis l'en-tête, puis on va à la première ligne de données nbLignes_avantET1+1+1)
+    #table.ref = "A1:{}{}".format(lettreFinTableau, len(df)+1) #+1 car on a la ligne d'en-tête #Méthodo initiale qui requiert de connaître la lettre de fin du tableau
+
+    # On copie le format sur toutes les nouvelles lignes du tableau
+    copieFormatTableauStructure_openpyxl(ws, table, indexLigneSourceFormat = min_row + 1, indexLigneDebutCopie = max_row + 1, indexLigneFinCopie = max_row + len(df) +1)
+
+    # Si désiré par l'utilisateur, alors on supprime les anciennes lignes de la feuille Excel (ça garde la dimension initiale du tableau structuré)
+    if supprimeDonneesEtRemplace:
+        # Suppression des anciennes lignes
+        ws.delete_rows(idx=min_row + 1, amount=data_rows)
+
+        # On redéfinit les dimensions du tableau structuré
+        table.ref = f"{ws.cell(row=min_row, column=min_col).coordinate}:{ws.cell(row=min_row + len(df), column=max_col).coordinate}" #On saut le nb de ligens avant l'en-tête, puis l'en-tête, puis on va à la première ligne de données nbLignes_avantET1+1+1)
+
+def copieFormatTableauStructure_openpyxl(ws, table, indexLigneSourceFormat = 1, indexLigneDebutCopie = -1, indexLigneFinCopie = -1) -> None:
+    """
+    Recopie le format d'une ligne d'un tableau structure a une plage du tableau structure
+
+    :param ws: feuille dans laquelle est le tableau structure
+    :type ws: openpyxl.worksheet
+    :param table: tableau structure
+    :type table: openpyxl.Table
+    :param indexLigneSourceFormat: indice de la ligne qui est a recopier (indice absolu dans la feuille excel, i.e. pas #ligne dans le tableau structure). Defaut = 1.
+    :type indexLigneSourceFormat: int
+    :param indexLigneDebutCopie: indice de la 1ere ligne ou il faut copier le format (indice absolu dans la feuille excel, i.e. pas #ligne dans le tableau structure). Defaut = indexLigneSourceFormat + 1
+    :type indexLigneDebutCopie: int
+    :param indexLigneFintCopie: indice de la derniere ligne ou il faut copier le format (indice absolu dans la feuille excel, i.e. pas #ligne dans le tableau structure). Defaut = derniere ligne tableau structure
+    :type indexLigneFinCopie: int
+    :return: rien (on a copie les format dans le worksheet)
+    :rtype: None
+
+    :Example:
+
+    >>> copieFormatTableauStructure(ws, table, indexLigneSourceFormat = min_row + 1, indexLigneDebutCopie = max_row + 1, indexLigneFinCopie = max_row + len(df) +1)
+
+
+    .. seealso:: Rien du tout.
+    .. warning:: Rien du tout.
+    .. note:: Pour rajouter des lignes, on le fait à la suite de la feuille (worksheet) . Il en résulte qu'on gruge un peu : 1) on vire le tableau structuré, 2) on colle toutes les nouvelles lignes, 3) on supprime la ligne 1 du tableau, 4) on redéfinit les dimensions du tableau structuré (car l'ajout de nouvbelles lignes ne l'étend pas automatiquement)
+    .. todo:: Rien du tout.
+    """
+
+    # On met à jour les styles des cellules (openpywl ne sait pas insérer de lignes en conservant les formats ; par ailleurs on ne sait pas appliquer ça ligne par ligne ou colonne par colonne : on va donc le faire cellule par cellule)
+    # On n'agrandit pas automatiquement le tableau structuré si l'on rajoute une cellule
+    # Quand on agrandit un tableau en redéfinissant le ref, on ne colle pas le format
+
+
+
+    # Infos de longueurs de mon tableau
+    min_col, min_row, max_col, max_row = range_boundaries(table.ref)
+    
+    # Initialisattion paramètres non renseignés
+    if indexLigneDebutCopie == -1: indexLigneDebutCopie = indexLigneSourceFormat + 1
+    if indexLigneFinCopie == -1: indexLigneFinCopie = max_row
+
+
+    # On récupère les formats de chaque cellule de la première ligne du tableau structuré 
+    formats=[]
+    for icol in range(min_col, max_col+1) :
+        formats.append(ws.cell(indexLigneSourceFormat, icol))
+        #print(formats[icol-1].number_format)
+    #print(formats)
+
+    # On copie colle les formats avec ces cellules
+    with tqdm(total=max_col, unit=' colonnes', desc=Fore.CYAN + "Copie des formats" + Style.RESET_ALL, ncols=150) as pbar:
+        for icol in range(min_col, max_col+1) :
+            pbar.set_postfix(progress=f"{icol}/{max_col}")
+            source = formats[icol-1] #Je prends un index de liste et pas un numéro de colonne, donc -1
+            #print(source.number_format, source.number_format == "General")
+
+            # Optimisation : on ne fait les copies que si le format est différent de General
+            #if source.number_format != "General":
+            for il in range(indexLigneDebutCopie, indexLigneFinCopie) : #+1 pour le row car en-tête
+                #print(il, icol, ws.cell(row=il, column=icol).value, source.number_format)
+                target = ws.cell(row=il, column=icol)
+                #target.font = copy(source.font)
+                #target.border = copy(source.border)
+                target.fill = copy(source.fill)
+                #target.alignment = copy(source.alignment)
+                #target.protection = copy(source.protection)
+                target.number_format = copy(source.number_format)
+
+            pbar.update(1)
+
+def concatene_ongletsExcels_openpyxl(nom_ws, nom_ws_imports = "", rep_defaut = ".", rep_output = "", nomBaseFichier = "Excel-output", nbLignes_avantET = 0) -> None:
+    """
+    Concatene des fichiers Excel avec une même stucture 
+
+    :param path_in: Chemin du repertoire a tester
+    :type path_in: string
+    :return: un chemin optimal (i.e. avec la plus longue arborescence) qui est fonctionnel
+    :rtype: string
+
+    :Example:
+
+    >>> string chemin = optimiseCheminRepertoire("C:\\Users\\fichier.xlsx")
+
+
+    .. seealso:: Rien du tout.
+    .. warning:: Rien du tout.
+    .. note:: Rien du tout.
+    .. todo:: Rien du tout.
+    """
+
+    if rep_output == "": rep_output=rep_defaut
+
+
+    # Lister/sélectionner les documents à concaténer
+    listeCheminsExcel = filedialog.askopenfilename(title="Sélectionner les fichiers Excel à concaténer", filetype=[("fichiers excel","*.xlsx")], initialdir=rep_defaut, multiple=True)
+
+    # On met les fichiers input dans un DataFrame
+    df_input = pd.concat((pd.read_excel(iFichier, skiprows=nbLignes_avantET) for iFichier in listeCheminsExcel), ignore_index=True)
+
+    # Définition du nom du classeur de base qui va servir à la sortie par la suite
+    s_output = rep_output + "\\" + nomBaseFichier + ".xlsx" #ou f"{datetime.now():%Y.%m.%d}"
+    #print(s_output)
+
+    # On copie le classeur
+    #shutil.copy(s_classeurIni, s_classeurDestination)
+
+    # On ouvre le classeur qui va recevoir la concaténation
+    wb_output = load_workbook(filename = s_output)
+    
+    # On met les fichiers input dans un DataFrame
+    df_input = pd.concat((pd.read_excel(rep_defaut + "\\" + iFichier, skiprows=nbLignes_avantET) for iFichier in listeCheminsExcel), ignore_index=True)
+
+    # On écrit dans le tableau structuré 
+    writeDataFrameInStructuredRef_openpyxl(df_input, wb_output, nom_ws)
+
+    # On écrit les références des fichiers copiés dans le tableau structuré "Imports"
+    if nom_ws_imports != "":
+        ws = wb_output.sheets[nom_ws_imports]
+        table = ws.tables[nom_ws_imports]
+        table.range.end('down').offset(1, 0).value = ['val1']
+
+    #On enregistre et on ferme
+    wb_output.save(filename=rep_output + "\\" + nomBaseFichier + "-" + date.today().strftime("%Y.%m.%d") + ".xlsx") #ou f"{datetime.now():%Y.%m.%d}")
+    wb_output.close()
+
+
+### --------------------------------------------------------------------
+#  xlwings
+### --------------------------------------------------------------------
+
+def writeDataFrameInStructuredRef_openpyxl_xlwings(df, wb, chemin_wb, nom_ws, nom_table = "", supprimeDonneesEtRemplace = False) -> None:
+    """
+    Ecrit un DataFrame dans un tableau structuré existant d'une feuille de calcul  
+    Utilise openpyxl pour l’écriture des données, puis xlwings pour copier rapidement le format.
+
+    :param df: DataFrame à integrer dans le tableau structure
+    :type df: DataFrame
+    :param wb: classeur a lire 
+    :type df: openpyxl.workbook
+    :param nom_ws: nom de la feuille dans laquelle est le tableau structure
+    :type nom_ws: string
+    :param nom_table: nom du tableau structure. Si non renseigné, alors ce sera le même nom que l'onglet
+    :type nom_table: string
+    :param supprimeDonneesEtRemplace: Pour savoir si l'on ajoute les données du DataFrame à l'existant (False) ou si l'on supprime les données existantes et qu'on les remplace avec celles du DataFrame
+    :type supprimeDonneesEtRemplace: Boolean
+    :return: rien (on écrit/sauve un fichier excel)
+    :rtype: None
+
+    :Example:
+
+    >>> writeDataFrameInStructuredRef(df_output, wb, nom_ws, nom_table = "Sessions", supprimeDonneesEtRemplace = False)
+
+
+    .. seealso:: Rien du tout.
+    .. warning:: Rien du tout.
+    .. note:: Pour rajouter des lignes, on le fait à la suite de la feuille (worksheet) . Il en résulte qu'on gruge un peu : 1) on vire le tableau structuré, 2) on colle toutes les nouvelles lignes, 3) on supprime la ligne 1 du tableau, 4) on redéfinit les dimensions du tableau structuré (car l'ajout de nouvbelles lignes ne l'étend pas automatiquement)
+    .. todo:: Rien du tout.
+    """
+    # Si nom_Table n'est pas défini en argument, c'est que par défaut c'est le même que nom_ws 
+    if nom_table == "": nom_table = nom_ws
+
+    # On ouvre la feuille et le tableau structuré
+    ws = wb[nom_ws]
+    table = ws._tables[nom_table] #Tableau structuré nommé
+
+    # Infos de dimension du tableau
+    min_col, min_row, max_col, max_row = range_boundaries(table.ref)
+    total_rows = max_row - min_row + 1
+    data_rows = total_rows - table.headerRowCount
+    #print(table.ref, total_rows, data_rows, min_col, min_row, max_col, max_row)
+    
+    # On écrit toutes les autres lignes une par une (on garde les lignes initiales pour garder le format qu'on copiera)
+    # Méthode 1 qui marche
+    #for il in tqdm(df.itertuples(), desc="Ecriture output Excel"):
+    total_lignes = len(df)
+    with tqdm(total=total_lignes, unit=' ligne', desc=Fore.CYAN + f"Écriture des lignes dans l'output {nom_table}" + Style.RESET_ALL) as pbar:
+        for i, il in enumerate(df.itertuples(), 1):
+            pbar.set_postfix(progress=f"{i}/{len(df)}")
+            row = [val if pd.notna(val) else None for val in il[1:]] #Je dois rajouter cette ligne car il faut tester si je n'ai pas de valeurs <NA> qu'il faut retravailler sinon ça plante
+            ws.append(row)
+            pbar.update(1)
+    
+    # Méthode 2 - Bug
+    #for r in dataframe_to_rows(df, index=False, header=False):
+    #    ws.append(r)
+    
+    # Redimensionnement du tableau 
+    nouvelle_max_row = max_row + len(df)
+    table.ref = f"{ws.cell(row=min_row, column=min_col).coordinate}:{ws.cell(row=nouvelle_max_row, column=max_col).coordinate}"
+
+    # Nécessaire avant d'utiliser xlwings
+    wb.save(chemin_wb)  
+    wb.close()
+
+    # ==== Copie du format avec xlwings ====
+    # Définir la plage source (= ligne de format) et plage cible (= nouvelles lignes)
+    col_lettre_debut = get_column_letter(min_col)
+    col_lettre_fin = get_column_letter(max_col)
+
+    range_modele = f"{col_lettre_debut}{min_row+1}:{col_lettre_fin}{min_row+1}"  # première ligne de données
+    range_cible = f"{col_lettre_debut}{max_row+1}:{col_lettre_fin}{nouvelle_max_row}"  # nouvelles lignes
+
+    # On copie le format sur toutes les nouvelles lignes du tableau
+    copierFormat_xlwings(chemin_wb, nom_ws, range_modele, range_cible)
+    
+    # Réouvrir pour finaliser les suppressions éventuelles
+    wb = load_workbook(filename=chemin_wb)
+    ws = wb[nom_ws]
+    table = ws._tables[nom_table]
+
+    # Si désiré par l'utilisateur, alors on supprime les anciennes lignes de la feuille Excel (ça garde la dimension initiale du tableau structuré)
+    if supprimeDonneesEtRemplace:
+        # Suppression des anciennes lignes
+        ws.delete_rows(idx=min_row + 1, amount=data_rows)
+
+        # On redéfinit les dimensions du tableau structuré
+        table.ref = f"{ws.cell(row=min_row, column=min_col).coordinate}:{ws.cell(row=min_row + len(df), column=max_col).coordinate}" #On saut le nb de ligens avant l'en-tête, puis l'en-tête, puis on va à la première ligne de données nbLignes_avantET1+1+1)
+
+def concatene_ongletsExcels_xlwings(nom_ws, nom_ws_imports = "", rep_defaut = ".", rep_output = "", nomBaseFichier = "Excel-output", nbLignes_avantET = 0) -> None:
+    """
+    Concatene des fichiers Excel avec une même stucture.
+    Si rep_output == "", alors rep_output=rep_defaut
+    nom_ws_imports est facultatif, c'est juste si l'on souhaite sauvegarder la liste des fichiers concatenes
+
+    :param nom_ws: nom du worksheet
+    :type nom_ws: str
+    :param nom_ws_imports: nom du worksheet ou on enregistre les fichiers excel qui vont etre concatene (defaut = "")
+    :type nom_ws_imports: str
+    :param rep_defaut: repertoire par defaut ou on va aller chercher les fichiers excel a concatener (defaut = ".")
+    :type rep_defaut: str
+    :param rep_output: repertoire ou on va enregistrer le fichier excel contenant la concatenation des fichiers (defaut = "", si rep_output == "", alors rep_output=rep_defaut)
+    :type rep_output: str
+    :param nomBaseFichier: nom du fichier output (defaut = "Excel-output")
+    :type nomBaseFichier: str
+    :param nbLignes_avantET: nombre de ligne avant l'en-tete des tableaux que l'on va concatener
+    :type nbLignes_avantET: int
+
+
+
+
+    :Example:
+    >>> concatene_ongletsExcels("Inscriptions", nom_ws_imports = "Imports", rep_defaut = rep_extractIRIS_INSTNT, rep_output = rep_extractIRIS_VTE, nomBaseFichier = "R04500_Sessions-Inscriptions-COMPLET", nbLignes_avantET = 1)
+
+
+    .. seealso:: Rien du tout.
+    .. warning:: Rien du tout.
+    .. note:: si rep_output == "", alors rep_output=rep_defaut
+    .. todo:: C'est tres long, il faudra que je teste les vitesses entre xlwings et openpyxl.
+    """
+
+    if rep_output == "": rep_output=rep_defaut
+
+    #Lister/sélectionner les documents à concaténer
+    listeCheminsExcel = filedialog.askopenfilename(title="Sélectionner les fichiers Excel à concaténer", filetype=[("fichiers excel","*.xlsx")], initialdir=rep_defaut, multiple=True)
+
+    # On met les fichiers input dans un DataFrame
+    #for iFichier in listeCheminsExcel :
+    #    df_input = pd.read_excel(rep_defaut + "\\" + iFichier, skiprows=nbLignes_avantET)
+    df_input = pd.concat((pd.read_excel(iFichier, skiprows=nbLignes_avantET) for iFichier in listeCheminsExcel), ignore_index=True)
+    
+    # On met le dataframe en liste pour l'envoyer à ajouter_lignes_tableau_xlwings
+    donnees = df_input.values.tolist()
+    
+    # Forme à avoir
+    #donnees = [
+    #    ['Jean', 'Durand', 'jean@example.com', 42],
+    #    ['Claire', 'Martin', 'claire@example.com', 35]
+    #]
+    #donnees = [[2], [4]]
+    #donnees = df.values.tolist()
+
+
+    # Définition du nom du classeur de base qui va servir à la sortie par la suite
+    s_output = rep_output + "\\" + nomBaseFichier + ".xlsx" #ou f"{datetime.now():%Y.%m.%d}"
+    #print(s_output)
+
+    # On ouvre l'app pour xlwings
+    app = xw.App(visible=False)  # Excel s'ouvre en arrière-plan
+        
+    # On copie le classeur
+    #shutil.copy(s_classeurIni, s_classeurDestination)
+
+    # On ouvre le classeur qui va recevoir la concaténation
+    wb_output = app.books.open(s_output)
+
+    # On écrit dans le tableau structuré 
+    #writeDataFrameInStructuredRef_openpyxl(df_input, wb_output, nom_ws) #Marche
+    ajouter_lignes_tableau_xlwings(donnees, wb_output, nom_ws) #Tres long (~20 minutes pour mon test avec toutes les sessions)
+
+
+    # On écrit les références des fichiers copiés dans le tableau structuré "Imports" ssi il y a un nom dans nom_ws_imports
+    if nom_ws_imports != "":
+        ajouter_lignes_tableau_xlwings(tuple_vers_liste_de_listes(listeCheminsExcel), wb_output, nom_ws_imports)
+
+    #On enregistre et on ferme
+    #wb_output.save(filename=rep_defaut + "\\" + nomBaseFichier + "-" + date.today().strftime("%Y.%m.%d") + ".xlsx") #ou f"{datetime.now():%Y.%m.%d}")
+    wb_output.save(rep_output + "\\" + nomBaseFichier + "-" + date.today().strftime("%Y.%m.%d") + ".xlsx") #ou f"{datetime.now():%Y.%m.%d}")
+    wb_output.close()
+    app.quit()
+
+def ajouter_lignes_tableau_xlwings(donnees, wb, nom_feuille, nom_tableau = "") -> None:
+    """
+    Insere une ou plusieurs lignes dans un tableau structure Excel en minimisant les appels COM.
+    Méthode longue → Préférer openpyxl si possible
+
+    :param donnees: Liste contenant les donnees a inserer dans le tableau Excel
+    :type donnees: List
+    :param wb: Classeur dans lequel on souhaite inscrire nos donnees
+    :type wb: xlwing book
+    :param nom_feuille: nom de la feuille contenant le tableau
+    :type nom_feuille: str
+    :param nom_tableau: nom du tableau structuré (ListObject) (defaut = "")
+    :type nom_tableau: str
+
+    :Example:
+    >>> ajouter_lignes_tableau_xlwings(donnees, wb_output, nom_ws)
+
+
+    .. seealso:: Rien du tout.
+    .. warning:: Rien du tout.
+    .. note:: Rien du tout.
+    .. todo:: C'est tres long (~20 minutes pour mon test avec toutes les sessions), il faudra que je teste les vitesses entre xlwings et openpyxl.
+    """
+
+
+
+
+    #On gère le cas par défaut où on ne donne pas de nom_tableau car c'est le même que le nom de la feuille
+    if nom_tableau == "": nom_tableau = nom_feuille
+
+
+    ws = wb.sheets[nom_feuille]
+    table = ws.api.ListObjects(nom_tableau)
+    
+    data_body_range = table.DataBodyRange
+
+    nb_lignes_nouvelles = len(donnees)
+    nb_colonnes = len(donnees[0])
+
+    # Détermine l'endroit où écrire : soit première ligne du tableau, soit après la dernière ligne existante
+    if data_body_range is None or data_body_range.Value is None:
+        start_cell = ws.range((table.HeaderRowRange.Row + 1, table.HeaderRowRange.Column))
+    else :
+        nb_lignes_existantes = data_body_range.Rows.Count
+        next_row = data_body_range.Row + nb_lignes_existantes
+        start_cell = ws.range((next_row, data_body_range.Column))
+
+    # Écriture en bloc pour performance    
+    ws.range(start_cell.address).resize(nb_lignes_nouvelles, nb_colonnes).value = donnees
+
+def copierFormat_xlwings(chemin_fichier, nom_ws, range_modele, range_cible) -> None:
+    """
+    Copie rapidement le format d'une plage source vers une plage cible dans un fichier Excel 
+    en utilisant `xlwings` et l'API COM (équivalent au collage spécial > formats dans Excel).
+
+    :param chemin_fichier: Chemin complet du fichier Excel à modifier.
+    :type chemin_fichier: str
+    :param nom_ws: Nom de la feuille contenant les plages.
+    :type nom_ws: str
+    :param range_modele: Adresse de la plage source contenant les formats à copier (ex: "A2:G2").
+    :type range_modele: str
+    :param range_cible: Adresse de la plage cible à laquelle appliquer les formats (ex: "A3:G100").
+    :type range_cible: str
+
+    :return: Aucun. Le fichier Excel est modifié et enregistré.
+    :rtype: None
+
+    :example:
+    >>> copier_format_rapide(
+            nom_fichier="mon_fichier.xlsx",
+            nom_feuille="Données",
+            range_modele="A2:G2",
+            range_cible="A3:G100"
+        )
+
+    .. note::
+        Cette fonction nécessite Microsoft Excel installé sur votre machine (Windows uniquement).
+
+    .. warning::
+        Seuls les formats (style, bordures, police, etc.) sont copiés. Les valeurs ne sont pas modifiées.
+    """
+    
+    app = xw.App(visible=False)
+    wb = app.books.open(chemin_fichier)
+    ws = wb.sheets[nom_ws]
+
+    # Copie de la première ligne (format uniquement)
+    ws.range(range_modele).copy()
+
+    # Collage spécial des formats uniquement
+    #tqdm.write("⏳ Application des formats avec Excel (xlwings)...")
+    ws.range(range_cible).api.PasteSpecial(Paste=-4122)  # -4122 = xlPasteFormats
+    #tqdm.write("✅ Formats collés avec succès.")
+
+    wb.save()
+    wb.close()
+    app.quit()
+
