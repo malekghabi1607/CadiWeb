@@ -25,6 +25,20 @@ def excel_nonStruct():
         "columns": ['A', 'B', 'Formule']
     }
 
+@pytest.fixture
+def excel_extractIRIS():
+    return {
+        "chemin": DATA_DIR / r"R04110_Sessions-2024 FINAL (extract IRIS natif).xlsx",
+        "nom_onglet": "Data",
+        "nbLignes_avantET": 1,
+        "ref": "A2:AU1329",
+        "nom_last_col": "Nb. Absents"
+    }
+
+ #fe = FichierExcel.depuis_fichier(r"C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Extracts originaux\R04110_Sessions-2015 FINAL.xlsx")
+    #fe.charger_tableau("Data", nbLignes_avantET=1)
+    #print(fe._tableaux["Data"])
+    #print(fe)
 
 # ---------- TESTS ----------
 
@@ -61,6 +75,23 @@ def test_depuis_fichier_tableauSpecifique_nonStruct(excel_nonStruct):
     assert tab.nom_tableau == excel_nonStruct["nom_onglet"]
     assert tab.ref_tableau == excel_nonStruct["ref"]
     assert tab.df.columns.tolist() == excel_nonStruct["columns"]
+
+
+def test_depuis_fichier_extractIRIS(excel_extractIRIS):
+    fe = FichierExcel.depuis_fichier(excel_extractIRIS["chemin"], nom_onglet=excel_extractIRIS["nom_onglet"], nbLignes_avantET=excel_extractIRIS["nbLignes_avantET"])
+    #print(fe)
+
+    tab = fe.get_tableau(excel_extractIRIS["nom_onglet"])
+    print(tab)
+    print(tab.df.columns)
+    
+    assert fe.nom_fichier == os.path.basename(excel_extractIRIS["chemin"])
+    assert fe.wb is not None
+    assert len(fe.tableaux) == 1
+
+    assert tab.nom_tableau == excel_extractIRIS["nom_onglet"]
+    assert tab.df.columns[-1] == excel_extractIRIS["nom_last_col"]
+    assert tab.ref_tableau == excel_extractIRIS["ref"]
 
 """
 def test_ecriture_dataframe_dans_tableau(fichier_excel_pandas, tmp_path):
