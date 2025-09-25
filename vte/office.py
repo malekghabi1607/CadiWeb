@@ -1690,53 +1690,39 @@ class Mail:
                 lignes.append(f"    • {pj}")
         return "\n".join(lignes)
 
+
+
 class RDV_Outlook:
     """
-    Classe représentant un rendez-vous Outlook à créer à partir de données Excel
-    ou d'un modèle Outlook (.msg).
+    Classe représentant un rendez-vous Outlook.
 
-    Attributs d'instance correspondant aux propriétés principales d'un rendez-vous Outlook.
+    Cette classe permet de créer, manipuler et importer des rendez-vous Outlook
+    directement depuis Python en utilisant COM.
 
-    Variables d'instance:
-        _sujet (str): Sujet du rendez-vous.
-        _lieu (Optional[str]): Lieu du rendez-vous.
-        _date_debut (datetime.datetime): Date et heure de début.
-        _date_fin (datetime.datetime): Date et heure de fin.
-        _evenement_journee_entiere (bool): True si événement journée entière.
-        _categorie (Optional[str]): Catégorie Outlook.
-        _disponibilite (Optional[str]): Statut de disponibilité ("Occupé", "Libre", etc.).
-        _rappel_active (bool): Indique si le rappel est activé.
-        _rappel_minutes_avant (Optional[int]): Minutes avant début pour le rappel.
-        _importance (Optional[int]): Importance (0=faible,1=normal,2=haute).
-        _sensibilite (Optional[int]): Sensibilité (0=normale,1=personnelle,2=privée,3=confidentielle).
-        _reponse_demande (bool): Indique si une réponse est demandée.
-        _texte_rdv (Optional[str]): Corps texte brut du rendez-vous.
-        _html_corps (Optional[str]): Corps au format HTML.
-        _participants_obligatoires (List[str]): Liste des emails participants obligatoires.
-        _participants_facultatifs (List[str]): Liste des emails participants facultatifs.
-        _pieces_jointes (List[str]): Liste des chemins vers pièces jointes.
-        _rdv_skype (bool): Indique si le rdv est une réunion Skype.
+    Fonctionnalités principales :
+      - Création d’un RDV classique (méthode `creer_rdv_outlook`)
+      - Création depuis un modèle Outlook `.oft` (méthode `depuis_modele_oft`)
+      - Création rapide depuis texte brut (méthode `depuis_texte`)
+      - Création rapide depuis HTML (méthode `depuis_html`)
+      - Import d’un rendez-vous déjà existant dans Outlook (méthode `depuis_rdv_outlook`)
 
+    Gestion Skype :
+      Si l’argument `rdv_skype=True` est passé, l’objet Outlook sera configuré
+      comme une réunion Skype (avec génération automatique du lien et adaptation
+      du champ lieu).
+
+    Exemple minimal :
+    ----------------
+    >>> rdv = RDV_Outlook(
+    ...     sujet="Réunion projet",
+    ...     lieu="Salle A",
+    ...     date_debut=datetime.datetime(2025, 9, 25, 14, 0),
+    ...     date_fin=datetime.datetime(2025, 9, 25, 15, 0),
+    ...     participants_obligatoires=["alice@example.com"],
+    ...     rdv_skype=True
+    ... )
+    >>> rdv.creer_rdv_outlook(envoyer=False)  # Affiche le rendez-vous dans Outlook
     """
-
-    _sujet: str
-    _lieu: Optional[str]
-    _date_debut: datetime.datetime
-    _date_fin: datetime.datetime
-    _evenement_journee_entiere: bool
-    _categorie: Optional[str]
-    _disponibilite: Optional[str]
-    _rappel_active: bool
-    _rappel_minutes: Optional[int]
-    _importance: Optional[int]
-    _sensibilite: Optional[int]
-    _reponse_demande: bool
-    _texte_rdv: Optional[str]
-    _html_rdv: Optional[str]
-    _participants_obligatoires: List[str]
-    _participants_facultatifs: List[str]
-    _pieces_jointes: List[str]
-    _rdv_skype: bool
 
     def __init__(
         self,
@@ -1759,46 +1745,8 @@ class RDV_Outlook:
         pieces_jointes: Optional[List[str]] = None,
         rdv_skype: bool = False
     ) -> None:
-        """
-        Initialise un rendez-vous Outlook avec les paramètres fournis.
 
-        Args:
-            sujet (str) : Sujet du rendez-vous.
-            lieu (Optional[str]) : Lieu du rendez-vous.
-            date_debut (datetime.datetime) : Date et heure de début du rendez-vous.
-            date_fin (datetime.datetime) : Date et heure de fin du rendez-vous.
-            evenement_journee_entiere (bool, optional) : True si événement journée entière. Défaut False.
-            categorie (Optional[str], optional) : Catégorie Outlook. Défaut None.
-            disponibilite (Optional[str], optional) : Statut de disponibilité ("Occupé", "Libre", etc.). Défaut "Occupé".
-            rappel_active (bool, optional) : Si un rappel est activé. Défaut False.
-            rappel_minutes_avant (Optional[int], optional) : Minutes avant début pour le rappel.
-            importance (Optional[int], optional) : Importance (0=faible, 1=normale, 2=haute). Défaut None.
-            sensibilite (Optional[int], optional) : Sensibilité (0=normale,1=personnelle,2=privée,3=confidentielle). Défaut None.
-            reponse_demande (bool, optional) : Si une réponse est demandée. Défaut True.
-            texte_rdv (Optional[str], optional) : Corps texte brut. Défaut None.
-            html_rdv (Optional[str], optional) : Corps en HTML. Défaut None.
-            participants_obligatoires (Optional[Union[List[str], str]], optional) : Emails participants obligatoires.
-            participants_facultatifs (Optional[Union[List[str], str]], optional) : Emails participants facultatifs.
-            pieces_jointes (Optional[List[str]], optional) : Liste des chemins des pièces jointes. Défaut None.
-            rdv_skype (bool, optional) : Indique si c'est une réunion Skype. Défaut False.
-
-        Exemple:
-            >>> rdv = RDV_Outlook(
-                    sujet="Réunion Projet",
-                    lieu="Salle 1",
-                    date_debut=datetime.datetime(2025, 9, 20, 14, 0),
-                    date_fin=datetime.datetime(2025, 9, 20, 15, 0),
-                    rappel_active=True,
-                    rappel_minutes_avant=15,
-                    participants_obligatoires=["collab@example.com"],
-                    disponibilite="Occupé",
-                    categorie="Projet",
-                    texte_rdv="Discussion sur le projet X",
-                    evenement_journee_entiere=False,
-                    rdv_skype=True
-                )
-        """
-
+        # Champs principaux
         self._sujet = sujet
         self._lieu = lieu
         self._date_debut = date_debut
@@ -1814,6 +1762,7 @@ class RDV_Outlook:
         self._texte_rdv = texte_rdv
         self._html_rdv = html_rdv
 
+        # Participants (conversion en liste si string)
         if isinstance(participants_obligatoires, str):
             participants_obligatoires = [participants_obligatoires]
         self._participants_obligatoires = participants_obligatoires or []
@@ -1822,9 +1771,114 @@ class RDV_Outlook:
             participants_facultatifs = [participants_facultatifs]
         self._participants_facultatifs = participants_facultatifs or []
 
+        # Pièces jointes
         self._pieces_jointes = pieces_jointes or []
+
+        # Option Skype
         self._rdv_skype = rdv_skype
 
+    # -------------------------------------------------------------------------
+    # Méthode privée : appliquer les données Python à un AppointmentItem Outlook
+    # -------------------------------------------------------------------------
+    def _remplir_rdv_outlook(self, rdv_outlook):
+        """Applique les propriétés de l'objet Python sur un AppointmentItem Outlook."""
+
+        # Sujet et lieu
+        rdv_outlook.Subject = self._sujet
+        rdv_outlook.Location = self._lieu or ""
+
+        # Dates
+        if self._evenement_journee_entiere:
+            rdv_outlook.AllDayEvent = True
+            rdv_outlook.Start = self._date_debut
+            rdv_outlook.End = (self._date_fin + datetime.timedelta(days=1)) if self._date_fin else self._date_debut
+        else:
+            rdv_outlook.Start = self._date_debut
+            rdv_outlook.End = self._date_fin
+
+        # Rappel
+        if self._rappel_active and self._rappel_minutes:
+            rdv_outlook.ReminderSet = True
+            rdv_outlook.ReminderMinutesBeforeStart = self._rappel_minutes
+        else:
+            rdv_outlook.ReminderSet = False
+
+        # Catégorie
+        if self._categorie:
+            rdv_outlook.Categories = self._categorie
+
+        # Disponibilité (BusyStatus)
+        disponibilites_map = {
+            "Libre": 0,
+            "Provisoire": 1,
+            "Occupé": 2,
+            "Absent": 3,
+            "Travaille en dehors du bureau": 4,
+        }
+        if self._disponibilite:
+            rdv_outlook.BusyStatus = disponibilites_map.get(self._disponibilite, 2)
+
+        # Corps
+        if self._texte_rdv:
+            rdv_outlook.Body = self._texte_rdv
+        if self._html_rdv:
+            rdv_outlook.HTMLBody = self._html_rdv
+
+        # Participants
+        if self._participants_obligatoires or self._participants_facultatifs:
+            rdv_outlook.MeetingStatus = 1  # réunion
+        for email in self._participants_obligatoires:
+            rdv_outlook.Recipients.Add(email).Type = 1
+        for email in self._participants_facultatifs:
+            rdv_outlook.Recipients.Add(email).Type = 2
+        rdv_outlook.Recipients.ResolveAll()
+
+        # Pièces jointes
+        for pj in self._pieces_jointes:
+            if os.path.exists(pj):
+                rdv_outlook.Attachments.Add(os.path.abspath(pj))
+
+        # Réunion Skype
+        if self._rdv_skype:
+            rdv_outlook.MeetingStatus = 1  # obligatoire pour activer Skype
+            rdv_outlook.IsOnlineMeeting = True
+            rdv_outlook.OnlineMeetingProvider = 1  # 1 = Skype
+            if not self._lieu:
+                rdv_outlook.Location = "Réunion Skype"
+
+    # -------------------------------------------------------------------------
+    # Méthode privée : finalisation (envoi ou affichage + nettoyage)
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _finaliser_rdv_outlook(rdv, outlook, envoyer: bool) -> None:
+        """Affiche ou envoie le rendez-vous, puis libère les ressources COM."""
+        if envoyer:
+            rdv.Send()
+        else:
+            rdv.Display()
+        del rdv
+        del outlook
+
+    # -------------------------------------------------------------------------
+    # Création classique
+    # -------------------------------------------------------------------------
+    def creer_rdv_outlook(self, envoyer: bool = False) -> None:
+        """
+        Crée un rendez-vous Outlook à partir des attributs Python.
+
+        Exemple :
+        ---------
+        >>> rdv = RDV_Outlook("Test", "Salle X", dt(2025, 1, 1, 10), dt(2025, 1, 1, 11))
+        >>> rdv.creer_rdv_outlook(envoyer=False)  # affiche le rendez-vous
+        """
+        outlook = win32com.client.Dispatch("Outlook.Application")
+        rdv_outlook = outlook.CreateItem(1)  # olAppointmentItem
+        self._remplir_rdv_outlook(rdv_outlook)
+        self._finaliser_rdv_outlook(rdv_outlook, outlook, envoyer)
+
+    # -------------------------------------------------------------------------
+    # Création depuis modèle .oft
+    # -------------------------------------------------------------------------
     @classmethod
     def depuis_modele_oft(
         cls,
@@ -1833,78 +1887,187 @@ class RDV_Outlook:
         lieu: Optional[str] = None,
         participants_obligatoires: Optional[Union[List[str], str]] = None,
         participants_facultatifs: Optional[Union[List[str], str]] = None,
-        date_debut: Optional[datetime] = None,
+        date_debut: Optional[dt] = None,
         duree: Optional[timedelta] = None,
         categorie: Optional[str] = None,
+        rdv_skype: bool = False,
         envoyer: bool = False
-    ) -> RDV_Outlook:
+    ) -> "RDV_Outlook":
         """
-        Crée un rendez-vous Outlook à partir d'un modèle .oft enregistré sur disque,
-        en évitant le problème de duplication de l'ID Outlook et la signature automatique,
-        puis ajoute les destinataires.
+        Crée un rendez-vous Outlook à partir d'un modèle `.oft`.
 
-        Args:
-            chemin_modele (str): Chemin complet vers le fichier .msg modèle.
-            participants_obligatoires (Optional[Union[List[str], str]]): Destinataires obligatoires.
-            participants_facultatifs (Optional[Union[List[str], str]]): Destinataires facultatifs.
-            envoyer (bool): Si True, envoie directement le RDV. Sinon, l'affiche prêt à l'édition (par défaut False).
-
-        Returns:
-            RDV_Outlook : Une instance de RDV_Outlook créée à partir du modèle.
-
-        Exemple:
-            RDV_Outlook.depuis_modele_msg(
-                chemin_modele="C:/Modeles/mon_rdv_modele.msg",
-                participants_obligatoires=["participant1@example.com", "participant2@example.com"],
-                participants_facultatifs="assistant@example.com",
-                envoyer=True
-            )
+        Exemple :
+        ---------
+        >>> rdv = RDV_Outlook.depuis_modele_oft("modele.oft", sujet="Réunion", rdv_skype=True)
         """
         outlook = win32com.client.Dispatch("Outlook.Application")
-        
-        # Ouvre le modèle .oft comme un nouvel item
         rdv = outlook.CreateItemFromTemplate(os.path.abspath(chemin_modele))
-        
-        #rdv.Display()  # ← important : force le chargement complet
 
-        # Convertit les destinataires s'ils sont passés en chaîne
-        participants_obligatoires = participants_obligatoires or []
-        participants_facultatifs = participants_facultatifs or []
-
-        if isinstance(participants_obligatoires, str):
-            participants_obligatoires = [participants_obligatoires]
-        if isinstance(participants_facultatifs, str):
-            participants_facultatifs = [participants_facultatifs]
-
-        # Si des participants sont présents, on passe en mode "réunion"
-        if participants_obligatoires or participants_facultatifs:
-            rdv.MeetingStatus = 1  # olMeeting
-
-        for adresse in participants_obligatoires:
-            destinataire = rdv.Recipients.Add(adresse)
-            destinataire.Type = 1  # olRequired
-
-        for adresse in participants_facultatifs:
-            destinataire = rdv.Recipients.Add(adresse)
-            destinataire.Type = 2  # olOptional
-
-        rdv.Recipients.ResolveAll()
-
-        # Remplace éventuellement les paramètre copiés par les arguments de la fonction
-        if sujet is not None:
-            rdv.Subject = sujet
-        if lieu is not None:
-            rdv.Location = lieu
-        if date_debut is not None:
-            rdv.Start = datetime.combine(date_debut, time(hour=10, minute=0))
-        if duree is not None:
-            rdv.End = rdv.Start + duree
-        if categorie is not None:
-            rdv.Categories = categorie
-        
-
-        # Création de l'objet Python RDV_Outlook
         instance = cls(
+            sujet=sujet or rdv.Subject,
+            lieu=lieu or rdv.Location,
+            date_debut=date_debut or rdv.Start,
+            date_fin=(date_debut + duree) if (date_debut and duree) else rdv.End,
+            evenement_journee_entiere=rdv.AllDayEvent,
+            categorie=categorie or rdv.Categories,
+            disponibilite=rdv.BusyStatus,
+            rappel_active=rdv.ReminderSet,
+            rappel_minutes=rdv.ReminderMinutesBeforeStart if rdv.ReminderSet else None,
+            importance=rdv.Importance,
+            sensibilite=rdv.Sensitivity,
+            reponse_demande=rdv.ResponseRequested,
+            participants_obligatoires=participants_obligatoires,
+            participants_facultatifs=participants_facultatifs,
+            rdv_skype=rdv_skype
+        )
+
+        instance._remplir_rdv_outlook(rdv)
+        cls._finaliser_rdv_outlook(rdv, outlook, envoyer)
+        return instance
+
+    # -------------------------------------------------------------------------
+    # Création directe depuis HTML (avec tous les autres paramètres optionnels)
+    # -------------------------------------------------------------------------
+    @classmethod
+    def depuis_html(
+        cls,
+        sujet: str,
+        html: str,
+        date_debut: dt,
+        date_fin: dt,
+        *,
+        lieu: Optional[str] = None,
+        evenement_journee_entiere: bool = False,
+        categorie: Optional[str] = None,
+        disponibilite: Optional[str] = "Occupé",
+        rappel_active: bool = False,
+        rappel_minutes: Optional[int] = None,
+        importance: Optional[int] = None,
+        sensibilite: Optional[int] = None,
+        reponse_demande: bool = True,
+        participants_obligatoires: Optional[Union[List[str], str]] = None,
+        participants_facultatifs: Optional[Union[List[str], str]] = None,
+        pieces_jointes: Optional[List[str]] = None,
+        rdv_skype: bool = False,
+        envoyer: bool = False
+    ) -> "RDV_Outlook":
+        """
+        Crée un rendez-vous directement depuis un contenu HTML.
+
+        Tous les autres arguments de l'init peuvent être passés pour personnaliser le RDV.
+
+        Exemple :
+        ---------
+        >>> RDV_Outlook.depuis_html(
+        ...     sujet="Réunion",
+        ...     html="<b>Bonjour</b>",
+        ...     date_debut=dt.now(),
+        ...     date_fin=dt.now() + timedelta(hours=1),
+        ...     participants_obligatoires=["alice@example.com"],
+        ...     rdv_skype=True
+        ... )
+        """
+        instance = cls(
+            sujet=sujet,
+            lieu=lieu,
+            date_debut=date_debut,
+            date_fin=date_fin,
+            evenement_journee_entiere=evenement_journee_entiere,
+            categorie=categorie,
+            disponibilite=disponibilite,
+            rappel_active=rappel_active,
+            rappel_minutes=rappel_minutes,
+            importance=importance,
+            sensibilite=sensibilite,
+            reponse_demande=reponse_demande,
+            html_rdv=html,
+            participants_obligatoires=participants_obligatoires,
+            participants_facultatifs=participants_facultatifs,
+            pieces_jointes=pieces_jointes,
+            rdv_skype=rdv_skype
+        )
+        instance.creer_rdv_outlook(envoyer=envoyer)
+        return instance
+
+    # -------------------------------------------------------------------------
+    # Création directe depuis texte brut (avec tous les autres paramètres optionnels)
+    # -------------------------------------------------------------------------
+    @classmethod
+    def depuis_texte(
+        cls,
+        sujet: str,
+        texte: str,
+        date_debut: dt,
+        date_fin: dt,
+        *,
+        lieu: Optional[str] = None,
+        evenement_journee_entiere: bool = False,
+        categorie: Optional[str] = None,
+        disponibilite: Optional[str] = "Occupé",
+        rappel_active: bool = False,
+        rappel_minutes: Optional[int] = None,
+        importance: Optional[int] = None,
+        sensibilite: Optional[int] = None,
+        reponse_demande: bool = True,
+        participants_obligatoires: Optional[Union[List[str], str]] = None,
+        participants_facultatifs: Optional[Union[List[str], str]] = None,
+        pieces_jointes: Optional[List[str]] = None,
+        rdv_skype: bool = False,
+        envoyer: bool = False
+    ) -> "RDV_Outlook":
+        """
+        Crée un rendez-vous directement depuis un contenu texte.
+
+        Tous les autres arguments de l'init peuvent être passés pour personnaliser le RDV.
+
+        Exemple :
+        ---------
+        >>> RDV_Outlook.depuis_texte(
+        ...     sujet="Briefing",
+        ...     texte="Rappel: réunion importante",
+        ...     date_debut=dt.now(),
+        ...     date_fin=dt.now() + timedelta(hours=2),
+        ...     participants_obligatoires=["bob@example.com"],
+        ...     rdv_skype=True
+        ... )
+        """
+        instance = cls(
+            sujet=sujet,
+            lieu=lieu,
+            date_debut=date_debut,
+            date_fin=date_fin,
+            evenement_journee_entiere=evenement_journee_entiere,
+            categorie=categorie,
+            disponibilite=disponibilite,
+            rappel_active=rappel_active,
+            rappel_minutes=rappel_minutes,
+            importance=importance,
+            sensibilite=sensibilite,
+            reponse_demande=reponse_demande,
+            texte_rdv=texte,
+            participants_obligatoires=participants_obligatoires,
+            participants_facultatifs=participants_facultatifs,
+            pieces_jointes=pieces_jointes,
+            rdv_skype=rdv_skype
+        )
+        instance.creer_rdv_outlook(envoyer=envoyer)
+        return instance
+
+    # -------------------------------------------------------------------------
+    # Import d’un rendez-vous Outlook existant
+    # -------------------------------------------------------------------------
+    @classmethod
+    def depuis_rdv_outlook(cls, rdv) -> "RDV_Outlook":
+        """
+        Construit un objet Python RDV_Outlook à partir d'un AppointmentItem Outlook déjà existant.
+
+        Exemple :
+        ---------
+        >>> outlook = win32com.client.Dispatch("Outlook.Application")
+        >>> rdv_outlook = outlook.CreateItem(1)
+        >>> rdv_obj = RDV_Outlook.depuis_rdv_outlook(rdv_outlook)
+        """
+        return cls(
             sujet=rdv.Subject,
             lieu=rdv.Location,
             date_debut=rdv.Start,
@@ -1917,98 +2080,15 @@ class RDV_Outlook:
             importance=rdv.Importance,
             sensibilite=rdv.Sensitivity,
             reponse_demande=rdv.ResponseRequested,
-            html_rdv=None,  # ← on ne lit pas HTMLBody, on laisse Outlook gérer car il ne le lit pas
-            participants_obligatoires=participants_obligatoires,
-            participants_facultatifs=participants_facultatifs,
-            # Pièces jointes non extraites ici (car elles sont déjà incluses dans l'item Outlook)
-            rdv_skype=False  # Peut être ajusté si nécessaire
+            texte_rdv=rdv.Body if hasattr(rdv, "Body") else None,
+            html_rdv=rdv.HTMLBody if hasattr(rdv, "HTMLBody") else None,
+            participants_obligatoires=[],
+            participants_facultatifs=[],
+            rdv_skype=getattr(rdv, "IsOnlineMeeting", False),
         )
 
-        # Affiche ou envoie
-        if envoyer:
-            rdv.Send()
-        else:
-            rdv.Display()
 
-        # Nettoyage COM
-        del rdv
-        del outlook
 
-        return instance
-
-    def creer_rdv_outlook(self, envoyer: bool = False) -> None:
-        """
-        Crée un rendez-vous Outlook à partir des informations de l'instance.
-        
-        Args:
-            envoyer (bool, optional): Si True, envoie directement le RDV ; sinon l'affiche sans l'envoyer. Par défaut : False.
-
-        Exemple:
-            >>> rdv = RDV_Outlook(...)
-            >>> rdv.creer_rdv_outlook(envoyer=False)
-        """
-        outlook = win32com.client.Dispatch("Outlook.Application")
-        rdv_outlook = outlook.CreateItem(1)  # 1 = olAppointmentItem
-
-        # Si des participants sont présents, on passe en mode "réunion"
-        if self.participants_obligatoires or self.participants_facultatifs:
-            rdv_outlook.MeetingStatus = 1  # olMeeting
-        else:
-            rdv_outlook.MeetingStatus = 0  # olNonMeeting
-
-        rdv_outlook.Subject = self.sujet
-        rdv_outlook.Location = self.lieu or ""
-
-        if self.evenement_journee_entiere:
-            rdv_outlook.AllDayEvent = True
-            rdv_outlook.Start = self.date_debut
-            rdv_outlook.End = self.date_fin + datetime.timedelta(days=1) if self.date_fin else self.date_debut
-        else:
-            dt_debut = datetime.datetime.combine(self.date_debut, self.heure_debut)
-            rdv_outlook.Start = dt_debut
-            rdv_outlook.Duration = self.duree_minutes or 60
-
-        # Rappel
-        if self.rappel_minutes > 0:
-            rdv_outlook.ReminderSet = True
-            rdv_outlook.ReminderMinutesBeforeStart = self.rappel_minutes
-        else:
-            rdv_outlook.ReminderSet = False
-
-        # Disponibilité
-        disponibilites_map = {
-            "Libre": 0,
-            "Provisoire": 1,
-            "Occupé": 2,
-            "Absent": 3,
-            "Travaille en dehors du bureau": 4,
-        }
-        rdv_outlook.BusyStatus = disponibilites_map.get(self.disponibilite, 2)  # défaut : "Occupé"
-
-        # Catégorie
-        if self.categorie:
-            rdv_outlook.Categories = self.categorie
-
-        # Corps du message
-        if self.texte_rdv:
-            rdv_outlook.Body = self.texte_rdv
-
-        # Participants obligatoires
-        for email in self.participants_obligatoires:
-            destinataire = rdv_outlook.Recipients.Add(email)
-            destinataire.Type = 1  # 1 = Obligatoire
-
-        # Participants facultatifs
-        for email in self.participants_facultatifs:
-            destinataire = rdv_outlook.Recipients.Add(email)
-            destinataire.Type = 2  # 2 = Facultatif
-
-        rdv_outlook.Recipients.ResolveAll()
-
-        if envoyer:
-            rdv_outlook.Send()
-        else:
-            rdv_outlook.Display()
 
     def convertir_date_heure_en_datetime(
         date_: datetime.date,
@@ -2258,6 +2338,28 @@ class RDV_Outlook:
         """
         self._date_fin = self._date_debut + valeur
 
+    # -------------------------------------------------------------------------
+    # Représentation texte (__str__)
+    # -------------------------------------------------------------------------
+    def __str__(self) -> str:
+        """
+        Retourne une représentation textuelle lisible de l’instance.
+
+        Exemple :
+        ---------
+        >>> print(rdv)
+        📅 Rendez-vous Outlook
+          Sujet : Réunion projet
+          Lieu : Salle A
+          Date début : 2025-09-25 14:00:00
+          Date fin : 2025-09-25 15:00:00
+        """
+        header = "📅 Rendez-vous Outlook\n"
+        lignes = []
+        for k, v in vars(self).items():
+            if v is not None and v != []:
+                lignes.append(f"  {k[1:]} : {v}")
+        return header + "\n".join(lignes)
 
 ### --------------------------------------------------------------------
 #  Initialisations variables globales communes
