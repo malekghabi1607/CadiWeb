@@ -1876,7 +1876,7 @@ class RDV_Outlook:
         if isinstance(participants_facultatifs, str):
             participants_facultatifs = [participants_facultatifs]
 
-        # Ajoute les destinataires supplémentaires si nécessaire
+        # Si des participants sont présents, on passe en mode "réunion"
         if participants_obligatoires or participants_facultatifs:
             rdv.MeetingStatus = 1  # olMeeting
 
@@ -1935,6 +1935,115 @@ class RDV_Outlook:
         del outlook
 
         return instance
+
+    def creer_rdv_outlook(self, envoyer: bool = False) -> None:
+        """
+        Crée un rendez-vous Outlook à partir des informations de l'instance.
+        
+        Args:
+            envoyer (bool, optional): Si True, envoie directement le RDV ; sinon l'affiche sans l'envoyer. Par défaut : False.
+
+        Exemple:
+            >>> rdv = RDV_Outlook(...)
+            >>> rdv.creer_rdv_outlook(envoyer=False)
+        """
+        outlook = win32com.client.Dispatch("Outlook.Application")
+        rdv_outlook = outlook.CreateItem(1)  # 1 = olAppointmentItem
+
+        # Si des participants sont présents, on passe en mode "réunion"
+        if self.participants_obligatoires or self.participants_facultatifs:
+            rdv_outlook.MeetingStatus = 1  # olMeeting
+        else:
+            rdv_outlook.MeetingStatus = 0  # olNonMeeting
+
+        rdv_outlook.Subject = self.sujet
+        rdv_outlook.Location = self.lieu or ""
+
+        if self.evenement_journee_entiere:
+            rdv_outlook.AllDayEvent = True
+            rdv_outlook.Start = self.date_debut
+            rdv_outlook.End = self.date_fin + datetime.timedelta(days=1) if self.date_fin else self.date_debut
+        else:
+            dt_debut = datetime.datetime.combine(self.date_debut, self.heure_debut)
+            rdv_outlook.Start = dt_debut
+            rdv_outlook.Duration = self.duree_minutes or 60
+
+        # Rappel
+        if self.rappel_minutes > 0:
+            rdv_outlook.ReminderSet = True
+            rdv_outlook.ReminderMinutesBeforeStart = self.rappel_minutes
+        else:
+            rdv_outlook.ReminderSet = False
+
+        # Disponibilité
+        disponibilites_map = {
+            "Libre": 0,
+            "Provisoire": 1,
+            "Occupé": 2,
+            "Absent": 3,
+            "Travaille en dehors du bureau": 4,
+        }
+        rdv_outlook.BusyStatus = disponibilites_map.get(self.disponibilite, 2)  # défaut : "Occupé"
+
+        # Catégorie
+        if self.categorie:
+            rdv_outlook.Categories = self.categorie
+
+        # Corps du message
+        if self.texte_rdv:
+            rdv_outlook.Body = self.texte_rdv
+
+        # Participants obligatoires
+        for email in self.participants_obligatoires:
+            destinataire = rdv_outlook.Recipients.Add(email)
+            destinataire.Type = 1  # 1 = Obligatoire
+
+        # Participants facultatifs
+        for email in self.participants_facultatifs:
+            destinataire = rdv_outlook.Recipients.Add(email)
+            destinataire.Type = 2  # 2 = Facultatif
+
+        rdv_outlook.Recipients.ResolveAll()
+
+        if envoyer:
+            rdv_outlook.Send()
+        else:
+            rdv_outlook.Display()
+
+    def convertir_date_heure_en_datetime(
+        date_: datetime.date,
+        heure_: Optional[datetime.time] = None,
+        est_journee_entiere: bool = False
+    ) -> datetime.datetime:
+        """
+        Convertit une date et une heure (optionnelle) en un objet datetime.
+
+        Args:
+            date_ (datetime.date) : La date.
+            heure_ (Optional[datetime.time], optional) : L'heure (peut être None).
+            est_journee_entiere (bool, optional) : True si événement journée entière (heure = minuit). Défaut False.
+
+        Returns:
+            datetime.datetime : Objet datetime combiné.
+
+        Exemple:
+            >>> convertir_date_heure_en_datetime(datetime.date(2025, 9, 20), datetime.time(14, 30))
+            datetime.datetime(2025, 9, 20, 14, 30)
+
+            >>> convertir_date_heure_en_datetime(datetime.date(2025, 9, 20), est_journee_entiere=True)
+            datetime.datetime(2025, 9, 20, 0, 0)
+        """
+        if est_journee_entiere:
+            # Pour journée entière, on met l'heure à minuit
+            return datetime.datetime.combine(date_, datetime.time(0, 0))
+
+        if heure_ is None:
+            # Si pas d'heure fournie et pas journée entière, on met minuit par défaut
+            return datetime.datetime.combine(date_, datetime.time(0, 0))
+
+        # Sinon, combine date et heure normalement
+        return datetime.datetime.combine(date_, heure_)
+
 
 
     @classmethod
@@ -2079,113 +2188,6 @@ class RDV_Outlook:
         return emails
 
 
-    def creer_rdv_outlook(self, envoyer: bool = False) -> None:
-        """
-        Crée un rendez-vous Outlook à partir des informations de l'instance.
-        
-        Args:
-            envoyer (bool, optional): Si True, envoie directement le RDV ; sinon l'affiche sans l'envoyer. Par défaut : False.
-
-        Exemple:
-            >>> rdv = RDV_Outlook(...)
-            >>> rdv.creer_rdv_outlook(envoyer=False)
-        """
-        outlook = win32com.client.Dispatch("Outlook.Application")
-        rdv_outlook = outlook.CreateItem(1)  # 1 = olAppointmentItem
-
-        # Si des participants sont présents, on passe en mode "réunion"
-        if self.participants_obligatoires or self.participants_facultatifs:
-            rdv_outlook.MeetingStatus = 1  # olMeeting
-        else:
-            rdv_outlook.MeetingStatus = 0  # olNonMeeting
-
-        rdv_outlook.Subject = self.sujet
-        rdv_outlook.Location = self.lieu or ""
-
-        if self.evenement_journee_entiere:
-            rdv_outlook.AllDayEvent = True
-            rdv_outlook.Start = self.date_debut
-            rdv_outlook.End = self.date_fin + datetime.timedelta(days=1) if self.date_fin else self.date_debut
-        else:
-            dt_debut = datetime.datetime.combine(self.date_debut, self.heure_debut)
-            rdv_outlook.Start = dt_debut
-            rdv_outlook.Duration = self.duree_minutes or 60
-
-        # Rappel
-        if self.rappel_minutes > 0:
-            rdv_outlook.ReminderSet = True
-            rdv_outlook.ReminderMinutesBeforeStart = self.rappel_minutes
-        else:
-            rdv_outlook.ReminderSet = False
-
-        # Disponibilité
-        disponibilites_map = {
-            "Libre": 0,
-            "Provisoire": 1,
-            "Occupé": 2,
-            "Absent": 3,
-            "Travaille en dehors du bureau": 4,
-        }
-        rdv_outlook.BusyStatus = disponibilites_map.get(self.disponibilite, 2)  # défaut : "Occupé"
-
-        # Catégorie
-        if self.categorie:
-            rdv_outlook.Categories = self.categorie
-
-        # Corps du message
-        if self.texte_rdv:
-            rdv_outlook.Body = self.texte_rdv
-
-        # Participants obligatoires
-        for email in self.participants_obligatoires:
-            destinataire = rdv_outlook.Recipients.Add(email)
-            destinataire.Type = 1  # 1 = Obligatoire
-
-        # Participants facultatifs
-        for email in self.participants_facultatifs:
-            destinataire = rdv_outlook.Recipients.Add(email)
-            destinataire.Type = 2  # 2 = Facultatif
-
-        rdv_outlook.Recipients.ResolveAll()
-
-        if envoyer:
-            rdv_outlook.Send()
-        else:
-            rdv_outlook.Display()
-
-    def convertir_date_heure_en_datetime(
-        date_: datetime.date,
-        heure_: Optional[datetime.time] = None,
-        est_journee_entiere: bool = False
-    ) -> datetime.datetime:
-        """
-        Convertit une date et une heure (optionnelle) en un objet datetime.
-
-        Args:
-            date_ (datetime.date) : La date.
-            heure_ (Optional[datetime.time], optional) : L'heure (peut être None).
-            est_journee_entiere (bool, optional) : True si événement journée entière (heure = minuit). Défaut False.
-
-        Returns:
-            datetime.datetime : Objet datetime combiné.
-
-        Exemple:
-            >>> convertir_date_heure_en_datetime(datetime.date(2025, 9, 20), datetime.time(14, 30))
-            datetime.datetime(2025, 9, 20, 14, 30)
-
-            >>> convertir_date_heure_en_datetime(datetime.date(2025, 9, 20), est_journee_entiere=True)
-            datetime.datetime(2025, 9, 20, 0, 0)
-        """
-        if est_journee_entiere:
-            # Pour journée entière, on met l'heure à minuit
-            return datetime.datetime.combine(date_, datetime.time(0, 0))
-
-        if heure_ is None:
-            # Si pas d'heure fournie et pas journée entière, on met minuit par défaut
-            return datetime.datetime.combine(date_, datetime.time(0, 0))
-
-        # Sinon, combine date et heure normalement
-        return datetime.datetime.combine(date_, heure_)
 
     @staticmethod
     def get_lundi_depuis_num_semaine(numero_semaine: int) -> date:
