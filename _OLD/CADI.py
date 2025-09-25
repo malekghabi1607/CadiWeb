@@ -11,6 +11,44 @@ from typing import List, Tuple
 import INSTN
 from INSTN import Traiter_evalStat, FichierExcel, chemin_vers_unc, vlog
 
+
+# Todo CADI : faire un truc pour la lecture sessions qui peut changer (dernière version de GLOBAL)
+#def etat_boutons_traitement(state):
+#    # Désactive ou active les 3 boutons
+#    for btn in (btn_traiter_eval, bilan_button, iris_button):
+#        btn.config(state=state)
+
+#def chargements_initiaux():
+#    fe_sessions = FichierExcel.depuis_fichier(config["Extractions d'IRIS"]["Fichier sessions R04110"])
+
+
+
+# Au lancement, désactiver les 3 boutons de traitement
+#update_status("Lecture fichier session")
+#etat_boutons_traitement('disabled')
+
+#fe_sessions = None
+# Lancer le chargement en thread séparé
+#threading.Thread(target=chargements_initiaux, daemon=True).start()
+
+#print(fe_sessions)
+
+# Quand c'est fini, on réactive les boutons, mais dans le thread Tkinter !
+#etat_boutons_traitement('normal')
+#update_status("Prêt.")
+
+
+
+#fichiers = tuple(map(chemin_vers_unc, filedialog.askopenfilenames(filetypes=[("CSV files", "*.csv")])))
+#print(fichiers)
+
+
+#Tu peux maintenant :
+#Afficher des messages dans la barre de statut avec update_status("ton message"),
+#Suivre les étapes de traitement en direct pendant les clics,
+#Ajouter des appels à update_status(...) dans ton futur code métier.
+
+
 class ApplicationCADI(tk.Tk):
     FICHIER_CONFIG = "config.json"
 
