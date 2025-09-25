@@ -1,39 +1,14 @@
 from __future__ import annotations
-
-import warnings
-warnings.filterwarnings("ignore", message="Slicer List extension is not supported and will be removed")
-
 from .office import *
 
-from fileinput import filename
-from typing import Dict, List, Tuple, Optional
-
-import pandas as pd
-import pandas as DataFrame
-
-import win32com.client
-import extract_msg
-import os
-import shutil
-import sys
-import re
-import time
 import math
 
-from datetime import date, datetime, timedelta, time
 from dataclasses import dataclass
 from collections import defaultdict
-
 from tabulate import tabulate
 
-from tqdm import tqdm
-import colorama
-from colorama import Fore, Style
-
 from mailmerge import MailMerge
-
-import tkinter as tk
-from tkinter import filedialog, ttk, messagebox
+from tkinter import ttk, messagebox
 
 
 
@@ -397,7 +372,18 @@ class TravauxFichiersIRIS:
             )
 
 class BilanSessionV3:
-    "C'est la classe qui contient tous les éléments de ma formation pour mon bilan de session V3"
+    """
+    C'est la classe qui contient tous les éléments de ma formation pour mon bilan de session V3
+
+    # TODO j'en suis là
+    # Todo Word
+    # Dans le modèle Word : gérer le lien vers la GED 
+    # Exploiter EvalStat
+    # Il y a des trous dans la raquette dans le word de sortie (checkboxes)
+    # coller des images depuis Excel
+    # ? Exploiter export formation plutôt que export sessions pour les valeurs par défaut nmin/max...
+
+    """
     def __init__(self, codeFormation:str, annee:int, periode:str) -> None:
         self._codeFormation:str = codeFormation
         self._annee:int = annee
@@ -523,7 +509,6 @@ class BilanSessionV3:
         if tuple_csv_stagiaires:
             es = Traiter_evalStat.depuis_tuple_csv_stagiaires(tuple_csv_stagiaires=tuple_csv_stagiaires, fe_sessions=self._fe_sessions)
             
-            # TODO j'en suis là
 
         # On ouvre le fichier Excel EvalStat et on le filtre sur les sessions qui nous intéressent
 
@@ -548,8 +533,17 @@ class BilanSessionV3:
             #    print("Erreur : veuillez entrer uniquement des nombres entiers, séparés par des espaces ou des virgules.")
 
 class BilanFormation:
-    "C'est la classe qui contient tous les éléments de ma formation pour mon bilan"
+    """
+    C'est la classe qui contient tous les éléments de ma formation pour mon bilan
 
+    # TODO j'en suis là
+    # Todo Word
+    # Dans le modèle Word : gérer le lien vers la GED 
+    # Exploiter EvalStat
+    # Il y a des trous dans la raquette dans le word de sortie (checkboxes)
+    # coller des images depuis Excel
+    # ? Exploiter export formation plutôt que export sessions pour les valeurs par défaut nmin/max...
+    """
     def __init__(self, codeFormation:str, annee:int):
         
         self._codeFormation = codeFormation
@@ -1650,6 +1644,26 @@ class Traiter_REE:
                 print(f"❌ Erreur avec {nom_fichier} : {e}")
 
 class Traiter_contactsApprentis:
+    """
+    Classe permettant de contacter les apprentis et tuteurs lors d'un suivi d'apprentissage :
+       - mail de premier contact (à partir d'un modèle .msg) ;
+       - préparer les RDV Outlook pour les entretiens (à partir de modèles .oft) ;
+       - faire les mails de relance pour des documents ou Studea.
+    
+    Pour avoir accès aux mails et aux noms, j'ouvre le fichier Excel Etudiants (ADIN ou LP3D)
+    Dans ce fichier, on note aussi la réception des docs ou des signatures Studea pour filtrer les mails à envoyer
+
+    TODO :
+       - Pouvoir faire un RDV Skpe (lié à classe RDV_outlook)
+       - Ouvrir un mail vide, on le remplit, on sauve, et ça envoie à tous les apprentis et tuteurs
+
+    Validation :
+       - mail de premier contact (à partir d'un modèle .msg) → Oui mais TODO signature à enlever
+       - préparer les RDV Outlook pour les entretiens (à partir de modèles .oft) ;
+       - faire les mails de relance pour des documents ou Studea.
+
+    """
+    
     @dataclass
     class PropEntretien:
         chemin_modele: str
@@ -1659,9 +1673,19 @@ class Traiter_contactsApprentis:
         categorie: str = "FI"
     
     # Fichier Excel avec les informations des étudiants
-    _chemin_fichier_etudiants:str
+    #_chemin_fichier_etudiants:str
+    _prefixe_sujet:str
+    
     _fe_etudiants:FichierExcel
     _df_etudiants:DataFrame
+    
+    _chemin_modele_mail_priseContact:Optional[str] = None
+    _ficheEvaluation1:Optional[str] = None
+    _ficheEvaluation2:Optional[str] = None
+
+    _envoyer_mail:bool = False
+    _entretiens:List[PropEntretien] = []
+    _mail_responsables_univ:Optional[str] = None
 
 
     # === Initialisations statiques ===
@@ -1690,104 +1714,75 @@ class Traiter_contactsApprentis:
 
     @classmethod
     def UGA(cls) -> Traiter_contactsApprentis:
+        """
+        """
 
         # === Initialisations statiques ===
-        chemin_fichier_etudiants:str = r"\\instnt\partage\FORMATIONS_I\GDRA - Master IN (parcours ADIN-GDRA-SN)\2025-2026\1-dossier etudiants\Master ADIN - 2025_2026.xlsx"
-        nom_onglet:str = "Etudiants"
+        prefixe_sujet = "Master IN - Suivi d'alternance"
+        
+        nom_onglet = "Etudiants"
         envoyer_mail = False
 
+        chemin_fichier_etudiants =  r"\\instnt\partage\FORMATIONS_I\GDRA - Master IN (parcours ADIN-GDRA-SN)\2025-2026\1-dossier etudiants\Master ADIN - 2025_2026.xlsx"
+        ficheEvaluation1 =          r"\\instnt\partage\FORMATIONS_I\GDRA - Master IN (parcours ADIN-GDRA-SN)\2024-2025\9-stages\Fiche_Evaluation_alternance_M2_Ingénierie_Nucléaire_janvier.docx"
+        ficheEvaluation2 =          r"\\instnt\partage\FORMATIONS_I\GDRA - Master IN (parcours ADIN-GDRA-SN)\2024-2025\9-stages\Fiche_Evaluation_alternance_M2_Ingénierie_Nucléaire_aout.docx"
         chemin_modele_mail_priseContact = r"C:\Users\vt238770\Documents\_CEA\Modèles adaptés\Mails\Master IN\Master IN - Tutorat en entreprise - Prise de contact.msg"
+        
+        mail_responsables_univ = "master-in-responsables@univ-grenoble-alpes.fr"
 
         prise_de_fonction = cls.PropEntretien(
-            chemin_modele = r"C:\Users\vt238770\Documents\_CEA\Modèles adaptés\Mails\Master IN\Master IN - Suivi d'alternance - Entretien de prise de fonction.oft",
+            chemin_modele = r"C:\Users\vt238770\Documents\_CEA\Modèles adaptés\Mails\Master IN\Master IN - Suivi d'alternance - Entretien.oft",
             duree = timedelta(hours=0, minutes=45),
-            sujet = "Master IN - Suivi d'alternance - Entretien de prise de fonction",
+            sujet = "Entretien de prise de fonction",
             date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=41) # (Autour du 6 octobre : dernière semaine de la première période en entreprise → A faire avant mi-novembre)
         )
         
         premiere_visite = cls.PropEntretien(
-            chemin_modele = r"C:\Users\vt238770\Documents\_CEA\Modèles adaptés\Mails\Master IN\Master IN - Suivi d'alternance - 1ere visite en entreprise.oft",
+            chemin_modele = r"C:\Users\vt238770\Documents\_CEA\Modèles adaptés\Mails\Master IN\Master IN - Suivi d'alternance - Entretien.oft",
             duree = timedelta(hours=1),
-            sujet = "Master IN - Suivi d'alternance - 1ère visite en entreprise",
+            sujet = "1ère visite en entreprise",
             date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=51) # (Autour du 15 décembre : dernière semaine avant vacances Noël et reprise école → A faire avant mi-janvier)
         )
 
         deuxieme_visite = cls.PropEntretien(
-            chemin_modele = r"C:\Users\vt238770\Documents\_CEA\Modèles adaptés\Mails\Master IN\Master IN - Suivi d'alternance - 2eme visite en entreprise.oft",
+            chemin_modele = r"C:\Users\vt238770\Documents\_CEA\Modèles adaptés\Mails\Master IN\Master IN - Suivi d'alternance - Entretien.oft",
             duree = timedelta(hours=1),
-            sujet = "Master IN - Suivi d'alternance - 2ème visite en entreprise",
+            sujet = "2ème visite en entreprise",
             date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=17) # (Autour du 20 avril : dernière semaine reprise école → A faire avant fin mai)
         )
 
         # Initialisation de l'instance
         instance = cls(chemin_fichier_etudiants, nom_onglet)
 
-        # TODO TESTS : si je,veux boucler que le 1er élément : self._df_etudiants.head(1).iterrows()
-        #instance._df_etudiants = instance._df_etudiants.head(1)
+        instance._prefixe_sujet = prefixe_sujet
+        instance._chemin_modele_mail_priseContact = chemin_modele_mail_priseContact
+        instance._envoyer_mail = envoyer_mail
+        instance._mail_responsables_univ = mail_responsables_univ
 
-        # Prise de contact - (mi-septembre)
-        #instance.contactInitial(chemin_modele_mail_priseContact)
+        instance._entretiens.append(prise_de_fonction)
+        instance._entretiens.append(premiere_visite)
+        instance._entretiens.append(deuxieme_visite)
 
-        # RDV Outlook prise de fonction - (Autour du 6 octobre : dernière semaine de la première période en entreprise → A faire avant mi-novembre)
-        #instance.creer_rdv(prise_de_fonction)
+        instance._ficheEvaluation1 = ficheEvaluation1
+        instance._ficheEvaluation2 = ficheEvaluation2
 
-        # RDV Outlook prise de fonction - (Autour du 15 décembre : dernière semaine avant vacances Noël et reprise école → A faire avant mi-janvier)
-        #instance.creer_rdv(premiere_visite)
-
-        # RDV Outlook prise de fonction - (Autour du 20 avril : dernière semaine reprise école → A faire avant fin mai)
-        #instance.creer_rdv(deuxieme_visite)
-
-        # Relances
-        # Demander jusqu'à quel niveau il faut faire les relances
-        print(
-            f"Jusqu'à quel niveau voulez-vous faire les relances ?\n"
-            "\t• Engagement des parties : 0\n"
-            "\t• Entretien prise de fonction : 1\n"
-            "\t• 1ère visite : 2\n"
-            "\t• 2ème visite : 3\n"
-            "\t• Fiche d'évaluation 1 : 4\n"
-            "\t• Fiche d'évaluation 2 : 5"
-        )
-        while True:
-            try:
-                choix = int(input("Entrez un nombre entier : "))
-                break  # Sort de la boucle si conversion réussie
-            except ValueError:
-                print("Ce n'est pas un entier valide. Essayez encore.")
+        # Tests :
+        instance._df_etudiants = instance._df_etudiants.head(1)
         
-        #TODO : rajouter PJ pour les fiches d'évaluation
-        # pieces_jointes = r"\\instnt\partage\FORMATIONS_I\GDRA - Master IN (parcours ADIN-GDRA-SN)\2025-2026\9-stages\consignes_missions_entreprises_2526.pdf"
-        pieces_jointes = None
-
-        for _, ligne in instance._df_etudiants.iterrows():
-            # Apprenti
-            corps_html = cls.creer_html_mail_relance(choix, ligne, "A")
-            if corps_html:
-                Mail.creer_mail(
-                    destinataires = ligne["Mail apprenti"],
-                    sujet = "Master IN - Relance actions suivis de l'alternance",
-                    corps_html = corps_html,
-                    pieces_jointes = pieces_jointes,
-                    envoyer_mail = envoyer_mail
-                )
-            
-            # Tuteur entreprise
-            corps_html = cls.creer_html_mail_relance(choix, ligne, "T")
-            if corps_html:
-                Mail.creer_mail(
-                    destinataires = ligne["Mail apprenti"],
-                    sujet = "Master IN - Relance actions suivis de l'alternance",
-                    corps_html = corps_html,
-                    pieces_jointes = pieces_jointes,
-                    envoyer_mail = envoyer_mail
-                )
+        return instance
 
                 
 
-    def contactInitial(self, chemin_modele_mail_priseContact:str) -> None:
+    def contactInitial(self, chemin_modele_mail_priseContact:Optional(str)=None) -> None:
         """
-        Prépare un mail de contact initial des alternants
+        Prépare un mail de contact initial des alternants.
+            - Soit à partir de self._chemin_modele_mail_priseContact
+            - Soit à partir d'un modèle .msg donné en argument
         """
+
+        if chemin_modele_mail_priseContact is None:
+            chemin_modele_mail_priseContact = self._chemin_modele_mail_priseContact
+
         # Prise de contact
         # On ouvre un modèle de mail existant et on prépare un mail pour chaque apprenti
         for _, ligne in self._df_etudiants.iterrows():
@@ -1814,7 +1809,7 @@ class Traiter_contactsApprentis:
             # On créée le RDV à partir du modèle
             RDV_Outlook.depuis_modele_oft(
                 chemin_modele=prop.chemin_modele,
-                sujet = f"{prop.sujet} - {ligne['Prénom']} {ligne['Nom']}",
+                sujet = f"{self._prefixe_sujet} - {prop.sujet} - {ligne['Prénom']} {ligne['Nom']}",
                 lieu = f'{ligne["Entreprise "]} {ligne["Lieu entreprise"]}',
                 date_debut = prop.date_debut,
                 duree = prop.duree,
@@ -1836,44 +1831,96 @@ class Traiter_contactsApprentis:
 
         len_corps_html_ini = len(corps_html)
         
-        if choix in (0, 1, 2, 3, 4, 5) :
+        if choix in (1, 2, 3, 4, 5, 6) :
             if lettreInterlocuteur not in str(ligne.get("Engagement des parties") or "").strip():
                 #print("Relance engagement des parties")
                 corps_html += """<li>Signer dans Studea la section <strong>"Engagement des parties"</strong></li>\n"""
-        if choix in (1, 2, 3, 4, 5) :
+        if choix in (2, 3, 4, 5, 6) :
             if lettreInterlocuteur not in str(ligne.get("Entretien initial") or "").strip():
                 #print("Relance entretien prise de fonction")
                 corps_html += """<li>Compléter et signer dans Studea <strong>l'entretien de prise de fonction</strong> dans la partie "Visites en entreprise"</li>\n"""
-        if choix in (2, 3, 4, 5) :
+        if choix in (3, 4, 5, 6) :
             if lettreInterlocuteur not in str(ligne.get("1ère visite") or "").strip():
                 #print("Relance 1ère visite")
                 corps_html += """<li>Compléter et signer dans Studea <strong>le relevé de conclusion de la première visite en entreprise</strong> dans la partie "Visites en entreprise"</li>\n"""
-        if choix in (3, 4, 5) :
+        if choix in (4, 5, 6) :
             if lettreInterlocuteur not in str(ligne.get("2ème visite") or "").strip():
                 #print("Relance 2ème visite")
                 corps_html += """<li>Compléter et signer dans Studea <strong>le relevé de conclusion de la deuxième visite en entreprise</strong> dans la partie "Visites en entreprise"</li>\n"""
-        if choix == 4:
+        if choix == 5:
             if lettreInterlocuteur not in str(ligne.get("Fiche évaluation 1") or "").strip():
                 #print("Relance fiche d'évaluation 1")
                 corps_html += """<li>Compléter et nous renvoyer <span style="color: red; font-weight: bold;">la fiche d'évaluation du 1er semestre nécessaire pour la soutenance de début janvier</span></li>\n"""
-        if choix == 5:
+        if choix == 6:
             if lettreInterlocuteur not in str(ligne.get("Fiche évaluation 2") or "").strip():
                 #print("Relance fiche d'évaluation 2")
                 corps_html += """<li>Compléter et nous renvoyer <span style="color: red; font-weight: bold;">la fiche d'évaluation du 2ème semestre nécessaire pour la soutenance finale</span></li>\n"""
 
         if len(corps_html) > len_corps_html_ini:
             corps_html += """
-                </ul></p>
+                </ul>
 
-                <p>Je vous remercie, passez une excellente fin de journée,
+                <p>Je vous remercie, passez une excellente fin de journée,</p>
             </body>
             </html>"""
             return corps_html
         else:
             return None
         
+
+    def creer_html_mail_ficheEvaluation(self, ligne:pd.Series, date:date) -> str:
         
+        periode = self.periode_scolaire_UGA()
+        date_str = date.strftime('%d %B')     
+
+        corps_html = """
+        <html>
+        <body>
+            <p>Bonjour,</p>
+            <p>Dans le cadre de la notation de """ + f'{ligne["Prénom"]} {ligne["Nom"]}' + f" lors de sa prochaine soutenance de {periode}, " + """est-ce que vous pouvez compléter et signer le document en PJ s'il vous plait ?</p>
+            <p>Il sera à retourner à moi-même en mettant en copie""" + f"{self._mail_responsables_univ}" + f"pour le <span style='color: red; font-weight: bold;'>{date_str} au plus tard</span> " + """.</p>
+            <p>Je vous envoie un avis de rdv pour faire office de pense-bête. Il sera mis au """ + f"{date_str}" + """ avec un rappel une semaine avant (mais en mode « disponible » histoire de ne pas bloquer le créneau sur vos agendas donc vous pouvez l’accepter dans risque).</p>
+            """
+
+        if periode == "fin d'année" :
+            corps_html += """<p>Si vous êtes en vacances durant cette période, veillez me l’envoyer avant de profiter de votre repos mérité !</p>"""
+
+        corps_html += """
+                <p>Je vous remercie, passez une excellente fin de journée,</p>
+            </body>
+            </html>"""
+       
+        return corps_html
+
+    def creer_mail_ficheEvaluation(self, ligne:pd.Series, date:date):
+        corps_html = self.creer_html_mail_ficheEvaluation(ligne, date)
+        pieces_jointes = self.defini_pj_ficheEvaluation_UGA()
+        sujet = self._prefixe_sujet + " - Fiche d'évaluation à compléter et retourner"
         
+        Mail.creer_mail(
+            destinataires = ligne["Mail TE"],
+            sujet = sujet,
+            corps_html = corps_html,
+            pieces_jointes = pieces_jointes,
+            envoyer_mail = self._envoyer_mail
+        )
+
+        
+
+    def defini_pj_ficheEvaluation_UGA(self) -> str:
+        """
+        Sélectionne et renvoei le chemin de la bonne fiche d'évaluation en fonction de la période (mi-année ou fin d'année)
+        """
+        periode = self.periode_scolaire_UGA()
+
+        if (periode == "mi-année"):
+            #print("On est entre septembre et février (inclus)")
+            pieces_jointes = self._ficheEvaluation1
+        else:
+            #print("On est entre mars et août")
+            pieces_jointes = self._ficheEvaluation2
+        
+        return pieces_jointes
 
     def rdv_prise_de_fonction_BAK(self, chemin_modele_rdv:str) -> None:
 
@@ -1904,7 +1951,25 @@ class Traiter_contactsApprentis:
                 )
 
     @staticmethod
-    def diagnostiquer_msg(chemin_modele: str):
+    def periode_scolaire_UGA() -> str:
+        """
+        Renvoie "mi-année" si date actuelle entre septembre et février.
+        Renvoie "fin d'année" sinon
+        """
+        # Période à définir pour la fiche d'évaluation à employer
+        mois = date.today().month  # 1=janvier, ..., 12=décembre
+
+        if ((9 <= mois) and (mois <= 2)):  # septembre (9) → février (2)
+            #print("On est entre septembre et février (inclus)")
+            periode = "mi-année"
+        else:
+            #print("On est entre mars et août")
+            periode = "fin d'année"        
+        return periode
+
+
+    @staticmethod
+    def _diagnostiquer_msg(chemin_modele: str):
         print("== Diagnostique du fichier .msg ==\n")
         print(f"Chemin du fichier : {chemin_modele}\n")
 
@@ -2251,79 +2316,6 @@ def fenetreBilan():
 
 
 
-def tests():
-    
-    # ==== Tests Fichier Excel ====
-    #fe = FichierExcel()
-    #fe = FichierExcel.depuis_repertoire(rep_extractIRIS_VTE)
-    #fe = FichierExcel.depuis_fichier(t_fichierExcel_tabeauStructure)
-    #fe.charger_tableaux()
-
-    #fe = FichierExcel.depuis_fichier(r"C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Extracts originaux\R04110_Sessions-2015 FINAL.xlsx")
-    #fe.charger_tableau("Data", nbLignes_avantET=1)
-    #print(fe._tableaux["Data"])
-    #print(fe)
-
-
-    # === Test ouverture fichier IRIS ===
-    #t_input = FichierExcel.depuis_repertoire(repertoire=r"C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Extracts originaux")
-    #t_modele = FichierExcel.depuis_fichier(chemin_fichier=r"C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Modèles\R04110_Sessions-Modèle.xlsx")
-    #t_modele = FichierExcel.depuis_fichier(chemin_fichier=r"C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Modèles\R04110_Sessions-Modèle.xlsx", nom_onglet="Sessions")
-    #t_output = FichierExcel.depuis_fichier(chemin_fichier=r"C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Extracts complets\R0304_Formations-Extract COMPLET", avec_ouverture_wb=False)
-
-
-
-    # === Test PropExportIRIS ===
-    #print(inscriptions)
-
-
-
-    #=== Tests TravauxFichiersIRIS ===
-    #env = TravauxFichiersIRIS.avecLecture(sessions, (r'C:/Users/vt238770/Documents/_CEA/_Formations/Extracts IRIS - Faits/Extracts originaux/R04110_Sessions-2021 FINAL.xlsx', r'C:/Users/vt238770/Documents/_CEA/_Formations/Extracts IRIS - Faits/Extracts originaux/R04110_Sessions-2022 FINAL.xlsx'))
-    #env = TravauxFichiersIRIS.avecEcritureOutputDefaut(sessions, (r'.\R04110_Sessions-2021 FINAL.xlsx', r'.\R04110_Sessions-2022 FINAL.xlsx'))
-    #env = TravauxFichiersIRIS.avecEcritureOutputDefaut(sessions, (r'C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Extracts originaux\R04110_Sessions-2021 FINAL.xlsx', r'C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Extracts originaux\R04110_Sessions-2022 FINAL.xlsx'))
-    #env = TravauxFichiersIRIS.avecEcritureOutputDefaut(sessions, r'C:/Users/vt238770/Documents/_CEA/_Formations/Extracts IRIS - Faits/Extracts originaux/R04110_Sessions-2021 FINAL.xlsx')
-    #env = TravauxFichiersIRIS.avecEcritureOutputDefaut(formations, )
-    #print(env)
-
-
-
-
-    # === mettreAJourTousLesExportsIRIS_auto ===
-    #mettreAJourTousLesExportsIRIS_auto(("Sessions", "Formations", "Ventes", "Inscriptions"))
-    #mettreAJourTousLesExportsIRIS_auto(("Sessions", "Formations"))
-    #mettreAJourTousLesExportsIRIS_fileDialog(("Formations", ))
-
-
-
-
-    # === EvalStat
-    # === Fichier CSV individuel
-    #es = Traiter_evalStat()
-    #es = Traiter_evalStat.depuis_chemin_csv_stagiaires(r"\\instnt\partage\FORMATIONS_C\22B\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-17606 - 22B - 06-2025\S-17606-FC25-22B-VTE-CAR-Stagiaires.csv")
-    #es = Traiter_evalStat.depuis_chemin_csv_stagiaires(r"P:\FORMATIONS_C\778\P07-bilan-sessions-et-bilan-formation\2024-Bilans 778\Evaluations 778(2024.11)\S-15715-FC24-778-VMO-VCA-Stagiaires.csv")
-
-    tuple_csv_stagiaires = (
-        r"\\INSTNT\partage\FORMATIONS_C\948\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\2021-11-S-11369 UEM\EVALSTAT\S-11369-FC21-948-VLE-SNA-Stagiaires.csv",
-        r"\\INSTNT\partage\FORMATIONS_C\948\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\2022-11-S-12995 UEM\S-12995-FC22-948-VTE-SNA-Stagiaires.csv",
-        r"\\INSTNT\partage\FORMATIONS_C\948\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\2024-01-S-15697 UEM\S-15697-FC24-948-VTE-VCA-Stagiaires.csv"
-        )
-
-    #es = Traiter_evalStat.depuis_tuple_csv_stagiaires(tuple_csv_stagiaires=tuple_csv_stagiaires)
-
-
-
-
-
-    # === Lire fiche de coûts
-    #lire_fdc(r"\\instnt\PARTAGE\FORMATIONS_C\948\P05-P06-dossier-conception-referentiel\fiche-de-cout-et-code-de-formation\Fiche de coûts - 948 - Elaboration de scénarios de DEM - 2025.01.24.xlsx")
-
-
-
-
-    # === Bilans pédagogiques
-
-
 ### --------------------------------------------------------------------
 #  Initialisations variables globales communes
 ### --------------------------------------------------------------------
@@ -2339,8 +2331,15 @@ vlog = Vlog()
 
 
 
+
+
+
+
+
+
+
 ### --------------------------------------------------------------------
-#  Code pour mises à jour des Extracts IRIS
+#  Initialisations pour mises à jour des Extracts IRIS
 ### --------------------------------------------------------------------
 
 # ==== Initialisation exports IRIS ====
@@ -2425,25 +2424,15 @@ dict_DE_IRIS["PropExportIRIS"] = {
         "Inscriptions" : inscriptions}
 
 
-# === Lancer TravauxFichiersIRIS pour un seul type d'export ===
-#env = TravauxFichiersIRIS.avecEcritureOutputDefaut(sessions, (r'C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Extracts originaux\R04110_Sessions-2021 FINAL.xlsx', r'C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Extracts originaux\R04110_Sessions-2022 FINAL.xlsx'))
-#env = TravauxFichiersIRIS.avecEcritureOutputDefaut(formations, )
-#print(env)
-
-# === Lancer TravauxFichiersIRIS pour plusieurs types d'export ===
-#mettreAJourTousLesExportsIRIS_auto(("Sessions", "Formations", "Ventes", "Inscriptions"))
-
-
-
 
 
 ### --------------------------------------------------------------------
-#   Code pour création bilans pédagogiques
+#   Initialisations pour création bilans pédagogiques
 ### --------------------------------------------------------------------
 
 # ==== Initialisation variables utilisateur ====
 # Initialisation des chemins des répertoires
-rep_gedMiroir = r"\\instnt\partage\FORMATIONS_C"
+#rep_gedMiroir = r"\\instnt\partage\FORMATIONS_C"
 rep_fdc_defaut = r"\\instnt\partage\FORMATIONS_C\XXX\P05-P06-dossier-conception-referentiel\fiche-de-cout-et-code-de-formation"
 rep_specsPedagogiques_defaut = r"\\instnt\partage\FORMATIONS_C\XXX\P05-P06-dossier-conception-referentiel\specifications-pedagogiques-et-referentiel"
 
@@ -2461,125 +2450,40 @@ chemin_word_bilan_output = r'C:\Users\vt238770\Documents\_CEA\Prog\Modèles\Bila
 #chemin_specsPedagogiques = r'\\instnt\partage\FORMATIONS_C\948\P05-P06-dossier-conception-referentiel\specifications-pedagogiques-et-referentiel\P06-Pr01-F01_Specifications-pedagogiques - 948 - 2025.04.pdf'
 
 
+"""
+from __future__ import annotations
+from .office import *
 
-# === Lancer génération du bilan
-#fenetreBilan()
+import warnings
+warnings.filterwarnings("ignore", message="Slicer List extension is not supported and will be removed")
 
-### --------------------------------------------------------------------
-#   Code pour création EvalStat
-### --------------------------------------------------------------------
+from fileinput import filename
+from typing import Dict, List, Tuple, Optional
 
-# === Fichier CSV individuel
-#es = Traiter_evalStat()
-#es = Traiter_evalStat.depuis_chemin_csv_stagiaires(r"\\instnt\partage\FORMATIONS_C\22B\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-17606 - 22B - 06-2025\S-17606-FC25-22B-VTE-CAR-Stagiaires.csv")
-#es = Traiter_evalStat.depuis_chemin_csv_stagiaires(r"P:\FORMATIONS_C\778\P07-bilan-sessions-et-bilan-formation\2024-Bilans 778\Evaluations 778(2024.11)\S-15715-FC24-778-VMO-VCA-Stagiaires.csv")
-#es = Traiter_evalStat.depuis_chemin_csv_stagiaires(r"\\INSTNT\partage\FORMATIONS_C\948\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\2024-01-S-15697 UEM\S-15697-FC24-948-VTE-VCA-Stagiaires.csv")
+import pandas as pd
+import pandas as DataFrame
 
-tuple_csv_stagiaires = (
-    r"\\INSTNT\partage\FORMATIONS_C\948\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\2021-11-S-11369 UEM\EVALSTAT\S-11369-FC21-948-VLE-SNA-Stagiaires.csv",
-    r"\\INSTNT\partage\FORMATIONS_C\948\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\2022-11-S-12995 UEM\S-12995-FC22-948-VTE-SNA-Stagiaires.csv",
-    r"\\INSTNT\partage\FORMATIONS_C\948\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\2024-01-S-15697 UEM\S-15697-FC24-948-VTE-VCA-Stagiaires.csv"
-    )
+import win32com.client
+import extract_msg
+import os
+import shutil
+import sys
+import re
+import time
+import math
 
-#es = Traiter_evalStat.depuis_tuple_csv_stagiaires(tuple_csv_stagiaires=tuple_csv_stagiaires)
+from datetime import date, datetime, timedelta, time
+from dataclasses import dataclass
+from collections import defaultdict
 
+from tabulate import tabulate
 
-### --------------------------------------------------------------------
-#   Code pour traiter le contact des apprentis
-### --------------------------------------------------------------------
-ca = Traiter_contactsApprentis.UGA()
+from tqdm import tqdm
+import colorama
+from colorama import Fore, Style
 
-#rdv = RDV_Outlook()
-r"C:\Users\vt238770\Documents\_CEA\Modèles adaptés\Mails\TEST.msg"
+from mailmerge import MailMerge
 
-#rdv = RDV_Outlook.depuis_modele_msg(
-#    chemin_modele=r"C:\Users\vt238770\Documents\_CEA\Modèles adaptés\Mails\Master IN\Master IN - Suivi d'alternance - Entretien de prise de fonction.msg",
-#    participants_obligatoires="vincent.testard@cea.fr",
-#    participants_facultatifs="assistant@example.com"
-#)
-
-
-
-### --------------------------------------------------------------------
-#   Code pour Fichier EE
-### --------------------------------------------------------------------
-#fw = FichierWord.depuisFichier(r"C:\Users\vt238770\Documents\_CEA\EXCEL - Tests ou Backup\Lien formulaire Word vers Excel\Fiche admin - ContentControl.docx")
-#print(fw)
-#mail= Mail()
-
-#mail._creer_mail(
-#    destinataires="vacataires.instn@cea.fr",
-#    sujet="Documents pour mise à jour IRIS", # Pimper avec le nom de l'intervenant
-#    corps_html="<p>Bonjour Laëtitia,</p><p>Je t’ai mis en PJ les documents pour intégrer/mettre à jour la fiche IRIS de ###.</p><p>Je te remercie, passe une excellente journée,</p>", # Pimper avec le nom de l'intervenant
-#    pieces_jointes=r"C:\Users\vt238770\Documents\_CEA\EXCEL - Tests ou Backup\Lien formulaire Word vers Excel\Fiche admin - ContentControl.docx", # if None, sélectionner avec fileDialog
-#    envoyer_mail=False  # envoie directement sans afficher
-#)
-
-#t_ree = Traiter_REE()
-#Il me faudrait une classe Traiter_REE :
-#   - variables de la classe : _word_ficheAdministrative:FichierWord= None, _excel_ficheIntervenant:FichierExcel = None, _mail_traitement _repertoire_sauvegarde + _mail_gestionnaire_REE +
-
-#TODO : j'en suis là
-#bs = BilanSessionV3("948", 2024, "Année")
-
-
-
-
-
-# Todo : 
-# Dans le modèle Word : gérer le lien vers la GED 
-# Exploiter EvalStat
-# optimiser copie format avec xlwings
-# Mettre au propre
-# Avoir un répertoire dédié où je vais chercher le modèle du bilan
-# dans tkinter, mettre des points d'étapes dans une barre de status
-# ? Exploiter export formation plutôt que export sessions pour les valeurs par défaut nmin/max...
-# Faire un module / exe dédié traitements exports IRIS
-# Faire un module / exe dédié traitements CSV EvalStat
-
-
-# Todo Word
-# Il y a des trous dans la raquette dans le word de sortie (checkboxes)
-# coller des images depuis Excel
-# 
-
-
-
-
-
-
-# Todo : faire un truc pour la lecture sessions qui peut changer (dernière version de GLOBAL)
-#def etat_boutons_traitement(state):
-#    # Désactive ou active les 3 boutons
-#    for btn in (btn_traiter_eval, bilan_button, iris_button):
-#        btn.config(state=state)
-
-#def chargements_initiaux():
-#    fe_sessions = FichierExcel.depuis_fichier(config["Extractions d'IRIS"]["Fichier sessions R04110"])
-
-
-
-# Au lancement, désactiver les 3 boutons de traitement
-#update_status("Lecture fichier session")
-#etat_boutons_traitement('disabled')
-
-#fe_sessions = None
-# Lancer le chargement en thread séparé
-#threading.Thread(target=chargements_initiaux, daemon=True).start()
-
-#print(fe_sessions)
-
-# Quand c'est fini, on réactive les boutons, mais dans le thread Tkinter !
-#etat_boutons_traitement('normal')
-#update_status("Prêt.")
-
-
-
-#fichiers = tuple(map(chemin_vers_unc, filedialog.askopenfilenames(filetypes=[("CSV files", "*.csv")])))
-#print(fichiers)
-
-
-#Tu peux maintenant :
-#Afficher des messages dans la barre de statut avec update_status("ton message"),
-#Suivre les étapes de traitement en direct pendant les clics,
-#Ajouter des appels à update_status(...) dans ton futur code métier.
+import tkinter as tk
+from tkinter import filedialog, ttk, messagebox
+"""
