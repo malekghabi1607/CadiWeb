@@ -110,3 +110,11 @@ def test_ecriture_dataframe_dans_tableau(fichier_excel_pandas, tmp_path):
     assert tableau2._df.equals(new_df)
 
     """
+
+
+    # === Test ouverture fichier IRIS ===
+    #t_input = FichierExcel.depuis_repertoire(repertoire=r"C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Extracts originaux")
+    #t_modele = FichierExcel.depuis_fichier(chemin_fichier=r"C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Modèles\R04110_Sessions-Modèle.xlsx")
+    #t_modele = FichierExcel.depuis_fichier(chemin_fichier=r"C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Modèles\R04110_Sessions-Modèle.xlsx", nom_onglet="Sessions")
+    #t_output = FichierExcel.depuis_fichier(chemin_fichier=r"C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Extracts complets\R0304_Formations-Extract COMPLET", avec_ouverture_wb=False)
+
