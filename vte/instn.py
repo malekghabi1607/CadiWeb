@@ -1905,7 +1905,10 @@ class Traiter_contactsApprentis:
             envoyer_mail = self._envoyer_mail
         )
 
-        
+        # TODO : Faire envoi d'un RDV à date donnée avec PJ et rappel une semaine avant
+        # Adapter l'appli une fois fini
+
+
 
     def defini_pj_ficheEvaluation_UGA(self) -> str:
         """
