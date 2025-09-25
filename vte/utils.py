@@ -478,6 +478,33 @@ def convertir_si_possible(valeur) -> str|int|float:
             return valeur
     return valeur
 
+def convertir_en_liste(val: Optional[Union[str, List[str], pd.Series]]) -> List[str]:
+    """
+    Convertit une valeur en liste Python de chaînes de caractères.
+
+    Supporte :
+        - str → [str]
+        - list → list inchangée
+        - pandas.Series → list
+        - None → []
+
+    Args:
+        val: valeur à convertir
+
+    Returns:
+        List[str]: liste prête à être utilisée
+    """
+    if val is None:
+        return []
+    elif isinstance(val, str):
+        return [val]
+    elif isinstance(val, pd.Series):
+        return val.dropna().astype(str).tolist()
+    elif isinstance(val, list):
+        return [str(v) for v in val]
+    else:
+        raise TypeError(f"Type non supporté pour conversion en liste : {type(val)}")
+
 def tuple_vers_liste_de_listes(t):
     """
     Permet de transformer un tuple (2, 4) en liste de listes [[2], [4]]
