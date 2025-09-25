@@ -1477,76 +1477,209 @@ class Mail:
         _corps (Optional[str]): Corps du mail (texte brut ou HTML).
         _pieces_jointes (Optional[List[str]]): Liste des chemins vers les fichiers à joindre.
 
-    Exemple d'utilisation :
-    ```python
-    mail = Mail()
-    mail._destinataires = ["exemple@domaine.com"]
-    mail._sujet = "Test via Outlook"
-    mail.definir_corps_message("<p>Bonjour, ceci est un mail préparé via Python.</p>")
-    mail.selectionner_pj()
-    mail.preparer_mail()  # Ouvre la fenêtre Outlook
-    # ou mail.envoyer_mail() pour envoyer directement
-    print(mail)
-    ```
+    Exemple :
+    --------
+    >>> mail = Mail()
+    >>> mail._destinataires = ["exemple@domaine.com"]
+    >>> mail._sujet = "Test via Outlook"
+    >>> mail.definir_corps_message("<p>Bonjour, ceci est un mail préparé via Python.</p>")
+    >>> mail.selectionner_pj()
+    >>> mail.creer_mail()  # Ouvre la fenêtre Outlook
+    >>> mail.envoyer_mail()  # Envoie directement
     """
 
-    def __init__(self) -> None:
-        self._destinataires: Optional[List[str]] = None
-        self._copies: Optional[List[str]] = None
-        self._copies_cachees: Optional[List[str]] = None
-        self._sujet: Optional[str] = None
-        self._corps_html: Optional[str] = None  # Corps HTML
-        self._pieces_jointes: Optional[List[str]] = None
+    # -------------------------------------------------------------------------
+    # Variables d'instance
+    # -------------------------------------------------------------------------
+    _destinataires: Optional[List[str]]
+    _copies: Optional[List[str]]
+    _copies_cachees: Optional[List[str]]
+    _sujet: Optional[str]
+    _corps: Optional[str]
+    _pieces_jointes: Optional[List[str]]
 
+    # -------------------------------------------------------------------------
+    # Initialisation
+    # -------------------------------------------------------------------------
+    def __init__(self) -> None:
+        self._destinataires = None
+        self._copies = None
+        self._copies_cachees = None
+        self._sujet = None
+        self._corps = None
+        self._pieces_jointes = None
+
+    # -------------------------------------------------------------------------
+    # Fonction interne factorisée pour créer un mail
+    # -------------------------------------------------------------------------
     @classmethod
-    def depuis_modele(cls, 
-        chemin_modele: str, 
-        destinataires: Optional[Union[List[str], str]] = None,
-        copies: Optional[Union[List[str], str]] = None
-    ) -> Mail:
+    def _creer_mail(
+        cls,
+        mail_obj: Optional[win32com.client.CDispatch] = None,
+        destinataires: Optional[Union[str, List[str], pd.Series]] = None,
+        copies: Optional[Union[str, List[str], pd.Series]] = None,
+        copies_cachees: Optional[Union[str, List[str], pd.Series]] = None,
+        sujet: Optional[str] = None,
+        corps_html: Optional[str] = None,
+        pieces_jointes: Optional[Union[str, List[str], pd.Series]] = None,
+        envoyer_mail: bool = False
+    ) -> None:
         """
-        Ouvre un modèle de mail (.msg) et prépare un nouveau mail Outlook basé sur ce modèle,
-        avec ajout facultatif de la signature de l'utilisateur.
+        Crée ou complète un mail Outlook existant (ex: depuis modèle) ou un mail vierge.
 
         Args:
-            chemin_modele: chemin complet vers un fichier .msg (modèle Outlook)
-            destinataires: destinataires principaux à ajouter (To)
-            copies: destinataires en copie (CC)
-            
+            mail_obj: objet mail Outlook existant (None pour un mail vierge)
+            destinataires, copies, copies_cachees, sujet, corps_html, pieces_jointes
+            envoyer_mail: si True, envoie directement le mail
+
         Exemple :
-        ```python
-        Mail.depuis_modele(
-            chemin_modele="C:/Modeles/modele.msg",
-            destinataires="etudiant@example.com",
-            copies=["tuteur@example.com"]
-        )
-        ```
+        --------
+        >>> Mail._creer_mail(
+        >>>     destinataires="user@example.com",
+        >>>     copies=["copie@example.com"],
+        >>>     copies_cachees=None,
+        >>>     sujet="Sujet test",
+        >>>     corps_html="<p>Bonjour</p>",
+        >>>     pieces_jointes=["C:/fichier.pdf"],
+        >>>     envoyer_mail=False
+        >>> )
         """
+        # Convertir tous les champs en listes
+        to_list = convertir_en_liste(destinataires)
+        cc_list = convertir_en_liste(copies)
+        bcc_list = convertir_en_liste(copies_cachees)
+        pj_list = convertir_en_liste(pieces_jointes)
+
+        # Créer mail si pas fourni
         outlook = win32com.client.Dispatch("Outlook.Application")
-        modele = outlook.CreateItemFromTemplate(os.path.abspath(chemin_modele))
+        mail = mail_obj or outlook.CreateItem(0)
 
-        # Convertir destinataires et copies en chaînes si nécessaire
-        if destinataires:
-            if isinstance(destinataires, list):
-                modele.To = ";".join(destinataires)
-            else:
-                modele.To = destinataires
+        # Destinataires, copies, copies cachées
+        if to_list:
+            mail.To = ";".join(to_list)
+        if cc_list:
+            mail.CC = ";".join(cc_list)
+        if bcc_list:
+            mail.BCC = ";".join(bcc_list)
 
-        if copies:
-            if isinstance(copies, list):
-                modele.CC = ";".join(copies)
-            else:
-                modele.CC = copies
+        if sujet:
+            mail.Subject = sujet
 
+        # Affichage pour forcer la signature
+        mail.Display()
 
-        # Afficher le mail prêt à l'envoi
-        modele.Display()
+        # Ajouter corps HTML
+        signature = mail.HTMLBody
+        mail.HTMLBody = (corps_html or "") + signature
 
-        
-        # Nettoyage des objets COM
-        del modele
+        # Ajouter pièces jointes
+        for pj in pj_list:
+            mail.Attachments.Add(pj)
+
+        # Envoyer ou laisser affiché
+        if envoyer_mail:
+            mail.Send()
+
+        # Nettoyage COM
+        if mail_obj is None:  # si on a créé l'objet ici
+            del mail
+            del outlook
+
+    # -------------------------------------------------------------------------
+    # Méthode publique pour créer un mail vierge
+    # -------------------------------------------------------------------------
+    @classmethod
+    def creer_mail(
+        cls,
+        destinataires: Optional[Union[str, List[str], pd.Series]] = None,
+        copies: Optional[Union[str, List[str], pd.Series]] = None,
+        copies_cachees: Optional[Union[str, List[str], pd.Series]] = None,
+        sujet: Optional[str] = None,
+        corps_html: Optional[str] = None,
+        pieces_jointes: Optional[Union[str, List[str], pd.Series]] = None,
+        envoyer_mail: bool = False
+    ) -> None:
+        """
+        Crée un mail vierge Outlook et l'affiche ou l'envoie.
+
+        Exemple :
+        --------
+        >>> Mail.creer_mail(
+        >>>     destinataires="user@example.com",
+        >>>     copies=["cc@example.com"],
+        >>>     sujet="Test",
+        >>>     corps_html="<p>Bonjour</p>",
+        >>>     pieces_jointes=["C:/fichier.pdf"],
+        >>>     envoyer_mail=False
+        >>> )
+        """
+        cls._creer_mail(
+            mail_obj=None,
+            destinataires=destinataires,
+            copies=copies,
+            copies_cachees=copies_cachees,
+            sujet=sujet,
+            corps_html=corps_html,
+            pieces_jointes=pieces_jointes,
+            envoyer_mail=envoyer_mail
+        )
+
+    # -------------------------------------------------------------------------
+    # Méthode publique pour créer un mail depuis un modèle .msg
+    # -------------------------------------------------------------------------
+    @classmethod
+    def depuis_modele(
+        cls,
+        chemin_modele: str,
+        destinataires: Optional[Union[str, List[str], pd.Series]] = None,
+        copies: Optional[Union[str, List[str], pd.Series]] = None,
+        copies_cachees: Optional[Union[str, List[str], pd.Series]] = None,
+        sujet: Optional[str] = None,
+        corps_html: Optional[str] = None,
+        pieces_jointes: Optional[Union[str, List[str], pd.Series]] = None,
+        envoyer_mail: bool = False
+    ) -> None:
+        """
+        Crée un mail Outlook à partir d'un modèle .msg et ajoute éventuellement
+        destinataires, sujet, corps et pièces jointes.
+
+        Exemple :
+        --------
+        >>> Mail.depuis_modele(
+        >>>     chemin_modele="C:/Modeles/modele.msg",
+        >>>     destinataires="user@example.com",
+        >>>     copies=["cc@example.com"],
+        >>>     sujet="Sujet test",
+        >>>     corps_html="<p>Bonjour</p>",
+        >>>     pieces_jointes=["C:/fichier.pdf"],
+        >>>     envoyer_mail=False
+        >>> )
+        """
+        if not os.path.isfile(chemin_modele):
+            raise FileNotFoundError(f"Fichier modèle non trouvé : {chemin_modele}")
+
+        outlook = win32com.client.Dispatch("Outlook.Application")
+        mail = outlook.CreateItemFromTemplate(os.path.abspath(chemin_modele))
+
+        # Utilise la méthode factorisée
+        cls._creer_mail(
+            mail_obj=mail,
+            destinataires=destinataires,
+            copies=copies,
+            copies_cachees=copies_cachees,
+            sujet=sujet,
+            corps_html=corps_html,
+            pieces_jointes=pieces_jointes,
+            envoyer_mail=envoyer_mail
+        )
+
+        # Nettoyage COM
+        del mail
         del outlook
-
+    
+    # -------------------------------------------------------------------------
+    # Méthode pour sélectionner des pièces jointes via un dialogue
+    # -------------------------------------------------------------------------
     def selectionner_pj(self) -> None:
         """
         Ouvre une boîte de dialogue pour sélectionner une ou plusieurs pièces jointes.
@@ -1570,102 +1703,6 @@ class Mail:
         else:
             self._pieces_jointes = []
 
-    @classmethod
-    def creer_mail(
-        cls,
-        destinataires: Optional[Union[List[str], str]] = None,
-        copies: Optional[Union[List[str], str]] = None,
-        copies_cachees: Optional[Union[List[str], str]] = None,
-        sujet: Optional[str] = None,
-        corps_html: Optional[str] = None,
-        pieces_jointes: Optional[List[str]] = None,
-        envoyer_mail: bool = False
-    ) -> Mail:
-        """
-        Méthode interne : crée, remplit et affiche/envoie le mail.
-
-        Args:
-            destinataires: liste ou str de destinataires
-            copies: liste ou str de destinataires en copie
-            copies_cachees: liste ou str de copies cachées
-            sujet: sujet du mail
-            corps_html: corps HTML du mail
-            pieces_jointes: liste des chemins vers fichiers joints
-            envoyer_mail: si True, envoie sans afficher
-
-        :Example:
-
-        >>> mail = Mail()
-        >>> mail._creer_mail(
-        >>>     destinataires=["user1@example.com", "user2@example.com", "user3@example.com"],
-        >>>     copies=["copie@example.com"],
-        >>>     copies_cachees=["cachee1@example.com", "cachee2@example.com"],
-        >>>     sujet="Sujet multiple destinataires",
-        >>>     corps_html="<p>Bonjour à tous, plusieurs destinataires.</p>",
-        >>>     pieces_jointes=["C:\\chemin\\fichier1.pdf", "C:\\chemin\\fichier2.jpg"],
-        >>>     envoyer_mail=True  # envoie directement sans afficher
-        >>> )
-
-        """
-
-        instance = cls()
-
-        # Mise à jour des variables d'instance si arguments fournis
-        if destinataires is not None:
-            instance._destinataires = [destinataires] if isinstance(destinataires, str) else destinataires
-
-        if copies is not None:
-            instance._copies = [copies] if isinstance(copies, str) else copies
-
-        if copies_cachees is not None:
-            instance._copies_cachees = [copies_cachees] if isinstance(copies_cachees, str) else copies_cachees
-
-        if sujet is not None:
-            instance._sujet = sujet
-
-        if corps_html is not None:
-            instance._corps = corps_html
-
-        if pieces_jointes is not None:
-            instance._pieces_jointes = pieces_jointes
-
-        # Création Outlook
-        outlook = win32com.client.Dispatch("Outlook.Application")
-        mail = outlook.CreateItem(0)
-
-        # Affecter destinataires, copies, copies cachées, sujet
-        if instance._destinataires:
-            mail.To = ";".join(instance._destinataires)
-        if instance._copies:
-            mail.CC = ";".join(instance._copies)
-        if instance._copies_cachees:
-            mail.BCC = ";".join(instance._copies_cachees)
-        if instance._sujet:
-            mail.Subject = instance._sujet
-
-        # Affiche la fenêtre pour forcer la signature à charger
-        mail.Display()
-
-        # Récupérer la signature à partir du mail créé
-        signature = mail.HTMLBody
-
-        # Construire le corps complet
-        corps_complet = instance._corps + signature if instance._corps else signature
-        mail.HTMLBody = corps_complet
-
-        # Ajouter pièces jointes
-        if instance._pieces_jointes:
-            if isinstance(instance._pieces_jointes, str):
-                pieces_jointes = [instance._pieces_jointes]  # Convertit string en liste
-            for pj in pieces_jointes:
-                mail.Attachments.Add(pj)
-
-        # Afficher ou envoyer
-        if envoyer_mail:
-            mail.Send()
-        else:
-            # La fenêtre est déjà affichée (Display appelé plus haut)
-            pass
 
     def __str__(self) -> str:
         """
@@ -1732,10 +1769,10 @@ class RDV_Outlook:
         date_fin: datetime.datetime,
         evenement_journee_entiere: bool = False,
         categorie: Optional[str] = None,
-        disponibilite: Optional[str] = "Occupé",
+        disponibilite: Optional[str] = "Occupé",  # Disponibilités possibles : "Libre"=0, "Provisoire"=1, "Occupé"=2, "Absent"=3, "Travaille en dehors du bureau"=4
         rappel_active: bool = False,
         rappel_minutes: Optional[int] = None,
-        importance: Optional[int] = None,
+        importance: Optional[int] = None,  # 0 = faible ; 1 = normal, 2 = haute
         sensibilite: Optional[int] = None,
         reponse_demande: bool = True,
         texte_rdv: Optional[str] = None,
@@ -1887,12 +1924,12 @@ class RDV_Outlook:
         lieu: Optional[str] = None,
         participants_obligatoires: Optional[Union[List[str], str]] = None,
         participants_facultatifs: Optional[Union[List[str], str]] = None,
-        date_debut: Optional[dt] = None,
+        date_debut: Optional[datetime] = None,
         duree: Optional[timedelta] = None,
         categorie: Optional[str] = None,
         rdv_skype: bool = False,
         envoyer: bool = False
-    ) -> "RDV_Outlook":
+    ) -> RDV_Outlook:
         """
         Crée un rendez-vous Outlook à partir d'un modèle `.oft`.
 
@@ -1933,8 +1970,8 @@ class RDV_Outlook:
         cls,
         sujet: str,
         html: str,
-        date_debut: dt,
-        date_fin: dt,
+        date_debut: datetime,
+        date_fin: datetime,
         *,
         lieu: Optional[str] = None,
         evenement_journee_entiere: bool = False,
@@ -1950,7 +1987,7 @@ class RDV_Outlook:
         pieces_jointes: Optional[List[str]] = None,
         rdv_skype: bool = False,
         envoyer: bool = False
-    ) -> "RDV_Outlook":
+    ) -> RDV_Outlook:
         """
         Crée un rendez-vous directement depuis un contenu HTML.
 
@@ -1997,8 +2034,8 @@ class RDV_Outlook:
         cls,
         sujet: str,
         texte: str,
-        date_debut: dt,
-        date_fin: dt,
+        date_debut: datetime,
+        date_fin: datetime,
         *,
         lieu: Optional[str] = None,
         evenement_journee_entiere: bool = False,
@@ -2014,7 +2051,7 @@ class RDV_Outlook:
         pieces_jointes: Optional[List[str]] = None,
         rdv_skype: bool = False,
         envoyer: bool = False
-    ) -> "RDV_Outlook":
+    ) -> RDV_Outlook:
         """
         Crée un rendez-vous directement depuis un contenu texte.
 
@@ -2057,7 +2094,7 @@ class RDV_Outlook:
     # Import d’un rendez-vous Outlook existant
     # -------------------------------------------------------------------------
     @classmethod
-    def depuis_rdv_outlook(cls, rdv) -> "RDV_Outlook":
+    def depuis_rdv_outlook(cls, rdv) -> RDV_Outlook:
         """
         Construit un objet Python RDV_Outlook à partir d'un AppointmentItem Outlook déjà existant.
 
@@ -2201,7 +2238,34 @@ class RDV_Outlook:
         html_body = msg.htmlBody  # Contenu HTML complet, ou None si absent
         return html_body or ""
     
-    
+    @staticmethod
+    def calculer_rappel_minutes(
+        jours: int = 0,
+        heures: int = 0,
+        minutes: int = 0
+    ) -> int:
+        """
+        Convertit un délai en minutes pour le rappel Outlook.
+
+        Args:
+            jours (int, optional) : Nombre de jours avant le RDV. Défaut 0.
+            heures (int, optional) : Nombre d’heures avant le RDV. Défaut 0.
+            minutes (int, optional) : Nombre de minutes avant le RDV. Défaut 0.
+
+        Returns:
+            int : Nombre total de minutes à passer à ReminderMinutesBeforeStart.
+
+        Exemple :
+        --------
+        >>> RDV_Outlook.calculer_rappel_minutes(jours=7)
+        10080
+
+        >>> RDV_Outlook.calculer_rappel_minutes(jours=1, heures=2, minutes=30)
+        1590
+        """
+        total_minutes = jours * 24 * 60 + heures * 60 + minutes
+        return total_minutes
+
     @staticmethod
     def _convertir_en_date(valeur) -> Optional[datetime.date]:
         """
