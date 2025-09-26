@@ -28,6 +28,8 @@ from colorama import Fore, Style
 import tkinter as tk
 from tkinter import filedialog
 
+from bs4 import BeautifulSoup
+
 ### --------------------------------------------------------------------
 #  Tests (log et timer)
 ### --------------------------------------------------------------------
@@ -469,6 +471,12 @@ def nettoyer_nom_colonne(nom:str) -> str:
 
     return nom
 
+
+
+### --------------------------------------------------------------------
+#  Conversions
+### --------------------------------------------------------------------
+
 def convertir_si_possible(valeur) -> str|int|float:
     if isinstance(valeur, str):
         valeur = valeur.strip().replace(',', '.')
@@ -534,7 +542,38 @@ def tuple_vers_liste_de_listes(t):
     """
     return [[elem] for elem in t]
 
+def html_vers_texte(html: str) -> str:
+    """
+    Convertit du HTML en texte brut simple (compatible Outlook Body).
 
+    - Supprime les balises et styles.
+    - Conserve les paragraphes comme des sauts de ligne.
+    - Ajoute des retours à la ligne pour les <br>, <p>, <li>.
+
+    Exemple
+    -------
+    >>> html_vers_texte("<p>Bonjour <b>tout le monde</b></p><p>Deuxième paragraphe</p>")
+    'Bonjour tout le monde\n\nDeuxième paragraphe'
+    """
+    soup = BeautifulSoup(html, "html.parser")
+
+    # Gérer les retours à la ligne
+    for br in soup.find_all("br"):
+        br.replace_with("\n")
+    for p in soup.find_all("p"):
+        p.insert_before("\n")
+        p.insert_after("\n")
+    for li in soup.find_all("li"):
+        li.insert_before("- ")
+
+    # Texte brut
+    texte = soup.get_text()
+    
+    # Nettoyage : strip + normalisation des sauts de ligne
+    lignes = [l.strip() for l in texte.splitlines()]
+    texte_final = "\n".join([l for l in lignes if l])  # supprime les lignes vides en trop
+
+    return texte_final
 
 
 
