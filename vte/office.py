@@ -1727,8 +1727,6 @@ class Mail:
                 lignes.append(f"    • {pj}")
         return "\n".join(lignes)
 
-
-
 class RDV_Outlook:
     """
     Classe représentant un rendez-vous Outlook.
@@ -1777,9 +1775,9 @@ class RDV_Outlook:
         reponse_demande: bool = True,
         texte_rdv: Optional[str] = None,
         html_rdv: Optional[str] = None,
-        participants_obligatoires: Optional[Union[List[str], str]] = None,
-        participants_facultatifs: Optional[Union[List[str], str]] = None,
-        pieces_jointes: Optional[List[str]] = None,
+        participants_obligatoires: Optional[Union[List[str], str, pd.Series]] = None,
+        participants_facultatifs: Optional[Union[List[str], str, pd.Series]] = None,
+        pieces_jointes: Optional[Union[List[str], str, pd.Series]] = None,
         rdv_skype: bool = False
     ) -> None:
 
@@ -1799,17 +1797,12 @@ class RDV_Outlook:
         self._texte_rdv = texte_rdv
         self._html_rdv = html_rdv
 
-        # Participants (conversion en liste si string)
-        if isinstance(participants_obligatoires, str):
-            participants_obligatoires = [participants_obligatoires]
-        self._participants_obligatoires = participants_obligatoires or []
-
-        if isinstance(participants_facultatifs, str):
-            participants_facultatifs = [participants_facultatifs]
-        self._participants_facultatifs = participants_facultatifs or []
+        # Participants (conversion string / Series / list)
+        self._participants_obligatoires = convertir_en_liste(participants_obligatoires)
+        self._participants_facultatifs = convertir_en_liste(participants_facultatifs)
 
         # Pièces jointes
-        self._pieces_jointes = pieces_jointes or []
+        self._pieces_jointes = convertir_en_liste(pieces_jointes)
 
         # Option Skype
         self._rdv_skype = rdv_skype
@@ -1855,12 +1848,6 @@ class RDV_Outlook:
         if self._disponibilite:
             rdv_outlook.BusyStatus = disponibilites_map.get(self._disponibilite, 2)
 
-        # Corps
-        if self._texte_rdv:
-            rdv_outlook.Body = self._texte_rdv
-        if self._html_rdv:
-            rdv_outlook.HTMLBody = self._html_rdv
-
         # Participants
         if self._participants_obligatoires or self._participants_facultatifs:
             rdv_outlook.MeetingStatus = 1  # réunion
@@ -1883,6 +1870,16 @@ class RDV_Outlook:
             if not self._lieu:
                 rdv_outlook.Location = "Réunion Skype"
 
+        # Corps
+        # Ouvre le rendez-vous pour forcer Outlook à injecter la signature
+        rdv_outlook.Display()
+
+        inspector = rdv_outlook.GetInspector
+        doc = inspector.WordEditor  # Word COM object
+        if self._html_rdv:
+            doc.Content.InsertAfter(self._html_rdv)
+
+            
     # -------------------------------------------------------------------------
     # Méthode privée : finalisation (envoi ou affichage + nettoyage)
     # -------------------------------------------------------------------------
@@ -1922,12 +1919,13 @@ class RDV_Outlook:
         chemin_modele: str,
         sujet: Optional[str] = None,
         lieu: Optional[str] = None,
-        participants_obligatoires: Optional[Union[List[str], str]] = None,
-        participants_facultatifs: Optional[Union[List[str], str]] = None,
+        participants_obligatoires: Optional[Union[List[str], str, pd.Series]] = None,
+        participants_facultatifs: Optional[Union[List[str], str, pd.Series]] = None,
         date_debut: Optional[datetime] = None,
         duree: Optional[timedelta] = None,
         categorie: Optional[str] = None,
         rdv_skype: bool = False,
+        pieces_jointes: Optional[Union[List[str], str, pd.Series]] = None,
         envoyer: bool = False
     ) -> RDV_Outlook:
         """
@@ -1953,8 +1951,9 @@ class RDV_Outlook:
             importance=rdv.Importance,
             sensibilite=rdv.Sensitivity,
             reponse_demande=rdv.ResponseRequested,
-            participants_obligatoires=participants_obligatoires,
-            participants_facultatifs=participants_facultatifs,
+            participants_obligatoires=convertir_en_liste(participants_obligatoires),
+            participants_facultatifs=convertir_en_liste(participants_facultatifs),
+            pieces_jointes = convertir_en_liste(pieces_jointes),
             rdv_skype=rdv_skype
         )
 
@@ -1982,9 +1981,9 @@ class RDV_Outlook:
         importance: Optional[int] = None,
         sensibilite: Optional[int] = None,
         reponse_demande: bool = True,
-        participants_obligatoires: Optional[Union[List[str], str]] = None,
-        participants_facultatifs: Optional[Union[List[str], str]] = None,
-        pieces_jointes: Optional[List[str]] = None,
+        participants_obligatoires: Optional[Union[List[str], str, pd.Series]] = None,
+        participants_facultatifs: Optional[Union[List[str], str, pd.Series]] = None,
+        pieces_jointes: Optional[Union[List[str], str, pd.Series]] = None,
         rdv_skype: bool = False,
         envoyer: bool = False
     ) -> RDV_Outlook:
@@ -2018,9 +2017,9 @@ class RDV_Outlook:
             sensibilite=sensibilite,
             reponse_demande=reponse_demande,
             html_rdv=html,
-            participants_obligatoires=participants_obligatoires,
-            participants_facultatifs=participants_facultatifs,
-            pieces_jointes=pieces_jointes,
+            participants_obligatoires=convertir_en_liste(participants_obligatoires),
+            participants_facultatifs=convertir_en_liste(participants_facultatifs),
+            pieces_jointes=convertir_en_liste(pieces_jointes),
             rdv_skype=rdv_skype
         )
         instance.creer_rdv_outlook(envoyer=envoyer)
@@ -2046,9 +2045,9 @@ class RDV_Outlook:
         importance: Optional[int] = None,
         sensibilite: Optional[int] = None,
         reponse_demande: bool = True,
-        participants_obligatoires: Optional[Union[List[str], str]] = None,
-        participants_facultatifs: Optional[Union[List[str], str]] = None,
-        pieces_jointes: Optional[List[str]] = None,
+        participants_obligatoires: Optional[Union[List[str], str, pd.Series]] = None,
+        participants_facultatifs: Optional[Union[List[str], str, pd.Series]] = None,
+        pieces_jointes: Optional[Union[List[str], str, pd.Series]] = None,
         rdv_skype: bool = False,
         envoyer: bool = False
     ) -> RDV_Outlook:
@@ -2082,9 +2081,9 @@ class RDV_Outlook:
             sensibilite=sensibilite,
             reponse_demande=reponse_demande,
             texte_rdv=texte,
-            participants_obligatoires=participants_obligatoires,
-            participants_facultatifs=participants_facultatifs,
-            pieces_jointes=pieces_jointes,
+            participants_obligatoires=convertir_en_liste(participants_obligatoires),
+            participants_facultatifs=convertir_en_liste(participants_facultatifs),
+            pieces_jointes=convertir_en_liste(pieces_jointes),
             rdv_skype=rdv_skype
         )
         instance.creer_rdv_outlook(envoyer=envoyer)
