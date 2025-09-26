@@ -2,6 +2,7 @@ from __future__ import annotations
 from .office import *
 
 import math
+from babel.dates import format_date
 
 from dataclasses import dataclass
 from collections import defaultdict
@@ -1771,8 +1772,6 @@ class Traiter_contactsApprentis:
         
         return instance
 
-                
-
     def contactInitial(self, chemin_modele_mail_priseContact:Optional(str)=None) -> None:
         """
         Prépare un mail de contact initial des alternants.
@@ -1865,21 +1864,20 @@ class Traiter_contactsApprentis:
             </html>"""
             return corps_html
         else:
-            return None
-        
+            return None      
 
-    def creer_html_mail_ficheEvaluation(self, ligne:pd.Series, date:date) -> str:
+    def creer_html_mail_ficheEvaluation(self, ligne:pd.Series, date_deadline_retourFiche:date) -> str:
         
         periode = self.periode_scolaire_UGA()
-        date_str = date.strftime('%d %B')     
+        date_str = format_date(date_deadline_retourFiche, "d MMMM", locale="fr")
 
         corps_html = """
         <html>
         <body>
             <p>Bonjour,</p>
             <p>Dans le cadre de la notation de """ + f'{ligne["Prénom"]} {ligne["Nom"]}' + f" lors de sa prochaine soutenance de {periode}, " + """est-ce que vous pouvez compléter et signer le document en PJ s'il vous plait ?</p>
-            <p>Il sera à retourner à moi-même en mettant en copie""" + f"{self._mail_responsables_univ}" + f"pour le <span style='color: red; font-weight: bold;'>{date_str} au plus tard</span> " + """.</p>
-            <p>Je vous envoie un avis de rdv pour faire office de pense-bête. Il sera mis au """ + f"{date_str}" + """ avec un rappel une semaine avant (mais en mode « disponible » histoire de ne pas bloquer le créneau sur vos agendas donc vous pouvez l’accepter dans risque).</p>
+            <p>Il sera à retourner à moi-même en mettant en copie """ + f"{self._mail_responsables_univ}" + f" pour le <span style='color: red; font-weight: bold;'>{date_str} au plus tard</span> " + """.</p>
+            <p>Je vous envoie un avis de rdv pour faire office de pense-bête. Il sera mis au """ + f"{date_str}" + """ avec un rappel une semaine avant (mais en mode « libre » histoire de ne pas bloquer le créneau sur votre agenda donc vous pouvez l’accepter dans risque).</p>
             """
 
         if periode == "fin d'année" :
@@ -1892,8 +1890,8 @@ class Traiter_contactsApprentis:
        
         return corps_html
 
-    def creer_mail_ficheEvaluation(self, ligne:pd.Series, date:date):
-        corps_html = self.creer_html_mail_ficheEvaluation(ligne, date)
+    def creer_mail_ficheEvaluation(self, ligne:pd.Series, date_deadline_retourFiche:date):
+        corps_html = self.creer_html_mail_ficheEvaluation(ligne, date_deadline_retourFiche)
         pieces_jointes = self.defini_pj_ficheEvaluation_UGA()
         sujet = self._prefixe_sujet + " - Fiche d'évaluation à compléter et retourner"
         
@@ -1906,6 +1904,23 @@ class Traiter_contactsApprentis:
         )
 
         # TODO : Faire envoi d'un RDV à date donnée avec PJ et rappel une semaine avant
+        date_debut = datetime.combine(date_deadline_retourFiche, time(hour=8, minute=0))
+        date_fin = date_debut + timedelta(minutes=30)
+        RDV_Outlook.depuis_html(
+            sujet = sujet,
+            date_debut = date_debut,
+            date_fin = date_fin,
+            categorie = "FI",
+            html = corps_html,
+            participants_obligatoires = ligne["Mail TE"],
+            pieces_jointes = pieces_jointes,
+            disponibilite = "Libre",
+            importance = 2,
+            rappel_active = True,
+            rappel_minutes = RDV_Outlook.calculer_rappel_minutes(jours=7),
+            envoyer = self._envoyer_mail
+        )
+
         # Adapter l'appli une fois fini
 
 
@@ -1962,7 +1977,7 @@ class Traiter_contactsApprentis:
         # Période à définir pour la fiche d'évaluation à employer
         mois = date.today().month  # 1=janvier, ..., 12=décembre
 
-        if ((9 <= mois) and (mois <= 2)):  # septembre (9) → février (2)
+        if ((9 <= mois) or (mois <= 2)):  # septembre (9) → février (2)
             #print("On est entre septembre et février (inclus)")
             periode = "mi-année"
         else:

@@ -1872,12 +1872,13 @@ class RDV_Outlook:
 
         # Corps
         # Ouvre le rendez-vous pour forcer Outlook à injecter la signature
-        rdv_outlook.Display()
+        #rdv_outlook.Display()
 
-        inspector = rdv_outlook.GetInspector
-        doc = inspector.WordEditor  # Word COM object
-        if self._html_rdv:
-            doc.Content.InsertAfter(self._html_rdv)
+        if self._texte_rdv:
+            rdv_outlook.Body = self._texte_rdv
+        elif self._html_rdv:
+            # Fallback : convertir le HTML en texte brut utilisable
+            rdv_outlook.Body = html_vers_texte(self._html_rdv)
 
             
     # -------------------------------------------------------------------------
@@ -2117,7 +2118,7 @@ class RDV_Outlook:
             sensibilite=rdv.Sensitivity,
             reponse_demande=rdv.ResponseRequested,
             texte_rdv=rdv.Body if hasattr(rdv, "Body") else None,
-            html_rdv=rdv.HTMLBody if hasattr(rdv, "HTMLBody") else None,
+            html_rdv=getattr(rdv, "HTMLBody", None),
             participants_obligatoires=[],
             participants_facultatifs=[],
             rdv_skype=getattr(rdv, "IsOnlineMeeting", False),
