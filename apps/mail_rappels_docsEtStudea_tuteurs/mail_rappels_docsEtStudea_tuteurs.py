@@ -24,9 +24,9 @@ def main():
     # On demande quel traitement on veut faire :
     print(
         f"Quel type de traitement voulez-vous faire ?\n"
-        "\t• 1 : Mail de premier contact\n"
-        "\t• 2 : Préparer les RDV Outlook pour les entretiens\n"
-        "\t• 3 : Faire les mails de relance pour des documents ou Studea\n"
+        "\t• 1 : Mails\n"
+        "\t• 2 : RDV Outlook pour les entretiens\n"
+        "\t• 3 : Relance pour des documents ou Studea\n"
         "\n0 : Sortir de l'application\n"
     )
     while True:
@@ -46,9 +46,39 @@ def main():
     #  1 : Mail de premier contact (mi-septembre)
     ### --------------------------------------------------------------------
     if choix == 1 :
-        ca.contactInitial()
 
+        # On demande quel traitement on veut faire :
+        print(
+            f"Quel type de traitement voulez-vous faire ?\n"
+            "\t• 1 : Mail de premier contact\n"
+            "\t• 2 : Envoi fiche d'évaluation\n"
+            "\t• 3 : Mail à tous les apprentis et tuteurs suivis par tutorat (en CC) [TODO]\n"
+            "\t• 4 : Mail à tous les étudiants de la promo [TODO]\n"
+            "\n0 : Sortir de l'application\n"
+        )
+        while True:
+            try:
+                choix2 = int(input("Entrez un nombre entier : "))
+                if (choix2 in range(0, 5)) :
+                    break  # Sort de la boucle si conversion réussie et dans le bon intervalle
+            except ValueError:
+                print("Ce n'est pas un entier valide. Essayez encore.")
 
+        
+        if (choix2 == 0):
+            exit()
+        
+        elif (choix2 == 1):
+            ca.creer_mails_contactInitial()
+
+        elif (choix2 == 2):
+            ca.creer_mails_ficheEvaluation()
+
+        elif (choix2 == 3):
+            print("Méthode non encore faite")
+            
+        elif (choix2 == 4):
+            print("Méthode non encore faite")
 
     ### --------------------------------------------------------------------
     #  2 : Préparer les RDV Outlook pour les entretiens
@@ -135,6 +165,11 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    # 
+    #ca = Traiter_contactsApprentis.UGA()
+    #ligne = ca._df_etudiants.iloc[0]
+    #ca.creer_mail_ficheEvaluation(ligne, date(2025, 12, 5))
 
 
 

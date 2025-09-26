@@ -1768,11 +1768,11 @@ class Traiter_contactsApprentis:
         instance._ficheEvaluation2 = ficheEvaluation2
 
         # Tests :
-        instance._df_etudiants = instance._df_etudiants.head(1)
+        #instance._df_etudiants = instance._df_etudiants.head(1)
         
         return instance
 
-    def contactInitial(self, chemin_modele_mail_priseContact:Optional(str)=None) -> None:
+    def creer_mails_contactInitial(self, chemin_modele_mail_priseContact:Optional(str)=None) -> None:
         """
         Prépare un mail de contact initial des alternants.
             - Soit à partir de self._chemin_modele_mail_priseContact
@@ -1795,6 +1795,26 @@ class Traiter_contactsApprentis:
                     destinataires=destinataire,
                     copies=copie
                 )
+
+    def creer_mails_ficheEvaluation(self, date_deadline_retourFiche:date=None) -> None:
+        """
+        Prépare un mail pour envoyer les fiches d'évaluation aux tuteurs entreprises.
+            - mail avec pj
+            - rdv à deadline retour
+        """
+        # Si non existant, on demande la deadline à l'utilisateur :
+        if date_deadline_retourFiche is None:
+            while True:
+                saisie = input("Entrez la date butoir de retour de la fiche (jj/mm/aaaa) :")
+                try:                    
+                    date_deadline_retourFiche = datetime.strptime(saisie, "%d/%m/%Y").date()
+                    break  # Sort de la boucle si conversion réussie et dans le bon intervalle
+                except ValueError:
+                    print("Ce n'est pas une date valide. Essayez encore.")
+
+        # On prépare le mail et le RDV outlook pour chaque tuteur entreprise
+        for _, ligne in self._df_etudiants.iterrows():
+            self._creer_mail_ficheEvaluation(ligne, date_deadline_retourFiche)
 
     def creer_rdv(self, prop:PropEntretien) -> None:
         # On ouvre un modèle de mail existant et on prépare un mail pour chaque apprenti
@@ -1890,7 +1910,12 @@ class Traiter_contactsApprentis:
        
         return corps_html
 
-    def creer_mail_ficheEvaluation(self, ligne:pd.Series, date_deadline_retourFiche:date):
+    def _creer_mail_ficheEvaluation(self, ligne:pd.Series, date_deadline_retourFiche:date):
+        """
+        Pour un alternant (fonction appelée depuis une boucle) : 
+           - envoie un mail avec la fiche d'évaluation en pj
+           - envoie un rdv outlook avec rappel 1 semaine avant la date butoir
+        """
         corps_html = self.creer_html_mail_ficheEvaluation(ligne, date_deadline_retourFiche)
         pieces_jointes = self.defini_pj_ficheEvaluation_UGA()
         sujet = self._prefixe_sujet + " - Fiche d'évaluation à compléter et retourner"
@@ -1920,8 +1945,6 @@ class Traiter_contactsApprentis:
             rappel_minutes = RDV_Outlook.calculer_rappel_minutes(jours=7),
             envoyer = self._envoyer_mail
         )
-
-        # Adapter l'appli une fois fini
 
 
 
