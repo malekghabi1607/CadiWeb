@@ -132,36 +132,7 @@ def main():
             exit()
         
         else :  # On créée les mails de rappel
-            
-            # On n'affecte la PJ que si l'on relance pour les fiches d'évaluation
-            if choix2 in range(5,7) :
-                pieces_jointes = ca.defini_pj_ficheEvaluation_UGA()
-            else:
-                pieces_jointes = None
-
-            for _, ligne in ca._df_etudiants.iterrows():
-                # Apprenti
-                corps_html = ca.creer_html_mail_relance(choix2, ligne, "A")
-                if corps_html:
-                    Mail.creer_mail(
-                        destinataires = ligne["Mail apprenti"],
-                        sujet = ca._prefixe_sujet + "  - Relance actions suivis de l'alternance",
-                        corps_html = corps_html,
-                        pieces_jointes = pieces_jointes,
-                        envoyer_mail = ca._envoyer_mail
-                    )
-                
-                # Tuteur entreprise
-                corps_html = ca.creer_html_mail_relance(choix2, ligne, "T")
-                if corps_html:
-                    Mail.creer_mail(
-                        destinataires = ligne["Mail TE"],
-                        sujet = ca._prefixe_sujet + " - Relance actions suivis de l'alternance",
-                        corps_html = corps_html,
-                        pieces_jointes = pieces_jointes,
-                        envoyer_mail = ca._envoyer_mail
-                    )
-
+            ca.creer_mails_relances(choix2)
 
 if __name__ == "__main__":
     main()

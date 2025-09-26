@@ -1946,7 +1946,39 @@ class Traiter_contactsApprentis:
             envoyer = self._envoyer_mail
         )
 
+    def creer_mails_relances(self, niveau: int):
+        """
+        Envoie les mails de relance pour un niveau donné.
+        Niveau attendu : 1..6
+        """
+        # Pièces jointes seulement pour les fiches d’évaluation
+        if niveau in (5, 6):
+            pieces_jointes = self.defini_pj_ficheEvaluation_UGA()
+        else:
+            pieces_jointes = None
 
+        for _, ligne in self._df_etudiants.iterrows():
+            # Apprenti
+            corps_html = self.creer_html_mail_relance(niveau, ligne, "A")
+            if corps_html:
+                Mail.creer_mail(
+                    destinataires=ligne["Mail apprenti"],
+                    sujet=self._prefixe_sujet + "  - Relance actions suivis de l'alternance",
+                    corps_html=corps_html,
+                    pieces_jointes=pieces_jointes,
+                    envoyer_mail=self._envoyer_mail,
+                )
+
+            # Tuteur entreprise
+            corps_html = self.creer_html_mail_relance(niveau, ligne, "T")
+            if corps_html:
+                Mail.creer_mail(
+                    destinataires=ligne["Mail TE"],
+                    sujet=self._prefixe_sujet + " - Relance actions suivis de l'alternance",
+                    corps_html=corps_html,
+                    pieces_jointes=pieces_jointes,
+                    envoyer_mail=self._envoyer_mail,
+                )
 
     def defini_pj_ficheEvaluation_UGA(self) -> str:
         """
