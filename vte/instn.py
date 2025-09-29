@@ -1888,7 +1888,7 @@ class Traiter_contactsApprentis:
 
     def creer_html_mail_ficheEvaluation(self, ligne:pd.Series, date_deadline_retourFiche:date) -> str:
         
-        periode = self.periode_scolaire_UGA()
+        periode = self.periode_scolaire_UGA(date_deadline_retourFiche)
         date_str = format_date(date_deadline_retourFiche, "d MMMM", locale="fr")
 
         corps_html = """
@@ -2024,13 +2024,18 @@ class Traiter_contactsApprentis:
                 )
 
     @staticmethod
-    def periode_scolaire_UGA() -> str:
+    def periode_scolaire_UGA(date_input:date=None) -> str:
         """
-        Renvoie "mi-année" si date actuelle entre septembre et février.
+        La fonction emploie soit une date rentrée en argument, soit la date du jour.
+        
+        Renvoie "mi-année" si date est entre septembre et février.
         Renvoie "fin d'année" sinon
         """
         # Période à définir pour la fiche d'évaluation à employer
-        mois = date.today().month  # 1=janvier, ..., 12=décembre
+        if date_input is None:
+            mois = date.today().month  # 1=janvier, ..., 12=décembre
+        else:
+            mois = date_input.month
 
         if ((9 <= mois) or (mois <= 2)):  # septembre (9) → février (2)
             #print("On est entre septembre et février (inclus)")
