@@ -1667,27 +1667,36 @@ class Traiter_contactsApprentis:
     
     @dataclass
     class PropEntretien:
+        sujet: str
         chemin_modele: str
         duree: timedelta
-        sujet: str
         date_debut:datetime
         categorie: str = "FI"
-    
+
+    @dataclass
+    class PropFichierARenvoyer:
+        sujet: str
+        chemin_fichier: str
+        periode:str
+        deadline_retour:Optional[datetime]=None
+
     # Fichier Excel avec les informations des étudiants
-    #_chemin_fichier_etudiants:str
-    _prefixe_sujet:str
-    
     _fe_etudiants:FichierExcel
     _df_etudiants:DataFrame
-    
+
+    # Année en cours
+    _annee_scolaire:str
+
+    # Infos mails
+    _prefixe_sujet:str
     _chemin_modele_mail_priseContact:Optional[str] = None
-    _ficheEvaluation1:Optional[str] = None
-    _ficheEvaluation2:Optional[str] = None
+    _mail_responsables_univ:Optional[str] = None
+    
+    _entretiens:List[PropEntretien] = []
+    _relances:List[str] = []
+    _fichiersARenvoyer:List[PropFichierARenvoyer] = []
 
     _envoyer_mail:bool = False
-    _entretiens:List[PropEntretien] = []
-    _mail_responsables_univ:Optional[str] = None
-
 
     # === Initialisations statiques ===
     # Colonnes du fichier etudiant à récupérer
@@ -1695,7 +1704,7 @@ class Traiter_contactsApprentis:
         "Cursus", 
         "Nom", "Prénom", "Mail apprenti", "Téléphone apprenti", 
         "Entreprise ", "Lieu entreprise", "Nom TE", "Prénom TE", "Mail TE", "Téléphone TE", "Ma fonction de suivi de l'alternant", 
-        "Engagement des parties", "Entretien initial", "1ère visite", "2ème visite", "Fiche évaluation 1", "Fiche évaluation 2"]
+        "Engagement des parties", "Entretien de prise de fonction", "1ère visite en entreprise", "2ème visite en entreprise", "Fiche évaluation 1", "Fiche évaluation 2"]
 
 
     def __init__(self, chemin_fichier_etudiants:str, nom_onglet:str) -> None:
@@ -1719,56 +1728,86 @@ class Traiter_contactsApprentis:
         """
 
         # === Initialisations statiques ===
-        prefixe_sujet = "Master IN - Suivi d'alternance"
-        
-        nom_onglet = "Etudiants"
+        annee_scolaire = "2025-2026"
         envoyer_mail = False
 
-        chemin_fichier_etudiants =  r"\\instnt\partage\FORMATIONS_I\GDRA - Master IN (parcours ADIN-GDRA-SN)\2025-2026\1-dossier etudiants\Master ADIN - 2025_2026.xlsx"
-        ficheEvaluation1 =          r"\\instnt\partage\FORMATIONS_I\GDRA - Master IN (parcours ADIN-GDRA-SN)\2024-2025\9-stages\Fiche_Evaluation_alternance_M2_Ingénierie_Nucléaire_janvier.docx"
-        ficheEvaluation2 =          r"\\instnt\partage\FORMATIONS_I\GDRA - Master IN (parcours ADIN-GDRA-SN)\2024-2025\9-stages\Fiche_Evaluation_alternance_M2_Ingénierie_Nucléaire_aout.docx"
-        chemin_modele_mail_priseContact = r"C:\Users\vt238770\Documents\_CEA\Modèles adaptés\Mails\Master IN\Master IN - Tutorat en entreprise - Prise de contact.msg"
-        
+        prefixe_sujet = "Master IN - Suivi d'alternance"
         mail_responsables_univ = "master-in-responsables@univ-grenoble-alpes.fr"
 
+        chemin_modele_mail_priseContact = r"C:\Users\vt238770\Documents\_CEA\Modèles adaptés\Mails\Master IN\Master IN - Tutorat en entreprise - Prise de contact.msg"
+
+        chemin_fichier_etudiants =  fr"\\instnt\partage\FORMATIONS_I\GDRA - Master IN (parcours ADIN-GDRA-SN)\{annee_scolaire}\1-dossier etudiants\Master ADIN - {annee_scolaire.replace('-', '_')}.xlsx"
+        
+        nom_onglet = "Etudiants"
+        
+
+        # Entretiens
         prise_de_fonction = cls.PropEntretien(
+            sujet = "Entretien de prise de fonction",
             chemin_modele = r"C:\Users\vt238770\Documents\_CEA\Modèles adaptés\Mails\Master IN\Master IN - Suivi d'alternance - Entretien.oft",
             duree = timedelta(hours=0, minutes=45),
-            sujet = "Entretien de prise de fonction",
             date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=41) # (Autour du 6 octobre : dernière semaine de la première période en entreprise → A faire avant mi-novembre)
         )
         
         premiere_visite = cls.PropEntretien(
+            sujet = "1ère visite en entreprise",
             chemin_modele = r"C:\Users\vt238770\Documents\_CEA\Modèles adaptés\Mails\Master IN\Master IN - Suivi d'alternance - Entretien.oft",
             duree = timedelta(hours=1),
-            sujet = "1ère visite en entreprise",
             date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=51) # (Autour du 15 décembre : dernière semaine avant vacances Noël et reprise école → A faire avant mi-janvier)
         )
 
         deuxieme_visite = cls.PropEntretien(
+            sujet = "2ème visite en entreprise",
             chemin_modele = r"C:\Users\vt238770\Documents\_CEA\Modèles adaptés\Mails\Master IN\Master IN - Suivi d'alternance - Entretien.oft",
             duree = timedelta(hours=1),
-            sujet = "2ème visite en entreprise",
             date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=17) # (Autour du 20 avril : dernière semaine reprise école → A faire avant fin mai)
         )
+        
+        # Fichiers à renvoyer
+        ficheEvaluation1 = cls.PropFichierARenvoyer(
+            sujet = "Fiche évaluation 1",
+            chemin_fichier = r"\\instnt\partage\FORMATIONS_I\GDRA - Master IN (parcours ADIN-GDRA-SN)\2024-2025\9-stages\Fiche_Evaluation_alternance_M2_Ingénierie_Nucléaire_janvier.docx",
+            periode = "mi-année",
+            deadline_retour = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=6) # (Autour du 5 février)
+        )
+        
+        ficheEvaluation2 = cls.PropFichierARenvoyer(
+            sujet = "Fiche évaluation 2",
+            chemin_fichier = r"\\instnt\partage\FORMATIONS_I\GDRA - Master IN (parcours ADIN-GDRA-SN)\2024-2025\9-stages\Fiche_Evaluation_alternance_M2_Ingénierie_Nucléaire_aout.docx",
+            periode = "fin d'année",
+            deadline_retour = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=35) # (Autour du 25 août)
+        )
+
 
         # Initialisation de l'instance
         instance = cls(chemin_fichier_etudiants, nom_onglet)
 
+        # Constantes du contexte UGA
+        instance._annee_scolaire = annee_scolaire
         instance._prefixe_sujet = prefixe_sujet
         instance._chemin_modele_mail_priseContact = chemin_modele_mail_priseContact
         instance._envoyer_mail = envoyer_mail
         instance._mail_responsables_univ = mail_responsables_univ
 
+        # RDV entretiens
         instance._entretiens.append(prise_de_fonction)
         instance._entretiens.append(premiere_visite)
         instance._entretiens.append(deuxieme_visite)
 
-        instance._ficheEvaluation1 = ficheEvaluation1
-        instance._ficheEvaluation2 = ficheEvaluation2
+        # Mail + RDV de rappel fiche évaluation TODO : faire liste
+        instance._fichiersARenvoyer.append(ficheEvaluation1)
+        instance._fichiersARenvoyer.append(ficheEvaluation2)
+
+        # Relances → Doit avoir la même structure que les colonnes Excel qui trace les retours tuteurs et apprentis
+        instance._relances.append("Engagement des parties")
+        for entretien in instance._entretiens:
+            instance._relances.append(entretien.sujet)
+        for fichierARenvoyer in instance._fichiersARenvoyer:
+            instance._relances.append(fichierARenvoyer.sujet)
+
 
         # Tests :
-        #instance._df_etudiants = instance._df_etudiants.head(1)
+        instance._df_etudiants = instance._df_etudiants.head(1)
         
         return instance
 
@@ -1796,7 +1835,7 @@ class Traiter_contactsApprentis:
                     copies=copie
                 )
 
-    def creer_mails_ficheEvaluation(self, date_deadline_retourFiche:date=None) -> None:
+    def creer_mails_ficheEvaluation(self, prop:PropFichierARenvoyer, date_deadline_retourFiche:date=None) -> None:
         """
         Prépare un mail pour envoyer les fiches d'évaluation aux tuteurs entreprises.
             - mail avec pj
@@ -1804,13 +1843,7 @@ class Traiter_contactsApprentis:
         """
         # Si non existant, on demande la deadline à l'utilisateur :
         if date_deadline_retourFiche is None:
-            while True:
-                saisie = input("Entrez la date butoir de retour de la fiche (jj/mm/aaaa) :")
-                try:                    
-                    date_deadline_retourFiche = datetime.strptime(saisie, "%d/%m/%Y").date()
-                    break  # Sort de la boucle si conversion réussie et dans le bon intervalle
-                except ValueError:
-                    print("Ce n'est pas une date valide. Essayez encore.")
+            date_deadline_retourFiche = prop.deadline_retour
 
         # On prépare le mail et le RDV outlook pour chaque tuteur entreprise
         for _, ligne in self._df_etudiants.iterrows():
@@ -1837,7 +1870,7 @@ class Traiter_contactsApprentis:
                 )
 
     @staticmethod
-    def creer_html_mail_relance(choix:int, ligne:pd.Series, lettreInterlocuteur:str) -> str|None:
+    def creer_html_mail_relance_BAK(choix:int, ligne:pd.Series, lettreInterlocuteur:str) -> str|None:
         corps_html = """
         <html>
         <body>
@@ -1895,7 +1928,7 @@ class Traiter_contactsApprentis:
         <html>
         <body>
             <p>Bonjour,</p>
-            <p>Dans le cadre de la notation de """ + f'{ligne["Prénom"]} {ligne["Nom"]}' + f" lors de sa prochaine soutenance de {periode}, " + """est-ce que vous pouvez compléter et signer le document en PJ s'il vous plait ?</p>
+            <p>Dans le cadre de la notation de """ + f'{ligne["Prénom"]} {ligne["Nom"]}' + f" lors de sa prochaine soutenance de {periode}, " + """est-ce que vous pouvez compléter et signer le document en PJ s'il vous plait ? Ce document restera strictement confidentiel à l'équipe pédagogique et ne sera pas divulgué à votre apprenti.</p>
             <p>Il sera à retourner à moi-même en mettant en copie """ + f"{self._mail_responsables_univ}" + f" pour le <span style='color: red; font-weight: bold;'>{date_str} au plus tard</span> " + """.</p>
             <p>Je vous envoie un avis de rdv pour faire office de pense-bête. Il sera mis au """ + f"{date_str}" + """ avec un rappel une semaine avant (mais en mode « libre » histoire de ne pas bloquer le créneau sur votre agenda donc vous pouvez l’accepter dans risque).</p>
             """
@@ -1928,7 +1961,6 @@ class Traiter_contactsApprentis:
             envoyer_mail = self._envoyer_mail
         )
 
-        # TODO : Faire envoi d'un RDV à date donnée avec PJ et rappel une semaine avant
         date_debut = datetime.combine(date_deadline_retourFiche, time(hour=8, minute=0))
         date_fin = date_debut + timedelta(minutes=30)
         RDV_Outlook.depuis_html(
@@ -1946,20 +1978,19 @@ class Traiter_contactsApprentis:
             envoyer = self._envoyer_mail
         )
 
-    def creer_mails_relances(self, niveau: int):
+    def creer_mails_relances(self, ind: int):
         """
-        Envoie les mails de relance pour un niveau donné.
-        Niveau attendu : 1..6
+        Envoie les mails de relance pour un indice donné (du tableau des relances self._relances)
         """
         # Pièces jointes seulement pour les fiches d’évaluation
-        if niveau in (5, 6):
+        if "évaluation" in self._relances[ind-1]:
             pieces_jointes = self.defini_pj_ficheEvaluation_UGA()
         else:
             pieces_jointes = None
 
         for _, ligne in self._df_etudiants.iterrows():
             # Apprenti
-            corps_html = self.creer_html_mail_relance(niveau, ligne, "A")
+            corps_html = self.creer_html_mail_relance(ind, ligne, "A")
             if corps_html:
                 Mail.creer_mail(
                     destinataires=ligne["Mail apprenti"],
@@ -1970,7 +2001,7 @@ class Traiter_contactsApprentis:
                 )
 
             # Tuteur entreprise
-            corps_html = self.creer_html_mail_relance(niveau, ligne, "T")
+            corps_html = self.creer_html_mail_relance(ind, ligne, "T")
             if corps_html:
                 Mail.creer_mail(
                     destinataires=ligne["Mail TE"],
@@ -1980,20 +2011,63 @@ class Traiter_contactsApprentis:
                     envoyer_mail=self._envoyer_mail,
                 )
 
+
+    def creer_html_mail_relance(self, ind:int, ligne:pd.Series, lettreInterlocuteur:str) -> str|None:
+        """
+        On choisit par définition que tout rappel d'un certain indice du tableau des rappel implique un rappel des entretiens/trucs précédents
+        ind est la valeur sélectionnée par l'utilisateur et commence à 1. Donc sa correspondance dans le tableau self._relances c'est ind-1
+        """
+        corps_html = """
+        <html>
+        <body>
+            <p>Bonjour,</p>
+            <p>Dans le cadre du suivi de l'alternance il vous manque certaines actions.</p>
+            <p>S'il vous plaît, est-ce que vous pouvez <span style="color: red; font-weight: bold;">au plus tôt</span> :</p>
+
+            <ul>
+        """
+
+        len_corps_html_ini = len(corps_html)
+        #for i, typeRelance in enumerate(self._relances):
+        for i in range(ind):
+            if lettreInterlocuteur not in str(ligne.get(self._relances[i]) or "").strip():
+                if "évaluation" in self._relances[i]: # Cas fiches d'évaluation
+                    corps_html += f"<li>Compléter et nous renvoyer <span style=\"color: red; font-weight: bold;\">la fiche d'évaluation nécessaire pour la soutenance de {self.periode_scolaire_UGA()}</span></li>\n"
+                else: # Cas studea
+                    corps_html += fr"<li>Compléter et signer dans Studea la ligne <strong>{self._relances[i]}</strong></li>\n"
+
+        
+        if len(corps_html) > len_corps_html_ini:
+            corps_html += """
+                </ul>
+
+                <p>Je vous remercie, passez une excellente fin de journée,</p>
+            </body>
+            </html>"""
+            return corps_html
+        else:
+            return None      
+
     def defini_pj_ficheEvaluation_UGA(self) -> str:
         """
-        Sélectionne et renvoei le chemin de la bonne fiche d'évaluation en fonction de la période (mi-année ou fin d'année)
+        Sélectionne et renvoie le chemin de la bonne fiche d'évaluation en fonction de la période (mi-année ou fin d'année) → Ancienne méthode
         """
         periode = self.periode_scolaire_UGA()
-
+        fichier = next(
+            (f for f in self._fichiersARenvoyer if f.periode == periode),
+            None  # valeur par défaut si rien trouvé
+        )
+        
+        """
         if (periode == "mi-année"):
             #print("On est entre septembre et février (inclus)")
             pieces_jointes = self._ficheEvaluation1
         else:
             #print("On est entre mars et août")
             pieces_jointes = self._ficheEvaluation2
+        """
         
-        return pieces_jointes
+        return fichier.chemin_fichier
 
     def rdv_prise_de_fonction_BAK(self, chemin_modele_rdv:str) -> None:
 
