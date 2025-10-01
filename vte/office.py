@@ -44,6 +44,7 @@ import copy
 import json
 
 from datetime import date, datetime, timedelta, time
+from zoneinfo import ZoneInfo
 from io import StringIO
 
 from tqdm import tqdm
@@ -1758,6 +1759,8 @@ class RDV_Outlook:
     ... )
     >>> rdv.creer_rdv_outlook(envoyer=False)  # Affiche le rendez-vous dans Outlook
     """
+    DEFAULT_TZ = ZoneInfo("Europe/Paris")
+
 
     def __init__(
         self,
@@ -1784,8 +1787,8 @@ class RDV_Outlook:
         # Champs principaux
         self._sujet = sujet
         self._lieu = lieu
-        self._date_debut = date_debut
-        self._date_fin = date_fin
+        self._date_debut = self._normaliser_datetime(date_debut)
+        self._date_fin = self._normaliser_datetime(date_fin)
         self._evenement_journee_entiere = evenement_journee_entiere
         self._categorie = categorie
         self._disponibilite = disponibilite
@@ -2197,6 +2200,7 @@ class RDV_Outlook:
                 duree_raw = ligne.get("Durée [min]", None)
                 rappel_raw = ligne.get("Rappel", None)
 
+                # TODO si pb heure UTC : appliquer self._normaliser_datetime(date_fin)
                 date_debut = cls._convertir_en_date(date_debut_raw)
                 date_fin = cls._convertir_en_date(date_fin_raw) if pd.notna(date_fin_raw) else None
                 heure_debut = cls._convertir_en_heure(heure_debut_raw) if pd.notna(heure_debut_raw) else None
@@ -2311,6 +2315,23 @@ class RDV_Outlook:
             return dt.time()
         except Exception:
             return None
+
+    @staticmethod
+    def _normaliser_datetime(dt: datetime, tz: ZoneInfo = None) -> datetime:
+        """
+        Normalise un datetime pour Outlook :
+        - Si naïf → ajoute le fuseau (Europe/Paris par défaut).
+        - Si déjà tz-aware → le conserve tel quel.
+
+        Exemple :
+            >>> RDV_Outlook._normaliser_datetime(datetime(2025, 2, 5, 8, 0))
+            datetime(2025, 2, 5, 8, 0, tzinfo=ZoneInfo("Europe/Paris"))
+        """
+        if tz is None:
+            tz = RDV_Outlook.DEFAULT_TZ
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=tz)
+        return dt
 
     @staticmethod
     def _separer_emails(valeur: Optional[Union[str, List[str]]]) -> List[str]:
