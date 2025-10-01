@@ -1835,12 +1835,19 @@ class Traiter_contactsApprentis:
                     copies=copie
                 )
 
-    def creer_mails_ficheEvaluation(self, prop:PropFichierARenvoyer, date_deadline_retourFiche:date=None) -> None:
+    def creer_mails_ficheEvaluation(self, date_deadline_retourFiche:date=None) -> None:
         """
         Prépare un mail pour envoyer les fiches d'évaluation aux tuteurs entreprises.
             - mail avec pj
             - rdv à deadline retour
         """
+        periode = self.periode_scolaire_UGA()
+        if periode == "mi-année" :
+            prop = self._fichiersARenvoyer[0]
+        else:
+            prop = self._fichiersARenvoyer[1]
+
+        
         # Si non existant, on demande la deadline à l'utilisateur :
         if date_deadline_retourFiche is None:
             date_deadline_retourFiche = prop.deadline_retour
