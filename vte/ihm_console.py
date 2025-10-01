@@ -65,44 +65,27 @@ class IHM_console:
             except ValueError:
                 print(f"Erreur : veuillez entrer une valeur de type {type_attendu.__name__}.")
 
-    def executer_action(self, action_def, item=None):
-        """
-        Exécute une action finale définie dans le menu.
-
-        :param action_def: dict avec clés "action", "kwargs", "demander"
-        :param item: objet courant d'un sous-menu dynamique (optionnel)
-        :return: résultat de l'action
-        """
+    def executer_action(self, action_def, choix_sousmenu=None):
         action = action_def["action"]
-        kwargs = dict(action_def.get("kwargs", {}))
-        demander = action_def.get("demander", [])
 
-        # Évaluation dynamique des kwargs si callable et item fourni
-        for k, v in kwargs.items():
-            if callable(v) and item is not None:
-                kwargs[k] = v(item)
+        kwargs_def = action_def.get("kwargs", {})
+        if callable(kwargs_def):
+            # Si kwargs est une fonction → on la résout avec le choix du sous-menu
+            if choix_sousmenu is None:
+                raise ValueError("Un choix de sous-menu est requis pour générer les kwargs.")
+            kwargs = kwargs_def(choix_sousmenu)
+        else:
+            # Sinon → c’est déjà un dictionnaire fixe
+            kwargs = dict(kwargs_def)
 
-        sig = inspect.signature(action)
+        # Gestion des paramètres à demander (idem ton code actuel)
+        for nom in action_def.get("demander", []):
+            sig = inspect.signature(action)
+            param = sig.parameters.get(nom)
+            type_attendu = param.annotation if param and param.annotation != inspect._empty else str
+            kwargs[nom] = self.demander_saisie(nom, type_attendu)
 
-        # Arguments obligatoires non fournis dans kwargs
-        for nom, param in sig.parameters.items():
-            if nom in kwargs:
-                continue
-            if param.default == inspect.Parameter.empty:
-                kwargs[nom] = self.demander_saisie(
-                    f"Entrez {nom}",
-                    param.annotation if param.annotation != inspect._empty else str
-                )
-
-        # Arguments explicitement à demander
-        for nom in demander:
-            if nom not in kwargs:
-                param = sig.parameters.get(nom)
-                type_attendu = str
-                if param and param.annotation != inspect._empty:
-                    type_attendu = param.annotation
-                kwargs[nom] = self.demander_saisie(f"Entrez {nom}", type_attendu)
-
+        # Enfin on exécute
         return action(**kwargs)
 
     def afficher_menu(self, menu=None, titre="Menu principal"):
