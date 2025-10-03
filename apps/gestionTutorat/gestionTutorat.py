@@ -50,18 +50,16 @@ def main():
             "Créer un RDV pour un entretien": {
                 "sous-menu": [ca._entretiens, "sujet"],  # affiche l'attribut .sujet
                 "action": ca.creer_rdv,
-                "kwargs": lambda e: {"entretien": e},
+                "kwargs": lambda p: {"prop": p},
                 "demander": []
             }
         },
 
         "Relances": {
-            "Choisir un type de relance": {
-                "sous-menu": [ca._relances, None],  # liste de str, donc on affiche directement str(obj)
-                "action": ca.creer_mails_relances,
-                "kwargs": lambda r: {"relance": r},  # injecte la string choisie dans l’appel
-                "demander": []
-            }
+            "sous-menu": [ca._relances, None],  # liste de str, donc on affiche directement str(obj)
+            "action": ca.creer_mails_relances,
+            "kwargs": lambda r: {"relance": r},  # injecte la string choisie dans l’appel
+            "demander": []
         }
     }
     

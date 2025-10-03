@@ -1672,6 +1672,11 @@ class Traiter_contactsApprentis:
         duree: timedelta
         date_debut:datetime
         categorie: str = "FI"
+        
+        def __post_init__(self):
+            # Normaliser en datetime
+            if isinstance(self.date_debut, date) and not isinstance(self.date_debut, datetime):
+                self.date_debut = datetime.combine(self.date_debut, time(9, 0))
 
     @dataclass
     class PropFichierARenvoyer:
@@ -1985,10 +1990,15 @@ class Traiter_contactsApprentis:
             envoyer = self._envoyer_mail
         )
 
-    def creer_mails_relances(self, ind: int):
+    def creer_mails_relances(self, relance: str):
         """
-        Envoie les mails de relance pour un indice donné (du tableau des relances self._relances)
+        Envoie les mails de relance pour un intitulé donné (élément de self._relances).
         """
+        try:
+            ind = self._relances.index(relance) + 1  # convertit en indice 1-based
+        except ValueError:
+            raise ValueError(f"Relance inconnue: {relance!r}")
+
         # Pièces jointes seulement pour les fiches d’évaluation
         if "évaluation" in self._relances[ind-1]:
             pieces_jointes = self.defini_pj_ficheEvaluation_UGA()
@@ -2041,7 +2051,7 @@ class Traiter_contactsApprentis:
                 if "évaluation" in self._relances[i]: # Cas fiches d'évaluation
                     corps_html += f"<li>Compléter et nous renvoyer <span style=\"color: red; font-weight: bold;\">la fiche d'évaluation nécessaire pour la soutenance de {self.periode_scolaire_UGA()}</span></li>\n"
                 else: # Cas studea
-                    corps_html += fr"<li>Compléter et signer dans Studea la ligne <strong>{self._relances[i]}</strong></li>\n"
+                    corps_html += fr"<li>Compléter et signer dans Studea la ligne <strong>{self._relances[i]}</strong></li>"
 
         
         if len(corps_html) > len_corps_html_ini:
