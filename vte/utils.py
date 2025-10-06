@@ -494,25 +494,32 @@ def convertir_en_liste(val: Optional[Union[str, List[str], pd.Series]]) -> List[
         - str → [str]
         - list → list inchangée
         - pandas.Series → list
-        - None → []
+        - None ou NaN → []
 
     Args:
-        val: valeur à convertir
+        val: valeur à convertir (str, list, Series, None ou NaN)
 
     Returns:
         List[str]: liste prête à être utilisée
     """
-    if val is None:
+    # Cas None ou NaN (ex: valeur vide venant d'Excel)
+    if val is None or (isinstance(val, float) and pd.isna(val)):
         return []
+
     elif isinstance(val, str):
-        return [val]
+        return [val.strip()] if val.strip() else []
+
     elif isinstance(val, pd.Series):
         return val.dropna().astype(str).tolist()
-    elif isinstance(val, list):
-        return [str(v) for v in val]
-    else:
-        raise TypeError(f"Type non supporté pour conversion en liste : {type(val)}")
 
+    elif isinstance(val, list):
+        # Nettoie les éléments vides ou NaN dans la liste
+        return [str(v).strip() for v in val if pd.notna(v) and str(v).strip()]
+
+    else:
+        # Cas inattendu
+        raise TypeError(f"Type non supporté pour conversion en liste : {type(val)}")
+        
 def tuple_vers_liste_de_listes(t):
     """
     Permet de transformer un tuple (2, 4) en liste de listes [[2], [4]]
