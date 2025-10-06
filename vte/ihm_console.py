@@ -25,15 +25,15 @@ class IHM_console:
     ...         "Créer un RDV pour un entretien": {
     ...             "sous-menu": [ca._entretiens, "sujet"],  # affiche l’attribut .sujet
     ...             "action": ca.creer_rdv,
-    ...             "kwargs": lambda e: {"entretien": e},
+    ...             "kwargs": lambda p: {"prop": p},
     ...             "demander": []
     ...         }
     ...     },
     ...     "Relances": {
     ...         "Choisir un type de relance": {
-    ...             "sous-menu": [ca._relances, None],  # liste de str
+    ...             "sous-menu": [ca._relances, None],  # liste de str, donc on affiche directement str(obj)
     ...             "action": ca.creer_mails_relances,
-    ...             "kwargs": lambda r: {"relance": r},
+    ...             "kwargs": lambda r: {"relance": r},  # injecte la string choisie dans l’appel (i.e. le nom de la relance)
     ...             "demander": []
     ...         }
     ...     }
@@ -59,7 +59,7 @@ class IHM_console:
             Un objet partagé qui peut être transmis aux callbacks
             si besoin (par ex. l’instance de gestion des apprentis).
         """
-        self.menus = menus
+        self.menus:str = menus
         self.contexte = contexte
 
     # -------------------------------------------------------------------------

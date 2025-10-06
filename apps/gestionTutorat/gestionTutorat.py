@@ -28,19 +28,20 @@ def main():
         }
     }
     """
-    ca = Traiter_contactsApprentis.UGA()
+    #contexte = Traiter_contactsApprentis.UGA()
+    contexte = Traiter_contactsApprentis.L3D()
     #gt = GestionTutoratUGA(ca, Mail)
 
     # Définition des menus
     menus = {
         "Mails": {
             "Mail de premier contact": {
-                "action": ca.creer_mails_contactInitial,
+                "action": contexte.creer_mails_contactInitial,
                 "kwargs": {},
                 "demander": []
             },
             "Envoi fiche d'évaluation": {
-                "action": ca.creer_mails_ficheEvaluation,
+                "action": contexte.creer_mails_ficheEvaluation,
                 "kwargs": {},
                 "demander": []
             },
@@ -48,17 +49,17 @@ def main():
 
         "RDV Outlook": {
             "Créer un RDV pour un entretien": {
-                "sous-menu": [ca._entretiens, "sujet"],  # affiche l'attribut .sujet
-                "action": ca.creer_rdv,
+                "sous-menu": [contexte._entretiens, "sujet"],  # affiche l'attribut .sujet
+                "action": contexte.creer_rdv,
                 "kwargs": lambda p: {"prop": p},
                 "demander": []
             }
         },
 
         "Relances": {
-            "sous-menu": [ca._relances, None],  # liste de str, donc on affiche directement str(obj)
-            "action": ca.creer_mails_relances,
-            "kwargs": lambda r: {"relance": r},  # injecte la string choisie dans l’appel
+            "sous-menu": [contexte._relances, None],  # liste de str, donc on affiche directement str(obj)
+            "action": contexte.creer_mails_relances,
+            "kwargs": lambda r: {"relance": r},  # injecte la string choisie dans l’appel (i.e. le nom de la relance)
             "demander": []
         }
     }
@@ -69,7 +70,7 @@ def main():
     
 
     if mode == "console":
-        ihm = IHM_console(menus, contexte=ca)
+        ihm = IHM_console(menus, contexte=contexte)
         ihm.afficher_menu()
     else:
         ihm = IHMTkinter(menus)

@@ -372,334 +372,6 @@ class TravauxFichiersIRIS:
             f"  df_tableau :\n{aff_df}"
             )
 
-class BilanSessionV3:
-    """
-    C'est la classe qui contient tous les éléments de ma formation pour mon bilan de session V3
-
-    # TODO j'en suis là
-    # Todo Word
-    # Dans le modèle Word : gérer le lien vers la GED 
-    # Exploiter EvalStat
-    # Il y a des trous dans la raquette dans le word de sortie (checkboxes)
-    # coller des images depuis Excel
-    # ? Exploiter export formation plutôt que export sessions pour les valeurs par défaut nmin/max...
-
-    """
-    def __init__(self, codeFormation:str, annee:int, periode:str) -> None:
-        self._codeFormation:str = codeFormation
-        self._annee:int = annee
-        self._periode:str = periode
-        self._lieuPrincipal:str = "INSTN Marcoule"
-
-        self._sessions_nom_typeExport = sessions._nom_typeExport #  Provient de la valeur globale sessions
-        self._sessions_codeExport = sessions._codeExport #  Provient de la valeur globale sessions
-        self._sessions_repertoire = sessions._output.repertoire #  Provient de la valeur globale sessions
-
-        self._fe_sessions:FichierExcel = None # Fichier Excel qui contient les extracts IRIS Sessions (ou a minima celles de la période en cours)
-
-        self._titreFormation:str = None
-        self._periodeSessionsEvaluees:str = f"{self._periode} {self._annee}"
-        self._nbSessionsEvaluees:int = None
-        self._numerosSessions:str = None
-        self._nbApprenants:int = None
-        self._rp:str = None
-        self._af:str = None
-
-        #####
-        # Exploitation de l'extract IRIS sessions
-        #####
-
-        # J'ouvre un export session de IRIS et load tous ses tableaux structurés dans des DataFrame (inclus dans un FichierExcel)
-        chemin_fichier_session = filedialog.askopenfilename(title="Sélectionner l'export " + self._sessions_nom_typeExport + " (" + self._sessions_codeExport + ") Excel à employer", filetype=[("Fichiers Excel", "*.xlsx")], initialdir=self._sessions_repertoire)
-        if not chemin_fichier_session:
-            vlog.log_erreur("click sur cancel du filedialog → Pas de chemin de fichier session")
-        self._fe_sessions = FichierExcel.depuis_fichier(chemin_fichier_session)
-        #print(self._fe_session)
-        self._df_sessions = self._fe_sessions._tableaux[self._sessions_nom_typeExport]._df  # Création d'un alias
-        self._df_sessions['Trigramme formation'] = self._df_sessions['Trigramme formation'].astype(str)
-        #print(self._df_sessions.columns.to_list())
-        #print(self._df_sessions)
-        #for col in self._df_sessions.columns:
-        #    print(repr(col))
-        #print(self._df_sessions['Trigramme formation'].dtype)
-        
-        # Pour initialiser les valeurs communes, déjà on filtre le Dataframe principal avec le code formation
-        if self._periode == "1er semestre":
-            date_debut = pd.Timestamp(f'{annee}-01-01')
-            date_fin = pd.Timestamp(f'{annee}-06-30')
-        elif self._periode == "2nd semestre":
-            date_debut = pd.Timestamp(f'{annee}-07-01')
-            date_fin = pd.Timestamp(f'{annee}-12-31')
-        elif self._periode == "Année":
-            date_debut = pd.Timestamp(f'{annee}-01-01')
-            date_fin = pd.Timestamp(f'{annee}-12-31')
-        else:
-            # Cas par défaut : on ne filtre pas sur la date
-            date_debut = None
-            date_fin = None
-
-        # Application du pré-filtre avec les 3 critères trigramme, statut session et période
-        df_sessions_filtre = self._df_sessions[
-            (self._df_sessions['Trigramme formation'] == str(self._codeFormation)) &
-            (self._df_sessions['Année début ses.'] == self._annee) &
-            (self._df_sessions['Statut Session'] != "Annulée")
-        ]
-        #print(df_sessions_filtre)
-        if date_debut is not None and date_fin is not None:
-            df_sessions_filtre = df_sessions_filtre[
-                (df_sessions_filtre['Date début ses.'] >= date_debut) &
-                (df_sessions_filtre['Date début ses.'] <= date_fin)
-            ]   
-        #print(df_sessions_filtre)
-        # Afficher les sessions et dates et statuts 
-        #print(df_sessions_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Statut \nSession', 'N° Session']].to_string(index=False))
-        print(f"Liste des sessions {self._codeFormation} dans {os.path.basename(chemin_fichier_session)} - {self._periode} {self._annee}")
-        print(tabulate(
-            df_sessions_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Statut Session', 'N° Session']], 
-            headers='keys', 
-            tablefmt='pretty', 
-            showindex=False
-        ))
-        
-        #On demande à l'utilisateur les sessions qu'il veut exclure
-        exclusionSessions = self.demander_entiers()
-        if exclusionSessions:  # si la liste n'est pas vide
-            df_sessions_filtre = df_sessions_filtre[~df_sessions_filtre['Code IRIS'].isin(exclusionSessions)]
-        else:
-            # la liste est vide, on ne filtre rien, on garde tout
-            pass
- 
-        print(tabulate(
-            df_sessions_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Statut Session', 'N° Session']], 
-            headers='keys', 
-            tablefmt='pretty', 
-            showindex=False
-        ))
-
-
-        # On définit les mergeField de Word issus de l'exrtract IRIS sessions
-        self._titreFormation = df_sessions_filtre[["Session"]].iloc[-1]
-        self._nbSessionsEvaluees = len(df_sessions_filtre)
-        self._numerosSessions = ", ".join(df_sessions_filtre["N° Session"].astype(str))
-        self._nbApprenants = df_sessions_filtre["Nb. Nommés"].sum()
-        self._rp = ", ".join(df_sessions_filtre["Trigramme RP"].astype(str))
-        self._af = ", ".join(df_sessions_filtre["Trigramme AF"].astype(str))
-
-
-        #####
-        # Exploitation des EvalStat
-        #####
-
-        # A partir de la liste df_sessions_filtre['Code IRIS'], on regarde les CSV qui ne sont pas dans le fichier Excel global
-        # On ouvre le fichier Excel global des évaluation de la formation
-        es = Traiter_evalStat.depuis_fe_evaluations_formation(self._codeFormation)
-
-        # On isole depuis ce fichier les CSV manquants
-        code_session_absents = List(set(df_sessions_filtre['Code IRIS']) - set(es._df_formation_stagiaires['Code IRIS']))
-
-        chemins_csv = {}
-        for code_IRIS in code_session_absents:
-            chemins_csv[code_IRIS] = chemin_vers_unc(es.filedialog_csv(code_IRIS=code_IRIS, trigramme=self._codeFormation))
-
-        
-
-        #TODO : Il serait bien que je gère les sessions sans CSV. Pour l'instant, j'exclue
-        # On en fait un tupe en excluant les None
-        tuple_csv_stagiaires = tuple(val for val in chemins_csv.values() if val is not None)
-
-        if tuple_csv_stagiaires:
-            es = Traiter_evalStat.depuis_tuple_csv_stagiaires(tuple_csv_stagiaires=tuple_csv_stagiaires, fe_sessions=self._fe_sessions)
-            
-
-        # On ouvre le fichier Excel EvalStat et on le filtre sur les sessions qui nous intéressent
-
-
-    @staticmethod
-    def demander_entiers(message="Pour exclure des sessions : entrez un ou plusieurs code IRIS (numéro à 5 chiffres) séparés par des espaces (ou rien pour passer) : ") -> List[str]:
-        while True:
-            entree = input(message).strip()
-            if not entree:
-                # Pas de saisie => retourner liste vide
-                return []
-            
-            # Séparer les valeurs (espaces ou virgules)
-            valeurs = [v.strip() for v in entree.replace(',', ' ').split()]
-            return valeurs
-            
-            # Vérifier que toutes les valeurs sont des entiers
-            #try:
-            #    entiers = [int(v) for v in valeurs]
-            #    return entiers
-            #except ValueError:
-            #    print("Erreur : veuillez entrer uniquement des nombres entiers, séparés par des espaces ou des virgules.")
-
-class BilanFormation:
-    """
-    C'est la classe qui contient tous les éléments de ma formation pour mon bilan
-
-    # TODO j'en suis là
-    # Todo Word
-    # Dans le modèle Word : gérer le lien vers la GED 
-    # Exploiter EvalStat
-    # Il y a des trous dans la raquette dans le word de sortie (checkboxes)
-    # coller des images depuis Excel
-    # ? Exploiter export formation plutôt que export sessions pour les valeurs par défaut nmin/max...
-    """
-    def __init__(self, codeFormation:str, annee:int):
-        
-        self._codeFormation = codeFormation
-        self._annee = annee
-
-        self._sessions_nom_typeExport = sessions._nom_typeExport #  Provient de la valeur globale sessions
-        self._sessions_codeExport = sessions._codeExport #  Provient de la valeur globale sessions
-        self._sessions_repertoire = sessions._output.repertoire #  Provient de la valeur globale sessions
-
-        self._chemin_specsPedagogiques = None
-
-        self._chemin_fdc = None
-
-        self._repertoire_fdc_defaut = rep_fdc_defaut
-        self._repertoire_specsPedagogiques_defaut = rep_specsPedagogiques_defaut
-        
-        #####
-        # Exploitation de l'extract IRIS sessions
-        #####
-
-        # J'ouvre un export session de IRIS et load tous ses tableaux structurés dans des DataFrame (inclus dans un FichierExcel)
-        chemin_fichier_session = filedialog.askopenfilename(title="Sélectionner l'export " + self._sessions_nom_typeExport + " (" + self._sessions_codeExport + ") Excel à employer", filetype=[("Fichiers Excel", "*.xlsx")], initialdir=self._sessions_repertoire)
-        if not chemin_fichier_session:
-            log_erreur("click sur cancel du filedialog → Pas de chemin de fichier session")
-        self._fe_session = FichierExcel.depuis_fichier(chemin_fichier_session)
-        #print(self._fe_session)
-        self._df_sessions = self._fe_session._tableaux[self._sessions_nom_typeExport]._df  # Création d'un alias
-
-        # Pour initialiser les valeurs communes, déjà on filtre le Dataframe principal avec le code formation
-        #df_filtre = self.__df_sessionsIRIS[(self.__df_sessionsIRIS['Trigramme formation'] == self.__codeFormation) & (self.__df_sessionsIRIS['Année début ses.'] == self.__annee)]
-        df_sessions_filtre = self._df_sessions[(self._df_sessions['Trigramme formation'] == self._codeFormation) & (self._df_sessions['Année début ses.'] == self._annee)]
-        
-        
-        # Puis on récupère la dernière ligne pour avoir les valeurs les plus à jour (tri par index)
-        [self._titreFormation, self._dureeHeures, self._dureeJours, self._minIRIS, self._maxIRIS, self._depassementAutoriseIRIS] = df_sessions_filtre[["Session", "Durée planif. (H.)", "Durée planif. (J.)", "Min.", "Max.", "Dépass. autorisé"]].iloc[-1]
-
-        # Pour obtenir la liste des RP et de leurs lieux
-        self._lieuxFormation = ""
-        for rp in df_sessions_filtre["Nom responsable pédag."].unique():
-            #print("\n\nRP = " + rp)
-            [prenomRP, nomRP, lieuRP] = df_sessions_filtre[self._df_sessions["Nom responsable pédag."] == rp][["Prénom responsable pédag.", "Nom responsable pédag.", "Lieu principal"]].iloc[-1]
-            self._lieuxFormation += prenomRP + " " + nomRP + " (" + lieuRP + "), "
-        self._lieuxFormation = self._lieuxFormation[:-2]
-        #print(self._lieuxFormation)
-
-
-
-
-        #####
-        # Exploitation des specs pédagogiques
-        #####
-        self._chemin_specsPedagogiques = filedialog.askopenfilename(title="Sélectionner les dernières specs pédagogiques", filetype=[("Fichiers PDF", "*.pdf"), ("Documents Word", "*.docx")], initialdir=optimiseCheminRepertoire(self._repertoire_specsPedagogiques_defaut.replace("XXX", self._codeFormation)))
-        if not chemin_fichier_session:
-            log_erreur("click sur cancel du filedialog → Pas de chemin des specs pédagogiques")
-        self._dateSpecs = time.localtime(os.path.getmtime(self._chemin_specsPedagogiques))
-        self._sDateSpecs = f"{self._dateSpecs[2]:02}/{self._dateSpecs[1]:02}/{self._dateSpecs[0]:04}"
-        #print(self._sDateSpecs)
-
-
-
-        #####
-        # Exploitation de la fiche de coûts
-        #####
-        self._chemin_fdc = filedialog.askopenfilename(title="Sélectionner la dernière fiche de coûts", filetype=[("Fichiers Excel", "*.xlsx")], initialdir=optimiseCheminRepertoire(self._repertoire_fdc_defaut.replace("XXX", self._codeFormation)))
-        if not chemin_fichier_session:
-            log_erreur("click sur cancel du filedialog → Pas de chemin de fiche de coûts")
-        self._dateFdC = time.localtime(os.path.getmtime(self._chemin_fdc))
-        self._sDateFdC = f"{self._dateFdC[2]:02}/{self._dateFdC[1]:02}/{self._dateFdC[0]:04}"
-        
-        self._df_fdc_infos, self._df_fdc_couts, self._prixVenteRetenuParParticipant, self._dateCreationFormation, self._dureeJours_fdc, self._osThematique, self._nbCible_fcd = lire_fdc(self._chemin_fdc)
-        
-
-
-
-
-        #####
-        # Exploitation de l'extract IRIS formation TODO
-        #####
-        #Date création formation
-        #Type de reconnaissance (Autre, Certification, Diplôme)
-        #Formation habilitante (bool)
-        #Reconnu au RNCP
-        #Eligible CPF
-        #Reconnue au RS
-
-
-    ### --------------------------------------------------------------------
-    #  Méthodes de la classe
-    ### --------------------------------------------------------------------
-    def mergeBilan(self, chemin_word_bilan_input, chemin_word_bilan_output):
-        """
-        A partir d'un chemin de fichier word avec des champs de fusion, on crée le bilan de formation final en incluant les données à l'intérieur.
-        Le fichier output est défini par l'utilisateur
-
-        :param s_word_bilan_input: Chemin du fichier Word contenant les champs de fusion et a employer
-        :type s_word_bilan_input: string
-        :param s_word_bilan_output: Chemin du fichier Word apres fusion des donnees
-        :type s_word_bilan_output: string
-        :return: pas de donnee en retour
-        :rtype: none
-
-        :Example:
-
-        >>> self.mergeBilan("C:\\Users\\wordIn.docx", "C:\\Users\\wordOut.docx")
-
-
-        .. seealso:: Rien du tout.
-        .. warning:: Rien du tout.
-        .. note:: Rien du tout.
-        .. todo:: Rien du tout.
-        """
-
-        #print(f"BilanFormation lancé avec : trigramme={self._codeFormation}, année={self._annee}")
-        document = MailMerge(chemin_word_bilan_input)
-        #print(document.get_merge_fields())
-
-        document.merge(
-            annee='{:%Y}'.format(date.today()),
-            codeFormation=self._codeFormation,
-            titreFormation=self._titreFormation,
-            
-            lienGED = r'file:///\\\\instnt\\PARTAGE\\FORMATIONS_C\\ACI\\',
-            osThematique = self._osThematique,
-            lieuxFormation = self._lieuxFormation,
-            dureeJours = f"{self._dureeJours:.1f}",
-            dureeHeures = f"{self._dureeHeures:.2f}",
-            dateCreationFormation = str(self._dateCreationFormation), #Actuellement pris depuis fdc, réaffecter à partir extract IRIS formations
-
-            dateSpecs = self._sDateSpecs,
-
-            dateFdC = self._sDateFdC,
-            minFdC = f"{self._df_fdc_couts.loc['Valeur fixée', 'Min participants T3']:d} p.",
-            cibleFdC = f"{self._nbCible_fcd:d} p.",
-            minIRIS = f"{self._minIRIS:d} p.",
-            cibleIRIS = f"{self._maxIRIS:d} p.",
-            maxIRIS = f"{self._depassementAutoriseIRIS:d} p.",
-
-            PT1_1 = f"{self._df_fdc_couts.loc['T1', 'Montant cible par participant']:.0f} €/p.",
-            PT1_2 = f"{self._df_fdc_couts.loc['T1', 'Montant cible par participant et par jour']:.0f} €/j/p.",
-            PT1_3 = f"{self._df_fdc_couts.loc['T1', 'Min participants T1']:d} p.",
-
-            PT3_1 = f"{self._df_fdc_couts.loc['1.1xT3', 'Montant cible par participant']:.0f} €/p.",
-            PT3_2 = f"{self._df_fdc_couts.loc['1.1xT3', 'Montant cible par participant et par jour']:.0f} €/j/p.",
-            PT3_3 = f"{self._df_fdc_couts.loc['1.1xT3', 'Min participants T1']:d} p.",
-            PT3_4 = f"{self._df_fdc_couts.loc['1.1xT3', 'Min participants T3']:d} p.",
-
-            PTR_1 = f"{self._df_fdc_couts.loc['Valeur fixée', 'Montant cible par participant']:.0f} €/p.",
-            PTR_2 = f"{self._df_fdc_couts.loc['Valeur fixée', 'Montant cible par participant et par jour']:.0f} €/j/p.",
-            PTR_3 = f"{self._df_fdc_couts.loc['Valeur fixée', 'Min participants T1']:d} p.",
-            PTR_4 = f"{self._df_fdc_couts.loc['Valeur fixée', 'Min participants T3']:d} p."
-            
-            )
-        
-        document.write(chemin_word_bilan_output)
-
 class Traiter_evalStat:
     # Obtenir :
     #   - Taux de recommandation en 2025 :	100%
@@ -1488,6 +1160,334 @@ class Traiter_evalStat:
         fenetre.mainloop()
         return choix.get("reponse")
 
+class BilanSessionV3:
+    """
+    C'est la classe qui contient tous les éléments de ma formation pour mon bilan de session V3
+
+    # TODO j'en suis là
+    # Todo Word
+    # Dans le modèle Word : gérer le lien vers la GED 
+    # Exploiter EvalStat
+    # Il y a des trous dans la raquette dans le word de sortie (checkboxes)
+    # coller des images depuis Excel
+    # ? Exploiter export formation plutôt que export sessions pour les valeurs par défaut nmin/max...
+
+    """
+    def __init__(self, codeFormation:str, annee:int, periode:str) -> None:
+        self._codeFormation:str = codeFormation
+        self._annee:int = annee
+        self._periode:str = periode
+        self._lieuPrincipal:str = "INSTN Marcoule"
+
+        self._sessions_nom_typeExport = sessions._nom_typeExport #  Provient de la valeur globale sessions
+        self._sessions_codeExport = sessions._codeExport #  Provient de la valeur globale sessions
+        self._sessions_repertoire = sessions._output.repertoire #  Provient de la valeur globale sessions
+
+        self._fe_sessions:FichierExcel = None # Fichier Excel qui contient les extracts IRIS Sessions (ou a minima celles de la période en cours)
+
+        self._titreFormation:str = None
+        self._periodeSessionsEvaluees:str = f"{self._periode} {self._annee}"
+        self._nbSessionsEvaluees:int = None
+        self._numerosSessions:str = None
+        self._nbApprenants:int = None
+        self._rp:str = None
+        self._af:str = None
+
+        #####
+        # Exploitation de l'extract IRIS sessions
+        #####
+
+        # J'ouvre un export session de IRIS et load tous ses tableaux structurés dans des DataFrame (inclus dans un FichierExcel)
+        chemin_fichier_session = filedialog.askopenfilename(title="Sélectionner l'export " + self._sessions_nom_typeExport + " (" + self._sessions_codeExport + ") Excel à employer", filetype=[("Fichiers Excel", "*.xlsx")], initialdir=self._sessions_repertoire)
+        if not chemin_fichier_session:
+            vlog.log_erreur("click sur cancel du filedialog → Pas de chemin de fichier session")
+        self._fe_sessions = FichierExcel.depuis_fichier(chemin_fichier_session)
+        #print(self._fe_session)
+        self._df_sessions = self._fe_sessions._tableaux[self._sessions_nom_typeExport]._df  # Création d'un alias
+        self._df_sessions['Trigramme formation'] = self._df_sessions['Trigramme formation'].astype(str)
+        #print(self._df_sessions.columns.to_list())
+        #print(self._df_sessions)
+        #for col in self._df_sessions.columns:
+        #    print(repr(col))
+        #print(self._df_sessions['Trigramme formation'].dtype)
+        
+        # Pour initialiser les valeurs communes, déjà on filtre le Dataframe principal avec le code formation
+        if self._periode == "1er semestre":
+            date_debut = pd.Timestamp(f'{annee}-01-01')
+            date_fin = pd.Timestamp(f'{annee}-06-30')
+        elif self._periode == "2nd semestre":
+            date_debut = pd.Timestamp(f'{annee}-07-01')
+            date_fin = pd.Timestamp(f'{annee}-12-31')
+        elif self._periode == "Année":
+            date_debut = pd.Timestamp(f'{annee}-01-01')
+            date_fin = pd.Timestamp(f'{annee}-12-31')
+        else:
+            # Cas par défaut : on ne filtre pas sur la date
+            date_debut = None
+            date_fin = None
+
+        # Application du pré-filtre avec les 3 critères trigramme, statut session et période
+        df_sessions_filtre = self._df_sessions[
+            (self._df_sessions['Trigramme formation'] == str(self._codeFormation)) &
+            (self._df_sessions['Année début ses.'] == self._annee) &
+            (self._df_sessions['Statut Session'] != "Annulée")
+        ]
+        #print(df_sessions_filtre)
+        if date_debut is not None and date_fin is not None:
+            df_sessions_filtre = df_sessions_filtre[
+                (df_sessions_filtre['Date début ses.'] >= date_debut) &
+                (df_sessions_filtre['Date début ses.'] <= date_fin)
+            ]   
+        #print(df_sessions_filtre)
+        # Afficher les sessions et dates et statuts 
+        #print(df_sessions_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Statut \nSession', 'N° Session']].to_string(index=False))
+        print(f"Liste des sessions {self._codeFormation} dans {os.path.basename(chemin_fichier_session)} - {self._periode} {self._annee}")
+        print(tabulate(
+            df_sessions_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Statut Session', 'N° Session']], 
+            headers='keys', 
+            tablefmt='pretty', 
+            showindex=False
+        ))
+        
+        #On demande à l'utilisateur les sessions qu'il veut exclure
+        exclusionSessions = self.demander_entiers()
+        if exclusionSessions:  # si la liste n'est pas vide
+            df_sessions_filtre = df_sessions_filtre[~df_sessions_filtre['Code IRIS'].isin(exclusionSessions)]
+        else:
+            # la liste est vide, on ne filtre rien, on garde tout
+            pass
+ 
+        print(tabulate(
+            df_sessions_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Statut Session', 'N° Session']], 
+            headers='keys', 
+            tablefmt='pretty', 
+            showindex=False
+        ))
+
+
+        # On définit les mergeField de Word issus de l'exrtract IRIS sessions
+        self._titreFormation = df_sessions_filtre[["Session"]].iloc[-1]
+        self._nbSessionsEvaluees = len(df_sessions_filtre)
+        self._numerosSessions = ", ".join(df_sessions_filtre["N° Session"].astype(str))
+        self._nbApprenants = df_sessions_filtre["Nb. Nommés"].sum()
+        self._rp = ", ".join(df_sessions_filtre["Trigramme RP"].astype(str))
+        self._af = ", ".join(df_sessions_filtre["Trigramme AF"].astype(str))
+
+
+        #####
+        # Exploitation des EvalStat
+        #####
+
+        # A partir de la liste df_sessions_filtre['Code IRIS'], on regarde les CSV qui ne sont pas dans le fichier Excel global
+        # On ouvre le fichier Excel global des évaluation de la formation
+        es = Traiter_evalStat.depuis_fe_evaluations_formation(self._codeFormation)
+
+        # On isole depuis ce fichier les CSV manquants
+        code_session_absents = List(set(df_sessions_filtre['Code IRIS']) - set(es._df_formation_stagiaires['Code IRIS']))
+
+        chemins_csv = {}
+        for code_IRIS in code_session_absents:
+            chemins_csv[code_IRIS] = chemin_vers_unc(es.filedialog_csv(code_IRIS=code_IRIS, trigramme=self._codeFormation))
+
+        
+
+        #TODO : Il serait bien que je gère les sessions sans CSV. Pour l'instant, j'exclue
+        # On en fait un tupe en excluant les None
+        tuple_csv_stagiaires = tuple(val for val in chemins_csv.values() if val is not None)
+
+        if tuple_csv_stagiaires:
+            es = Traiter_evalStat.depuis_tuple_csv_stagiaires(tuple_csv_stagiaires=tuple_csv_stagiaires, fe_sessions=self._fe_sessions)
+            
+
+        # On ouvre le fichier Excel EvalStat et on le filtre sur les sessions qui nous intéressent
+
+
+    @staticmethod
+    def demander_entiers(message="Pour exclure des sessions : entrez un ou plusieurs code IRIS (numéro à 5 chiffres) séparés par des espaces (ou rien pour passer) : ") -> List[str]:
+        while True:
+            entree = input(message).strip()
+            if not entree:
+                # Pas de saisie => retourner liste vide
+                return []
+            
+            # Séparer les valeurs (espaces ou virgules)
+            valeurs = [v.strip() for v in entree.replace(',', ' ').split()]
+            return valeurs
+            
+            # Vérifier que toutes les valeurs sont des entiers
+            #try:
+            #    entiers = [int(v) for v in valeurs]
+            #    return entiers
+            #except ValueError:
+            #    print("Erreur : veuillez entrer uniquement des nombres entiers, séparés par des espaces ou des virgules.")
+
+class BilanFormation:
+    """
+    C'est la classe qui contient tous les éléments de ma formation pour mon bilan
+
+    # TODO j'en suis là
+    # Todo Word
+    # Dans le modèle Word : gérer le lien vers la GED 
+    # Exploiter EvalStat
+    # Il y a des trous dans la raquette dans le word de sortie (checkboxes)
+    # coller des images depuis Excel
+    # ? Exploiter export formation plutôt que export sessions pour les valeurs par défaut nmin/max...
+    """
+    def __init__(self, codeFormation:str, annee:int):
+        
+        self._codeFormation = codeFormation
+        self._annee = annee
+
+        self._sessions_nom_typeExport = sessions._nom_typeExport #  Provient de la valeur globale sessions
+        self._sessions_codeExport = sessions._codeExport #  Provient de la valeur globale sessions
+        self._sessions_repertoire = sessions._output.repertoire #  Provient de la valeur globale sessions
+
+        self._chemin_specsPedagogiques = None
+
+        self._chemin_fdc = None
+
+        self._repertoire_fdc_defaut = rep_fdc_defaut
+        self._repertoire_specsPedagogiques_defaut = rep_specsPedagogiques_defaut
+        
+        #####
+        # Exploitation de l'extract IRIS sessions
+        #####
+
+        # J'ouvre un export session de IRIS et load tous ses tableaux structurés dans des DataFrame (inclus dans un FichierExcel)
+        chemin_fichier_session = filedialog.askopenfilename(title="Sélectionner l'export " + self._sessions_nom_typeExport + " (" + self._sessions_codeExport + ") Excel à employer", filetype=[("Fichiers Excel", "*.xlsx")], initialdir=self._sessions_repertoire)
+        if not chemin_fichier_session:
+            log_erreur("click sur cancel du filedialog → Pas de chemin de fichier session")
+        self._fe_session = FichierExcel.depuis_fichier(chemin_fichier_session)
+        #print(self._fe_session)
+        self._df_sessions = self._fe_session._tableaux[self._sessions_nom_typeExport]._df  # Création d'un alias
+
+        # Pour initialiser les valeurs communes, déjà on filtre le Dataframe principal avec le code formation
+        #df_filtre = self.__df_sessionsIRIS[(self.__df_sessionsIRIS['Trigramme formation'] == self.__codeFormation) & (self.__df_sessionsIRIS['Année début ses.'] == self.__annee)]
+        df_sessions_filtre = self._df_sessions[(self._df_sessions['Trigramme formation'] == self._codeFormation) & (self._df_sessions['Année début ses.'] == self._annee)]
+        
+        
+        # Puis on récupère la dernière ligne pour avoir les valeurs les plus à jour (tri par index)
+        [self._titreFormation, self._dureeHeures, self._dureeJours, self._minIRIS, self._maxIRIS, self._depassementAutoriseIRIS] = df_sessions_filtre[["Session", "Durée planif. (H.)", "Durée planif. (J.)", "Min.", "Max.", "Dépass. autorisé"]].iloc[-1]
+
+        # Pour obtenir la liste des RP et de leurs lieux
+        self._lieuxFormation = ""
+        for rp in df_sessions_filtre["Nom responsable pédag."].unique():
+            #print("\n\nRP = " + rp)
+            [prenomRP, nomRP, lieuRP] = df_sessions_filtre[self._df_sessions["Nom responsable pédag."] == rp][["Prénom responsable pédag.", "Nom responsable pédag.", "Lieu principal"]].iloc[-1]
+            self._lieuxFormation += prenomRP + " " + nomRP + " (" + lieuRP + "), "
+        self._lieuxFormation = self._lieuxFormation[:-2]
+        #print(self._lieuxFormation)
+
+
+
+
+        #####
+        # Exploitation des specs pédagogiques
+        #####
+        self._chemin_specsPedagogiques = filedialog.askopenfilename(title="Sélectionner les dernières specs pédagogiques", filetype=[("Fichiers PDF", "*.pdf"), ("Documents Word", "*.docx")], initialdir=optimiseCheminRepertoire(self._repertoire_specsPedagogiques_defaut.replace("XXX", self._codeFormation)))
+        if not chemin_fichier_session:
+            log_erreur("click sur cancel du filedialog → Pas de chemin des specs pédagogiques")
+        self._dateSpecs = time.localtime(os.path.getmtime(self._chemin_specsPedagogiques))
+        self._sDateSpecs = f"{self._dateSpecs[2]:02}/{self._dateSpecs[1]:02}/{self._dateSpecs[0]:04}"
+        #print(self._sDateSpecs)
+
+
+
+        #####
+        # Exploitation de la fiche de coûts
+        #####
+        self._chemin_fdc = filedialog.askopenfilename(title="Sélectionner la dernière fiche de coûts", filetype=[("Fichiers Excel", "*.xlsx")], initialdir=optimiseCheminRepertoire(self._repertoire_fdc_defaut.replace("XXX", self._codeFormation)))
+        if not chemin_fichier_session:
+            log_erreur("click sur cancel du filedialog → Pas de chemin de fiche de coûts")
+        self._dateFdC = time.localtime(os.path.getmtime(self._chemin_fdc))
+        self._sDateFdC = f"{self._dateFdC[2]:02}/{self._dateFdC[1]:02}/{self._dateFdC[0]:04}"
+        
+        self._df_fdc_infos, self._df_fdc_couts, self._prixVenteRetenuParParticipant, self._dateCreationFormation, self._dureeJours_fdc, self._osThematique, self._nbCible_fcd = lire_fdc(self._chemin_fdc)
+        
+
+
+
+
+        #####
+        # Exploitation de l'extract IRIS formation TODO
+        #####
+        #Date création formation
+        #Type de reconnaissance (Autre, Certification, Diplôme)
+        #Formation habilitante (bool)
+        #Reconnu au RNCP
+        #Eligible CPF
+        #Reconnue au RS
+
+
+    ### --------------------------------------------------------------------
+    #  Méthodes de la classe
+    ### --------------------------------------------------------------------
+    def mergeBilan(self, chemin_word_bilan_input, chemin_word_bilan_output):
+        """
+        A partir d'un chemin de fichier word avec des champs de fusion, on crée le bilan de formation final en incluant les données à l'intérieur.
+        Le fichier output est défini par l'utilisateur
+
+        :param s_word_bilan_input: Chemin du fichier Word contenant les champs de fusion et a employer
+        :type s_word_bilan_input: string
+        :param s_word_bilan_output: Chemin du fichier Word apres fusion des donnees
+        :type s_word_bilan_output: string
+        :return: pas de donnee en retour
+        :rtype: none
+
+        :Example:
+
+        >>> self.mergeBilan("C:\\Users\\wordIn.docx", "C:\\Users\\wordOut.docx")
+
+
+        .. seealso:: Rien du tout.
+        .. warning:: Rien du tout.
+        .. note:: Rien du tout.
+        .. todo:: Rien du tout.
+        """
+
+        #print(f"BilanFormation lancé avec : trigramme={self._codeFormation}, année={self._annee}")
+        document = MailMerge(chemin_word_bilan_input)
+        #print(document.get_merge_fields())
+
+        document.merge(
+            annee='{:%Y}'.format(date.today()),
+            codeFormation=self._codeFormation,
+            titreFormation=self._titreFormation,
+            
+            lienGED = r'file:///\\\\instnt\\PARTAGE\\FORMATIONS_C\\ACI\\',
+            osThematique = self._osThematique,
+            lieuxFormation = self._lieuxFormation,
+            dureeJours = f"{self._dureeJours:.1f}",
+            dureeHeures = f"{self._dureeHeures:.2f}",
+            dateCreationFormation = str(self._dateCreationFormation), #Actuellement pris depuis fdc, réaffecter à partir extract IRIS formations
+
+            dateSpecs = self._sDateSpecs,
+
+            dateFdC = self._sDateFdC,
+            minFdC = f"{self._df_fdc_couts.loc['Valeur fixée', 'Min participants T3']:d} p.",
+            cibleFdC = f"{self._nbCible_fcd:d} p.",
+            minIRIS = f"{self._minIRIS:d} p.",
+            cibleIRIS = f"{self._maxIRIS:d} p.",
+            maxIRIS = f"{self._depassementAutoriseIRIS:d} p.",
+
+            PT1_1 = f"{self._df_fdc_couts.loc['T1', 'Montant cible par participant']:.0f} €/p.",
+            PT1_2 = f"{self._df_fdc_couts.loc['T1', 'Montant cible par participant et par jour']:.0f} €/j/p.",
+            PT1_3 = f"{self._df_fdc_couts.loc['T1', 'Min participants T1']:d} p.",
+
+            PT3_1 = f"{self._df_fdc_couts.loc['1.1xT3', 'Montant cible par participant']:.0f} €/p.",
+            PT3_2 = f"{self._df_fdc_couts.loc['1.1xT3', 'Montant cible par participant et par jour']:.0f} €/j/p.",
+            PT3_3 = f"{self._df_fdc_couts.loc['1.1xT3', 'Min participants T1']:d} p.",
+            PT3_4 = f"{self._df_fdc_couts.loc['1.1xT3', 'Min participants T3']:d} p.",
+
+            PTR_1 = f"{self._df_fdc_couts.loc['Valeur fixée', 'Montant cible par participant']:.0f} €/p.",
+            PTR_2 = f"{self._df_fdc_couts.loc['Valeur fixée', 'Montant cible par participant et par jour']:.0f} €/j/p.",
+            PTR_3 = f"{self._df_fdc_couts.loc['Valeur fixée', 'Min participants T1']:d} p.",
+            PTR_4 = f"{self._df_fdc_couts.loc['Valeur fixée', 'Min participants T3']:d} p."
+            
+            )
+        
+        document.write(chemin_word_bilan_output)
+
 class Traiter_REE:
     def __init__(self):
         # Fichier renseigné par la ressource extérieure
@@ -1705,11 +1705,7 @@ class Traiter_contactsApprentis:
 
     # === Initialisations statiques ===
     # Colonnes du fichier etudiant à récupérer
-    _COLONNES_FE_ETUDIANTS = [
-        "Cursus", 
-        "Nom", "Prénom", "Mail apprenti", "Téléphone apprenti", 
-        "Entreprise ", "Lieu entreprise", "Nom TE", "Prénom TE", "Mail TE", "Téléphone TE", "Ma fonction de suivi de l'alternant", 
-        "Engagement des parties", "Entretien de prise de fonction", "1ère visite en entreprise", "2ème visite en entreprise", "Fiche évaluation 1", "Fiche évaluation 2"]
+    _colonnes_fe_etudiants = []
 
 
     def __init__(self, chemin_fichier_etudiants:str, nom_onglet:str) -> None:
@@ -1722,10 +1718,6 @@ class Traiter_contactsApprentis:
             chemin_fichier = chemin_fichier_etudiants,
             nom_onglet = nom_onglet
         )
-
-        # On réduit le DataFrame aux informations qui nous sont utiles
-        self._df_etudiants = self._fe_etudiants._tableaux[nom_onglet]._df[self._COLONNES_FE_ETUDIANTS] # On ne garde que les colonnes qui nous intéressent mais attention ça reste une vue dont les modifications affectent le dataframe initial
-        self._df_etudiants = self._df_etudiants[self._df_etudiants["Ma fonction de suivi de l'alternant"] == "Tuteur"]
 
     @classmethod
     def UGA(cls) -> Traiter_contactsApprentis:
@@ -1745,6 +1737,11 @@ class Traiter_contactsApprentis:
         
         nom_onglet = "Etudiants"
         
+        colonnes_fe_etudiants = [
+            "Cursus", 
+            "Nom", "Prénom", "Mail apprenti", "Téléphone apprenti", 
+            "Entreprise ", "Lieu entreprise", "Nom TE", "Prénom TE", "Mail TE", "Téléphone TE", "Ma fonction de suivi de l'alternant", 
+            "Engagement des parties", "Entretien de prise de fonction", "1ère visite en entreprise", "2ème visite en entreprise", "Fiche évaluation 1", "Fiche évaluation 2"]
 
         # Entretiens
         prise_de_fonction = cls.PropEntretien(
@@ -1793,6 +1790,11 @@ class Traiter_contactsApprentis:
         instance._chemin_modele_mail_priseContact = chemin_modele_mail_priseContact
         instance._envoyer_mail = envoyer_mail
         instance._mail_responsables_univ = mail_responsables_univ
+        instance._colonnes_fe_etudiants = colonnes_fe_etudiants
+        
+        # On réduit le DataFrame aux informations qui nous sont utiles
+        instance._df_etudiants = instance._fe_etudiants._tableaux[nom_onglet]._df[instance._colonnes_fe_etudiants] # On ne garde que les colonnes qui nous intéressent mais attention ça reste une vue dont les modifications affectent le dataframe initial
+        instance._df_etudiants = instance._df_etudiants[instance._df_etudiants["Ma fonction de suivi de l'alternant"] == "Tuteur"]
 
         # RDV entretiens
         instance._entretiens.append(prise_de_fonction)
@@ -1812,7 +1814,86 @@ class Traiter_contactsApprentis:
 
 
         # Tests :
-        instance._df_etudiants = instance._df_etudiants.head(1)
+        #instance._df_etudiants = instance._df_etudiants.head(1)
+        
+        return instance
+
+    @classmethod
+    def L3D(cls) -> Traiter_contactsApprentis:
+        """
+        """
+
+        # === Initialisations statiques ===
+        annee_scolaire = "2025-2026"
+        envoyer_mail = False
+
+        prefixe_sujet = "LP3D - Suivi d'alternance"
+        mail_responsables_univ = "isabelle.techer@unimes.fr"
+
+        chemin_modele_mail_priseContact = r"C:\Users\vt238770\Documents\_CEA\Modèles adaptés\Mails\LP3D\LP3D - Tutorat en entreprise - Prise de contact.msg"
+
+        chemin_fichier_etudiants =  fr"\\instnt\partage\FORMATIONS_I\LP3D+-démantelement désamiantage dépollution\{annee_scolaire}\1-dossier etudiants\LP3D - {annee_scolaire.replace('-', '_')}.xlsx"
+        
+        nom_onglet = "Etudiants"
+        
+        colonnes_fe_etudiants = [
+            "Cursus", 
+            "Nom", "Prénom", "Mail apprenti", "Téléphone apprenti", 
+            "Entreprise ", "Lieu entreprise", "Nom TE", "Prénom TE", "Mail TE", "Téléphone TE", "Ma fonction de suivi de l'alternant", 
+            "Première prise de contact", "Documents CFA à viser", "Entretien d'installation", "Entretien d’installation + fin période 1 en entreprise", "2ème entretien : fin période 2 en entreprise", "3ème entretien : milieu période 3 en entreprise"]
+
+        # Entretiens
+        premiere_visite = cls.PropEntretien(
+            sujet = "Entretien d’installation + fin période 1 en entreprise",
+            chemin_modele = r"C:\Users\vt238770\Documents\_CEA\Modèles adaptés\Mails\LP3D\LP3D - Suivi d'alternance - Entretien.oft",
+            duree = timedelta(hours=0, minutes=45),
+            date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=51) # (Autour du 15 décembre : dernière semaine avant vacances Noël et reprise école → A faire avant début janvier)
+        )
+        
+        deuxieme_visite = cls.PropEntretien(
+            sujet = "2ème entretien : fin période 2 en entreprise",
+            chemin_modele = r"C:\Users\vt238770\Documents\_CEA\Modèles adaptés\Mails\LP3D\LP3D - Suivi d'alternance - Entretien.oft",
+            duree = timedelta(hours=1),
+            date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=15) # (Autour du 6 avril : dernière semaine avant reprise école → A faire avant 17 avril)
+        )
+
+        troisieme_visite = cls.PropEntretien(
+            sujet = "3ème entretien : milieu période 3 en entreprise",
+            chemin_modele = r"C:\Users\vt238770\Documents\_CEA\Modèles adaptés\Mails\LP3D\LP3D - Suivi d'alternance - Entretien.oft",
+            duree = timedelta(hours=1),
+            date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=28) # (Autour du 6 juillet : avant vacances de chacun → A faire avant fin août)
+        )
+        
+
+        # Initialisation de l'instance
+        instance = cls(chemin_fichier_etudiants, nom_onglet)
+
+        # Constantes du contexte UGA
+        instance._annee_scolaire = annee_scolaire
+        instance._prefixe_sujet = prefixe_sujet
+        instance._chemin_modele_mail_priseContact = chemin_modele_mail_priseContact
+        instance._envoyer_mail = envoyer_mail
+        instance._mail_responsables_univ = mail_responsables_univ
+        instance._colonnes_fe_etudiants = colonnes_fe_etudiants
+        
+        # On réduit le DataFrame aux informations qui nous sont utiles
+        instance._df_etudiants = instance._fe_etudiants._tableaux[nom_onglet]._df[instance._colonnes_fe_etudiants] # On ne garde que les colonnes qui nous intéressent mais attention ça reste une vue dont les modifications affectent le dataframe initial
+        instance._df_etudiants = instance._df_etudiants[instance._df_etudiants["Ma fonction de suivi de l'alternant"] == "Tuteur"]
+
+        # RDV entretiens
+        instance._entretiens.append(premiere_visite)
+        instance._entretiens.append(deuxieme_visite)
+        instance._entretiens.append(troisieme_visite)
+
+        # Relances → Doit avoir la même structure que les colonnes Excel qui trace les retours tuteurs et apprentis
+        instance._relances.append("Documents CFA à viser")
+        instance._relances.append("Entretien d'installation")
+        for entretien in instance._entretiens:
+            instance._relances.append(entretien.sujet)
+
+
+        # Tests :
+        #instance._df_etudiants = instance._df_etudiants.head(1)
         
         return instance
 
