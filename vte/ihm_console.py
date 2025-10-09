@@ -14,21 +14,24 @@ class IHM_console:
     Exemple d’utilisation
     ---------------------
     >>> menus = {
-    ...     "Mails": {
+    ...     # Lancer une action avec sélection
+    ...     "Mails": {  
     ...         "Mail de premier contact": {
-    ...             "action": ca.creer_mails_contactInitial,
-    ...             "kwargs": {},
-    ...             "demander": []
+    ...             "action": ca.creer_mails_contactInitial, # Action à employer
+    ...             "kwargs": {}, # Arguments donnés automatiquement à la fonction – Pëut être enlevé si vide
+    ...             "demander": [] # Arguments demandés spécifiquement à l'utilisateur – Tout argument obligatoire non spécifié en kwarg est automatiquement demandé (pas besoin de respécifier) – Pëut être enlevé si vide
     ...         }
     ...     },
+    ...     # Liste les valeurs (string) d'une liste (ici ca._entretiens est une liste d'objets et on récupère pour chaque item ca._entretiens.sujet qui est un string)
     ...     "RDV Outlook": {
     ...         "Créer un RDV pour un entretien": {
     ...             "sous-menu": [ca._entretiens, "sujet"],  # affiche l’attribut .sujet
     ...             "action": ca.creer_rdv,
-    ...             "kwargs": lambda p: {"prop": p},
+    ...             "kwargs": lambda p: {"prop": p},  # injecte la string choisie dans l’appel (i.e. le nom de prop)
     ...             "demander": []
     ...         }
     ...     },
+    ...     # Liste les valeurs (string) d'une liste (ici ca._relances est une liste de string donc pas de 2ème argument à la liste)
     ...     "Relances": {
     ...         "Choisir un type de relance": {
     ...             "sous-menu": [ca._relances, None],  # liste de str, donc on affiche directement str(obj)
@@ -36,6 +39,12 @@ class IHM_console:
     ...             "kwargs": lambda r: {"relance": r},  # injecte la string choisie dans l’appel (i.e. le nom de la relance)
     ...             "demander": []
     ...         }
+    ...     }
+    ...     # Liste les valeurs (string) d'une liste de str (donc pas de 2nd argument) ; l'action applique la fonction de la clef (i.e du choix)
+    ...     # On ne met ni kwargs ni demander car vides et ces clefs sont facultatives
+    ...     "Choisir le contexte": {
+    ...         "sous-menu": [list(mapping.keys()), None],  # affiche directement les noms des contextes ; mapping est un dictionnaire {"UGA": Traiter_contactsApprentis.UGA,"L3D": Traiter_contactsApprentis.L3D}
+    ...         "action": lambda choix: mapping[choix]()   # crée l'instance correspondante
     ...     }
     ... }
     >>> ihm = IHM_console(menus)
@@ -61,6 +70,77 @@ class IHM_console:
         """
         self.menus:str = menus
         self.contexte = contexte
+
+
+    @classmethod
+    def depuis_sous_menu(cls, liste, action=None, attr=None, titre="Sous-menu"):
+        """
+        Constructeur rapide pour créer un menu console à partir d'une liste
+        et récupérer directement le choix utilisateur.
+
+        Exemple d’usage :
+        -----------------
+        >>> mapping = {"UGA": Traiter_contactsApprentis.UGA, "L3D": Traiter_contactsApprentis.L3D}
+        >>> contexte = IHM_console.depuis_sous_menu(
+        ...     liste=list(mapping.keys()),
+        ...     action=lambda choix: mapping[choix](),
+        ...     titre="Choisir le contexte"
+        ... )
+        (renvoie l’objet contexte sélectionné)
+
+        Paramètres
+        ----------
+        liste : list
+            Liste d’éléments à afficher (chaînes ou objets)
+        action : callable
+            Fonction à exécuter sur l’élément choisi. Peut renvoyer un résultat.
+        attr : str | None
+            Si non None, on affiche getattr(obj, attr) pour chaque élément.
+            Si None, on affiche directement str(obj).
+        titre : str
+            Titre affiché pour le sous-menu.
+
+        Retour
+        ------
+        Tout objet renvoyé par `action(élément_choisi)`, ou l’élément lui-même si action=None.
+        None si l’utilisateur quitte (choix 0).
+        """
+        print(f"\n--- {titre} ---")
+
+        # Préparation du sous-menu
+        if attr:
+            sous_menu_temp = {getattr(obj, attr): obj for obj in liste}
+        else:
+            sous_menu_temp = {str(obj): obj for obj in liste}
+
+        # Boucle d’interaction utilisateur
+        while True:
+            options = list(sous_menu_temp.keys())
+            for i, opt in enumerate(options, start=1):
+                print(f"{i}. {opt}")
+            print("0. Retour")
+
+            try:
+                choix = int(input("Votre choix : "))
+            except ValueError:
+                print("⚠️ Entrée invalide, merci de saisir un nombre.")
+                continue
+
+            if choix == 0:
+                return None  # Quitter sans rien renvoyer
+
+            if not (1 <= choix <= len(options)):
+                print("⚠️ Choix invalide, réessayez.")
+                continue
+
+            label = options[choix - 1]
+            element_choisi = sous_menu_temp[label]
+
+            # Retourne le résultat de l’action si fournie, sinon l’élément choisi
+            if action:
+                return action(element_choisi)
+            else:
+                return element_choisi
 
     # -------------------------------------------------------------------------
     # MÉTHODE : demander_saisie
@@ -161,7 +241,7 @@ class IHM_console:
     # -------------------------------------------------------------------------
     # MÉTHODE : afficher_menu
     # -------------------------------------------------------------------------
-    def afficher_menu(self, menu=None, titre="Menu principal"):
+    def afficher_menu(self, menu=None, titre="Menu principal", arret_apres_action=False):
         """
         Affiche un menu interactif en console et permet à l’utilisateur
         de naviguer dans les options.
@@ -248,7 +328,10 @@ class IHM_console:
 
             # Cas 2 : action directe
             elif isinstance(valeur, dict) and "action" in valeur:
-                self.executer_action(valeur)
+                resultat_action = self.executer_action(valeur)
+                
+                if arret_apres_action:
+                    return resultat_action  # quitte la boucle directement
 
             # Cas 3 : sous-menu statique
             elif isinstance(valeur, dict):

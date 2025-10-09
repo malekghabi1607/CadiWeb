@@ -5,9 +5,25 @@ from vte.ihm_tkinter import IHMTkinter
 #import Traiter_contactsApprentis
 #import Mail
 
+# =====================================================
+# MAPPING CENTRALISÉ DES CONTEXTES DISPONIBLES
+# =====================================================
+CONTEXTES_MAPPING = {
+    "UGA": Traiter_contactsApprentis.UGA,
+    "L3D": Traiter_contactsApprentis.L3D
+}
+    
+# mode = input("Choisir mode (console/tkinter) : ").strip().lower()
+mode = "console"
+#mode = "tkinter"
 
-def main():
+
+def main(retour_contexte_menus=False):
     """
+    Fonction principale :
+    1) Affiche un mini-menu IHM_console pour choisir le contexte.
+    2) Lance le menu principal correspondant.
+    
     Ex déclaration de menu:
     menus = {
         "Mails": {
@@ -29,8 +45,32 @@ def main():
     }
     """
     #contexte = Traiter_contactsApprentis.UGA()
-    contexte = Traiter_contactsApprentis.L3D()
+    #contexte = Traiter_contactsApprentis.L3D()
     #gt = GestionTutoratUGA(ca, Mail)
+
+
+    # --- Étape 1 : choix du contexte ---
+    #menu_contexte = {
+    #    "sous-menu": [list(CONTEXTES_MAPPING.keys()), None],
+    #    "action": lambda choix: CONTEXTES_MAPPING[choix]()  # crée et renvoie le bon contexte
+    #}
+
+    #ihm_context = IHM_console(menu_contexte)
+    #contexte = ihm_context.afficher_menu(arret_apres_action=True)
+    #if contexte is None:
+    #    print("⚠️ Aucun contexte sélectionné, arrêt du programme.")
+    #    return  # ou sys.exit(), ou un comportement par défaut
+
+    # Appel direct, menu interactif pour choisir le contexte
+    contexte = IHM_console.depuis_sous_menu(
+        liste=list(CONTEXTES_MAPPING.keys()),
+        action=lambda choix: CONTEXTES_MAPPING[choix](),  # renvoie l’instance du contexte choisi
+        titre="Choisir le contexte"
+    )
+
+# contexte contient maintenant Traiter_contactsApprentis.UGA() ou L3D()
+
+    # --- Étape 2 : définition du menu principal ---
 
     # Définition des menus
     menus = {
@@ -63,11 +103,12 @@ def main():
             "demander": []
         }
     }
+
     
-    # mode = input("Choisir mode (console/tkinter) : ").strip().lower()
-    mode = "console"
-    #mode = "tkinter"
-    
+
+    if retour_contexte_menus :
+        return contexte, menus
+
 
     if mode == "console":
         ihm = IHM_console(menus, contexte=contexte)
@@ -75,7 +116,6 @@ def main():
     else:
         ihm = IHMTkinter(menus)
         ihm.lancer()
-
 
 
 if __name__ == "__main__":
