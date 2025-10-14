@@ -1576,19 +1576,56 @@ class REE:
                 doc.chemin_fichier = os.path.join(self._repertoire_documents_ree, doc.nom_fichier)"""
         print()
 
+    def envoyerMail_REE(self, 
+        statut:str, 
+        destinataire:Optional[Union[str, List[str], pd.Series]] = None, 
+        copie:Optional[Union[str, List[str], pd.Series]] = None
+    ) -> None:
+        # TODO : comment récupérer le statu depuis Excel ?
+        # TODO : comment faire une boucle auto sur les personnes à qui envoyer ?
+        """
+        Prépare et envoie automatiquement un e-mail d'informations administratives
+        via Outlook à partir d'un modèle pré-défini (.msg), selon le statut de l'intervenant.
 
-    def envoyerMail_nouveau_REE(self):
-        # Mail nouveau REE
+        Cette méthode :
+        - récupère la liste des documents requis pour un type d'intervenant (ex. Vacataire, CEA, etc.)
+        - construit dynamiquement le corps du message (HTML) listant les documents à fournir
+        - ajoute automatiquement les pièces jointes correspondantes
+        - ouvre un e-mail Outlook basé sur le modèle type, avec remplacement des balises
+            ###statut### et ###listeInfos### dans le corps du message.
 
-        print()
+        Args:
+            statut (str):
+                Statut de l'intervenant (ex. `"Vacataire"`, `"CEA"`, `"Auto-entrepreneur"`, ...).
+                Sert à filtrer les documents associés à ce type d'intervenant.
+            destinataire (Optional[Union[str, List[str], pd.Series]], optional):
+                Adresse(s) e-mail des destinataires principaux.
+                Peut être une chaîne unique, une liste de chaînes ou une série Pandas.
+                Exemple : `"nom.prenom@domaine.com"` ou `["a@x.com", "b@y.com"]`.
+            copie (Optional[Union[str, List[str], pd.Series]], optional):
+                Adresse(s) e-mail des destinataires en copie (CC).
 
-    def envoyerMail_REE_existant(self):
-        # Mail REE existant
+        Returns:
+            None
 
-        print()
+        Raises:
+            FileNotFoundError:
+                Si le modèle de mail (_chemin_mailtype_informationsAdministratives) est introuvable.
+            Exception:
+                Toute erreur lors de la création ou de l'ouverture du mail Outlook.
+
+        Example:
+            >>> ree = REE()
+            >>> ree.envoyerMail_REE(
+            ...     statut="Vacataire",
+            ...     destinataire="vacataire@exemple.com",
+            ...     copie=["admin@instn.fr", "drh@instn.fr"]
+            ... )
+            # Ouvre un mail Outlook basé sur le modèle "Demande des informations administratives"
+            # avec la liste des documents à fournir par le vacataire et les fichiers joints.
+        """
 
 
-    def envoyerMail_REE(self, statut:str, destinataire:Optional[Union[str, List[str], pd.Series]] = None, copie:Optional[Union[str, List[str], pd.Series]] = None):
         # Faire choix auto pour existant ou nouveau
 
         #Je crée le texte pour listeInfo
@@ -1626,9 +1663,6 @@ class REE:
             remplaceBalises=[["###statut###", statut], ["###listeInfos###", listeInfos]]
         )
 
-        print()
-
-    #def lister_documents_mail
 
 class Traiter_REE_BAK:
     def __init__(self):
