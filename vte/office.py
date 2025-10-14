@@ -1638,7 +1638,8 @@ class Mail:
         sujet: Optional[str] = None,
         corps_html: Optional[str] = None,
         pieces_jointes: Optional[Union[str, List[str], pd.Series]] = None,
-        envoyer_mail: bool = False
+        envoyer_mail: bool = False,
+        remplaceBalises: Optional[List[List[str]]] = None,  #liste de couples [[texte_a_remplacer, texte_de_remplacement], ...]
     ) -> None:
         """
         Crée un mail Outlook à partir d'un modèle .msg et ajoute éventuellement
@@ -1653,6 +1654,7 @@ class Mail:
         >>>     sujet="Sujet test",
         >>>     corps_html="<p>Bonjour</p>",
         >>>     pieces_jointes=["C:/fichier.pdf"],
+        >>>     adaptations=[["###statut###", "Vacataire"], ["###annee###", "2025"]],
         >>>     envoyer_mail=False
         >>> )
         """
@@ -1661,6 +1663,13 @@ class Mail:
 
         outlook = win32com.client.Dispatch("Outlook.Application")
         mail = outlook.CreateItemFromTemplate(os.path.abspath(chemin_modele))
+
+        # ✅ Si des adaptations sont fournies, on les applique dans le corps du mail
+        if remplaceBalises:
+            corps = mail.HTMLBody
+            for ancien, nouveau in remplaceBalises:
+                corps = corps.replace(ancien, nouveau)
+            mail.HTMLBody = corps
 
         # Utilise la méthode factorisée
         cls._creer_mail(
