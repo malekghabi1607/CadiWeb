@@ -1566,12 +1566,19 @@ class Mail:
         if sujet:
             mail.Subject = sujet
 
-        # Affichage pour forcer la signature
-        mail.Display()
-
-        # Ajouter corps HTML
-        signature = mail.HTMLBody
-        mail.HTMLBody = (corps_html or "") + signature
+        # Affichage pour forcer la signature si on crée un mail vierge
+        if mail_obj is None:
+            # mail vierge : forcer l'affichage pour obtenir la signature
+            mail.Display()
+            signature = mail.HTMLBody
+            # si corps_html fourni on l'insère avant la signature, sinon on garde la signature seule
+            mail.HTMLBody = (corps_html or "") + signature
+        else:
+            # mail depuis modèle : ne pas "réinserer" la signature.
+            # si corps_html est fourni, on remplace le body du modèle par corps_html
+            if corps_html is not None:
+                mail.HTMLBody = corps_html
+            # sinon on laisse le corps du modèle tel quel (possiblement déjà adapté)
 
         # Ajouter pièces jointes
         for pj in pj_list:
@@ -1669,7 +1676,10 @@ class Mail:
             corps = mail.HTMLBody
             for ancien, nouveau in remplaceBalises:
                 corps = corps.replace(ancien, nouveau)
-            mail.HTMLBody = corps
+            # on passe le corps adapté à _creer_mail pour être sûr qu'il soit utilisé
+            corps_html = corps
+        else:
+            corps_html = None
 
         # Utilise la méthode factorisée
         cls._creer_mail(
