@@ -1535,7 +1535,7 @@ class REE:
         "CV" : DocREE(
             nom_fichier=r"CV-Type.docx", 
             frequence_maj=["Initialisation", "Mise à jour"],
-            intervenants=["vacataire", "contrat spécifique de collaboration", "auto-entrepreneur"]
+            intervenants=["CEA", "vacataire", "contrat spécifique de collaboration", "auto-entrepreneur"]
         ),
         "RIB" : DocREE( 
             frequence_maj=["Initialisation", "Mise à jour"],
@@ -1561,74 +1561,11 @@ class REE:
 
     }
 
-    
-    """
-    _ficheAdmin = DocREE(
-        nom = "Fiche administrative",
-        nom_fichier=r"Fiche administrative vacataire INSTN.docx", 
-        frequence_maj=["initialisation du dossier", "s'il y a une mise à jour"]
-        )
-
-    _cv = DocREE(
-        nom = "CV",
-        nom_fichier=r"CV-Type.docx", 
-        frequence_maj=["Initialisation", "Mise à jour"]
-        )
-
-    _rib = DocREE(
-        nom = "RIB",
-        frequence_maj=["Initialisation", "Mise à jour"]
-        )
-
-    _ae = DocREE(
-        nom = "Attestation employeur",
-        nom_fichier=r"Attestation employeur.docx", 
-        frequence_maj=["Initialisation", "Tous les ans"]
-    )
-
-    _devis = DocREE(
-        nom = "Devis",
-        frequence_maj=["Initialisation", "Tous les ans"]
-    )
-
-    _bilanPedagogique = enregistrer_docRee_dico(
-        nom = "Bilan pédagogique et financier année n-1",
-        frequence_maj=["Initialisation", "Tous les ans"]
-    )
-
-    _guideIntervenant = enregistrer_docRee_dico(
-        nom = "Guide pour l'intervenant",
-        nom_fichier=r"Guide pour l'intervenant.pdf"
-        )"""
-
     _correspondance_frequence_texte = {
         "Initialisation" : "initialisation du dossier",
         "Mise à jour" : "s'il y a une mise à jour",
-        "Tous les ans" : "chaque année civile"
+        "Tous les ans" : "<strong><u>chaque année civile</u></strong>"
     }
-
-    # Type des intervenants
-    """_cea = enregistrer_intervenant_dico(
-        nom = "CEA",
-        docs = [_ficheAdmin, _cv]
-    )
-
-    _vacataire = enregistrer_intervenant_dico(
-        nom = "Vacataire",
-        docs = [_ficheAdmin, _cv, _rib, _ae]
-    )
-
-    _contratSpecifique = enregistrer_intervenant_dico(
-        nom = "Contrat spécifique",
-        docs = [_ficheAdmin, _cv, _ae]
-    )
-
-    _autoEntrepreneur = enregistrer_intervenant_dico(
-        nom = "Auto-entrepreneur",
-        docs = [_ficheAdmin, _cv, _rib, _devis, _bilanPedagogique]
-    )
-    """
-
  
 
     def __init__(self):
@@ -1659,19 +1596,25 @@ class REE:
         
         listeInfos:str = ""
         listePJ:List[str] = []
-
+        #self._correspondance_frequence_texte
         for nom_doc, doc in self._docsREE.items():
             if statut in doc.intervenants:
                 # Gestion de la liste des infos à afficher dans le mail
                 if doc.frequence_maj is not None:
-                    listeInfos += f"\t• {nom_doc} ({', '.join(self._correspondance_frequence_texte[doc.frequence_maj])})\n"  
+                    # On mappe chaque élément de doc.frequence_maj via le dictionnaire
+                    frequences = [
+                        self._correspondance_frequence_texte.get(freq, freq)
+                        for freq in doc.frequence_maj or []
+                    ]
+
+                    listeInfos += f"<li><strong>{nom_doc}</strong> <em>({', '.join(frequences)})</em></li>\n"  
 
                 # Gestion des PJ à mettre dans le mail
                 if doc.nom_fichier is not None:
                     listePJ.append(os.path.join(self._repertoire_documents_ree, doc.nom_fichier))            
         
-        print(listeInfos)
-        print(listePJ)
+        if listeInfos != "":
+            listeInfos = "<ul> "+listeInfos+" </ul>\n"
 
         #Remplacer les textes avec statut et listeInfos
 
@@ -1679,7 +1622,8 @@ class REE:
             chemin_modele=self._chemin_mailtype_informationsAdministratives,
             destinataires=destinataire,
             copies=copie,
-            pieces_jointes=listePJ
+            pieces_jointes=listePJ,
+            remplaceBalises=[["###statut###", statut], ["###listeInfos###", listeInfos]]
         )
 
         print()

@@ -1585,7 +1585,9 @@ class Mail:
             mail.Attachments.Add(pj)
 
         # Envoyer ou laisser affiché
-        if envoyer_mail:
+        if not envoyer_mail:
+            mail.Display()
+        else:
             mail.Send()
 
         # Nettoyage COM
@@ -1672,14 +1674,15 @@ class Mail:
         mail = outlook.CreateItemFromTemplate(os.path.abspath(chemin_modele))
 
         # ✅ Si des adaptations sont fournies, on les applique dans le corps du mail
+        corps = mail.HTMLBody
         if remplaceBalises:
-            corps = mail.HTMLBody
             for ancien, nouveau in remplaceBalises:
                 corps = corps.replace(ancien, nouveau)
-            # on passe le corps adapté à _creer_mail pour être sûr qu'il soit utilisé
-            corps_html = corps
-        else:
-            corps_html = None
+
+
+        # si un corps est passé manuellement, il a la priorité
+        if corps_html:
+            corps = corps_html
 
         # Utilise la méthode factorisée
         cls._creer_mail(
@@ -1688,7 +1691,7 @@ class Mail:
             copies=copies,
             copies_cachees=copies_cachees,
             sujet=sujet,
-            corps_html=corps_html,
+            corps_html=corps,
             pieces_jointes=pieces_jointes,
             envoyer_mail=envoyer_mail
         )
