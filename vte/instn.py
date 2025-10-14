@@ -1488,7 +1488,205 @@ class BilanFormation:
         
         document.write(chemin_word_bilan_output)
 
-class Traiter_REE:
+
+
+@dataclass
+class TypeIntervenant:
+    nom:str
+    docs:List[REE.DocREE]
+
+class REE:
+    @dataclass
+    class DocREE:
+        frequence_maj:Optional[List[str]] = None
+        nom_fichier:Optional[str] = None
+        chemin_fichier:Optional[str] = None
+        intervenants:Optional[List[str]] = None
+
+    """
+    def enregistrer_docRee_dico(nom: str, frequence_maj:Optional[List[str]], nom_fichier:Optional[str] = None) -> DocREE:
+        doc = DocREE(nom, frequence_maj, nom_fichier)
+        REE._docsREE[nom] = doc
+        return doc
+
+
+    def enregistrer_intervenant_dico(cls, nom: str, docs: list[REE.DocREE]) -> TypeIntervenant:
+        ti = cls.TypeIntervenant(nom, docs)
+        cls._typesIntervenants[nom] = ti
+        return ti"""
+
+    
+    #destinataires=["CEA", "Vacataire", "Contrat spécifique", "Auto-entrepreneur", "Prestataire"]
+    
+    _repertoire_documents_ree:str = r"\\harmonie\instn\uem\_Documents_communs\Formations\Formateurs\0.Docs à envoyer"
+    _chemin_mailtype_informationsAdministratives = r"\\harmonie\instn\uem\_Documents_communs\Formations\Formateurs\Mails types\Demande des informations administratives.msg"
+
+    _docsREE:dict[DocREE] = {}  # Dictionnaire des documents (fiche admin, CV...)
+    _typesIntervenants:dict[TypeIntervenant] = {}  # Dictionnaire des types d'intervenant (CEA, vacataire...)
+
+
+    # Documents à envoyer / demander
+    _docsREE:dict[DocREE] ={
+        "Fiche administrative" : DocREE(
+            nom_fichier=r"Fiche administrative vacataire INSTN.docx", 
+            frequence_maj=["Initialisation", "Mise à jour"],
+            intervenants=["CEA", "vacataire", "contrat spécifique de collaboration", "auto-entrepreneur"]
+        ),
+        "CV" : DocREE(
+            nom_fichier=r"CV-Type.docx", 
+            frequence_maj=["Initialisation", "Mise à jour"],
+            intervenants=["vacataire", "contrat spécifique de collaboration", "auto-entrepreneur"]
+        ),
+        "RIB" : DocREE( 
+            frequence_maj=["Initialisation", "Mise à jour"],
+            intervenants=["vacataire", "auto-entrepreneur"]
+        ),
+        "Attestation employeur" : DocREE(
+            nom_fichier=r"Attestation employeur.docx", 
+            frequence_maj=["Initialisation", "Tous les ans"],
+            intervenants=["vacataire", "contrat spécifique de collaboration"]
+        ),
+        "Devis" : DocREE(
+            frequence_maj=["Initialisation", "Tous les ans"],
+            intervenants=["auto-entrepreneur"]
+        ),
+        "Bilan pédagogique et financier année n-1" : DocREE(
+            frequence_maj=["Initialisation", "Tous les ans"],
+            intervenants=["auto-entrepreneur"]
+        ),
+        "Guide pour l'intervenant" : DocREE(
+            nom_fichier=r"Guide pour l'intervenant.pdf",
+            intervenants=["CEA", "vacataire", "contrat spécifique de collaboration", "auto-entrepreneur"]
+        ),
+
+    }
+
+    
+    """
+    _ficheAdmin = DocREE(
+        nom = "Fiche administrative",
+        nom_fichier=r"Fiche administrative vacataire INSTN.docx", 
+        frequence_maj=["initialisation du dossier", "s'il y a une mise à jour"]
+        )
+
+    _cv = DocREE(
+        nom = "CV",
+        nom_fichier=r"CV-Type.docx", 
+        frequence_maj=["Initialisation", "Mise à jour"]
+        )
+
+    _rib = DocREE(
+        nom = "RIB",
+        frequence_maj=["Initialisation", "Mise à jour"]
+        )
+
+    _ae = DocREE(
+        nom = "Attestation employeur",
+        nom_fichier=r"Attestation employeur.docx", 
+        frequence_maj=["Initialisation", "Tous les ans"]
+    )
+
+    _devis = DocREE(
+        nom = "Devis",
+        frequence_maj=["Initialisation", "Tous les ans"]
+    )
+
+    _bilanPedagogique = enregistrer_docRee_dico(
+        nom = "Bilan pédagogique et financier année n-1",
+        frequence_maj=["Initialisation", "Tous les ans"]
+    )
+
+    _guideIntervenant = enregistrer_docRee_dico(
+        nom = "Guide pour l'intervenant",
+        nom_fichier=r"Guide pour l'intervenant.pdf"
+        )"""
+
+    _correspondance_frequence_texte = {
+        "Initialisation" : "initialisation du dossier",
+        "Mise à jour" : "s'il y a une mise à jour",
+        "Tous les ans" : "chaque année civile"
+    }
+
+    # Type des intervenants
+    """_cea = enregistrer_intervenant_dico(
+        nom = "CEA",
+        docs = [_ficheAdmin, _cv]
+    )
+
+    _vacataire = enregistrer_intervenant_dico(
+        nom = "Vacataire",
+        docs = [_ficheAdmin, _cv, _rib, _ae]
+    )
+
+    _contratSpecifique = enregistrer_intervenant_dico(
+        nom = "Contrat spécifique",
+        docs = [_ficheAdmin, _cv, _ae]
+    )
+
+    _autoEntrepreneur = enregistrer_intervenant_dico(
+        nom = "Auto-entrepreneur",
+        docs = [_ficheAdmin, _cv, _rib, _devis, _bilanPedagogique]
+    )
+    """
+
+ 
+
+    def __init__(self):
+        """
+        for doc in self._docsREE.values():
+            if doc.nom_fichier is not None:
+                # accès direct à la variable de classe REE._repertoire_documents_ree
+                doc.chemin_fichier = os.path.join(self._repertoire_documents_ree, doc.nom_fichier)"""
+        print()
+
+
+    def envoyerMail_nouveau_REE(self):
+        # Mail nouveau REE
+
+        print()
+
+    def envoyerMail_REE_existant(self):
+        # Mail REE existant
+
+        print()
+
+
+    def envoyerMail_REE(self, statut:str, destinataire:Optional[Union[str, List[str], pd.Series]] = None, copie:Optional[Union[str, List[str], pd.Series]] = None):
+        # Faire choix auto pour existant ou nouveau
+
+        #Je crée le texte pour listeInfo
+
+        
+        listeInfos:str = ""
+        listePJ:List[str] = []
+
+        for nom_doc, doc in self._docsREE.items():
+            if statut in doc.intervenants:
+                # Gestion de la liste des infos à afficher dans le mail
+                if doc.frequence_maj is not None:
+                    listeInfos += f"\t• {nom_doc} ({', '.join(self._correspondance_frequence_texte[doc.frequence_maj])})\n"  
+
+                # Gestion des PJ à mettre dans le mail
+                if doc.nom_fichier is not None:
+                    listePJ.append(os.path.join(self._repertoire_documents_ree, doc.nom_fichier))            
+        
+        print(listeInfos)
+        print(listePJ)
+
+        #Remplacer les textes avec statut et listeInfos
+
+        Mail.depuis_modele(
+            chemin_modele=self._chemin_mailtype_informationsAdministratives,
+            destinataires=destinataire,
+            copies=copie,
+            pieces_jointes=listePJ
+        )
+
+        print()
+
+    #def lister_documents_mail
+
+class Traiter_REE_BAK:
     def __init__(self):
         # Fichier renseigné par la ressource extérieure
         self._chemin_ficheAdministrative:str = None
