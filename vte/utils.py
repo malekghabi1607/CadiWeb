@@ -477,13 +477,35 @@ def nettoyer_nom_colonne(nom:str) -> str:
 #  Conversions
 ### --------------------------------------------------------------------
 
-def convertir_si_possible(valeur) -> str|int|float:
+def convertir_si_possible(valeur) -> str | int | float:
+    """
+    Tente de convertir une chaîne en int ou float si c'est pertinent.
+    Sinon, renvoie la valeur telle quelle.
+    - '42'       -> 42 (int)
+    - '3,14'     -> 3.14 (float)
+    - 'Bonjour'  -> 'Bonjour'
+    - '3,14 cm'  -> '3,14 cm' (reste string)
+    """
     if isinstance(valeur, str):
-        valeur = valeur.strip().replace(',', '.')
+        val_strip = valeur.strip()
+
+        # Cas entier pur
+        if val_strip.isdigit():
+            return int(val_strip)
+
+        # Cas nombre flottant avec virgule ou point uniquement
+        # On autorise une seule virgule ou un seul point, et rien d'autre
+        val_clean = val_strip.replace(',', '.')
         try:
-            return int(valeur) if valeur.isdigit() else float(valeur)
+            # Vérifie que la chaîne représente uniquement un nombre (optionnellement avec signe)
+            if all(c in "0123456789+-. " for c in val_strip) and val_strip.replace(',', '.').count('.') <= 1:
+                return float(val_clean)
         except ValueError:
-            return valeur
+            pass
+
+        # Sinon, renvoyer la chaîne d'origine (non modifiée)
+        return valeur.strip()
+
     return valeur
 
 def convertir_en_liste(val: Optional[Union[str, List[str], pd.Series]]) -> List[str]:
