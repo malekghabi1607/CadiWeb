@@ -304,7 +304,8 @@ class FichierExcel:
         def ecrit_dataFrame_dans_tableauStructure(self,
                                                  df: DataFrame,
                                                  supprimeDonneesEtRemplace: bool = False,
-                                                 remplace_df_par_nouveau: bool = False) -> None:
+                                                 remplace_df_par_nouveau: bool = False,
+                                                 copie_formules: bool = False) -> None:
             """
             Écrit un DataFrame dans un tableau structuré d'une feuille de calcul.
 
@@ -335,6 +336,12 @@ class FichierExcel:
 
             # On redéfinit le dimensionnement du tableau (tableau initial + nb lignes de df)
             self.change_references_tableauStructure_par_deltaNbLignes(len(df), avec_initialiation=False)  # Il ne faut pas réinitialiser les dimensions du tableau car pour ma copie des formats j'ai besoin des anciennes références
+
+            # Si désiré par l'utilisateur, on recopie les formules
+            if copie_formules:
+                self.recopier_formules_colonnes(indexLigneSourceFormules=self._min_row + 1,
+                                                indexLigneDebutCopie=self._max_row + 1,
+                                                indexLigneFinCopie=self._max_row + len(df))
 
             # On copie le format sur toutes les nouvelles lignes du tableau à partir de la 1ère ligne, i.e. self._min_row + 1
             self.copierFormat_tableauStructure_xlwings(indexLigneSourceFormat=self._min_row + 1,
@@ -545,13 +552,13 @@ class FichierExcel:
             for np_, regle in regles_a_rajouter:
                 self._ws.conditional_formatting.add(np_, regle)
 
-        def recopier_formules_colonnes(self, indexLigneSourceFormat: int, indexLigneDebutCopie: int, indexLigneFinCopie: int) -> None:
+        def recopier_formules_colonnes(self, indexLigneSourceFormules: int, indexLigneDebutCopie: int, indexLigneFinCopie: int) -> None:
             """
             Recopie les formules Excel des colonnes qui en ont dans la ligne source vers toutes les lignes
             entre indexLigneDebutCopie et indexLigneFinCopie (inclus).
             """
             for col in range(self._min_col, self._max_col + 1):
-                cellule_modele = self._ws.cell(row=indexLigneSourceFormat, column=col)
+                cellule_modele = self._ws.cell(row=indexLigneSourceFormules, column=col)
                 formule_modele = cellule_modele.value
                 if isinstance(formule_modele, str) and formule_modele.startswith('='):
                     # Recopie de la formule dans les nouvelles lignes en ajustant la référence relative

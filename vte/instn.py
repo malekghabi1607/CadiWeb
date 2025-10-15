@@ -1814,17 +1814,17 @@ class REE:
                 # Récupérer la valeur dans le dictionnaire Word, ou None si la clé absente
                 valeur = self._word_ficheAdministrative._cc.get(cc_key, None)
                 nouvelle_ligne[col_df] = convertir_si_possible(valeur)
-                print(col_df, cc_key, valeur, type(convertir_si_possible(valeur)))
+                #print(col_df, cc_key, valeur, type(convertir_si_possible(valeur)))
 
         print(pd.DataFrame([nouvelle_ligne]))
 
         # Ajouter la nouvelle ligne au DataFrame
         # TODO : non pas sûr
-        df_REE = pd.concat([df_REE, pd.DataFrame([nouvelle_ligne])], ignore_index=True)
-        print(df_REE)
+        #df_REE = pd.concat([df_REE, pd.DataFrame([nouvelle_ligne])], ignore_index=True)
+        #print(df_REE)
 
         # On écrit le dataframe dans le tableau structuré
-        excel_ficheIntervenant._tableaux["QualificationsREE"].ecrit_dataFrame_dans_tableauStructure(df_REE, remplace_df_par_nouveau=True)
+        excel_ficheIntervenant._tableaux["QualificationsREE"].ecrit_dataFrame_dans_tableauStructure(pd.DataFrame([nouvelle_ligne]), supprimeDonneesEtRemplace=True, remplace_df_par_nouveau=True, copie_formules=True)
 
 
         # On sauve la fiche intervenant
