@@ -1521,7 +1521,41 @@ class REE:
     _repertoire_sauvegarde_fichiersREE:str = r"\\harmonie\INSTN\UEM\_Documents_communs\Formations\Formateurs\1.Intervenants - Documents administratifs" # Lieu où sauvegarder les fichiers de l'intervenant
     _chemin_modele_excel_ficheIntervenant:str = r"\\harmonie\INSTN\UEM\_Documents_communs\Formations\Formateurs\P09-Pr01-Qualifier les ressources enseignantes\P09_Pr01_Ta.E_Grille des critères de qualification des compétences_V1.xlsx"  # Fichier Excel à remplir pour Laetitia Da Mota (RH INSTN qui s'occupe de rentrer les REE dans IRIS)
     
-
+    # Association colonnes excel avec command control Word
+    # La préparation de ce ditionnaire peut être faite avec : fe = FichierExcel.depuis_fichier(chemin_fichier=r"T:\_Documents_communs\Formations\Formateurs\P09-Pr01-Qualifier les ressources enseignantes\P09_Pr01_Ta.E_Grille des critères de qualification des compétences_V1.xlsx", charger_df=True) ; fe._tableaux["QualificationsREE"].generer_dictionnaire_depuis_excel()
+    _dict_colExcel_cc:Dict[str, str] = {
+        "NOM": "Nom",
+        "Pr\u00e9nom": "Prenoms",
+        "Dipl\u00f4me ou formation/exp\u00e9rience professionnelle": "Diplome",
+        "Dur\u00e9e exp\u00e9rience professionnelle": "DureeExperiencePro",
+        "Niveau d'expertise permettant une reconnaissance": "NiveauExpertise",
+        "Domaine / Sp\u00e9cialit\u00e9 \nde l'expertise": "DomaineExpertise",
+        "ATTRIBUTION Niveau comp\u00e9tences techniques": None,
+        "Combien de jours anim\u00e9s, en moyenne par an": "formation_nbJoursAnimes",
+        "Combien de jours de formations suivies en p\u00e9dagogie (=animation)": "formation_nbJoursFormationPedagogie",
+        "Profils d'apprenants form\u00e9s": "formation_profilApprenants",
+        "Taux consolid\u00e9 de la satisfaction des apprenants relativement \u00e0 l'enseignant-formateur consid\u00e9r\u00e9": None,
+        "Estimation par le RP de la capacit\u00e9 de l'enseignant-formateur \u00e0 animer \n(fond de salle)": None,
+        "Outils num\u00e9riques utilis\u00e9s durant les animations r\u00e9alis\u00e9es\n(serious game, blended-learning\u2026)": "formation_outilsNumeriques",
+        "Combien de jours pass\u00e9s en conception de s\u00e9quence de formation, en moyenne par an": "IngPedago_nbJoursConception",
+        "Combien de jours de formations suivies en ing\u00e9nierie p\u00e9dagogique (=conception de s\u00e9quences de formation)": "IngPedago_nbJoursFormationIngPedago",
+        "Estimation par le RP de la conception de la s\u00e9quence en fonction des objectifs p\u00e9dagogiques fournis par le RP\n(fond de salle, analyse des supports fournis)": None,
+        "Estimation par le RP de la pertinence de l'\u00e9valuation des acquis r\u00e9alis\u00e9e par l'enseignant-formateur sur sa s\u00e9quence\n(analyse de la progression des apprenants : tests avant/apr\u00e8s)": None,
+        "Estimation par le RP de l'utilisation des m\u00e9thodes actives\n(\u00e9tudes de cas, r\u00e9solution de probl\u00e8mes, classes invers\u00e9es, travaux de groupes\u2026)": None,
+        "Combien d'ann\u00e9es d'exp\u00e9rience en conception de dispositifs de formations\n(=cr\u00e9ation et coordination)": "IngFormation_nbJoursConception",
+        "Combien de jours de formations suivies en ing\u00e9nierie de formation\n(=conception de dispositifs de formation)": "IngFormation_nbJoursFormationIngFormation",
+        "Estimation par le chef de projet ou le CUE de la complexit\u00e9 des pr\u00e9c\u00e9dents dispositifs de formation con\u00e7us": None,
+        "Profil des apprenants des dispositifs de formations prc\u00e9demment con\u00e7us": "IngFormation_profilApprenants",
+        "Estimation par le chef de projet ou le CUE de l'\u00e9valuation des acquis r\u00e9alis\u00e9 dans le dispositif de formation\n(mesure de la progression des apprenants=estimation de la qualit\u00e9 du dispositif de formation)": None,
+        "Combien d'ann\u00e9es d'exp\u00e9rience en tant que tuteur acad\u00e9mique": "IngFormation_nbAnneesTuteur",
+        "Combien de r\u00e9f\u00e9rentiels d'activit\u00e9, de comp\u00e9tence et d'\u00e9valuation r\u00e9alis\u00e9s": "IngFormation_nbAnneesTuteur",
+        "Combien de jours de formations suivies en ing\u00e9nierie de comp\u00e9tences": "IngCompetences_nbReferentiels",
+        "Estimation par la cellule p\u00e9dagogique de DPF de la complexit\u00e9 des pr\u00e9c\u00e9dentes r\u00e9alisations de l'ing\u00e9nieur/consultant en ing\u00e9nierie de comp\u00e9tences \n(complexit\u00e9 du m\u00e9tier et de son environnement : risques, r\u00e9glementation...)": "IngCompetences_nbJoursFormationIngCompetences",
+        "ATTRIBUTION Niveau comp\u00e9tences p\u00e9dagogiques": None,
+        "Evaluation CECRL ou \u00e9quivalence TOEIC, TOEFL": "ResultatLangue2",
+        "ATTRIBUTION Niveau comp\u00e9tences linguistiques": None,
+        "Curriculum vitae": None,
+    }
 
     # --- Paramètres utilisateur
     # Documents à envoyer / demander
@@ -1688,41 +1722,8 @@ class REE:
         # On sélectionne tous les fichiers de la REE et on les déplace dans le répertoire idoine
         self._deplacer_fichiers(self._repertoire_sauvegarde_fichiersREE)
 
-        # On ouvre le fichier Excel à remplir pour Laetitia Da Mota (c'est un modèle, on l'enregistre avec le bon nom dans le répertoire idoine)
-        excel_ficheIntervenant = FichierExcel.depuis_modele(
-            chemin_modele = self._chemin_modele_excel_ficheIntervenant,
-            chemin_fichier_sauv = os.path.join(self._repertoire_sauvegarde_fichiersREE, os.path.basename(self._chemin_modele_excel_ficheIntervenant)),
-            charger_df = True
-        )
-        #print(excel_ficheIntervenant._tableaux["QualificationsREE"]._df)
 
-
-        # On écrit le dataframe du tableau QualificationsREE avec les données de l'intervenant provenant du word
-        df_REE = excel_ficheIntervenant._tableaux["QualificationsREE"]._df  # Alias
-        nouvelle_ligne = {}
-        for col_df, cc_key in self._dict_colExcel_cc.items():
-            if cc_key is None:
-                # Pas de clé correspondante => valeur vide dans la DataFrame
-                nouvelle_ligne[col_df] = None
-            else:
-                # Récupérer la valeur dans le dictionnaire Word, ou None si la clé absente
-                valeur = self._word_ficheAdministrative._cc.get(cc_key, None)
-                nouvelle_ligne[col_df] = convertir_si_possible(valeur)
-                #print(valeur, type(convertir_si_possible(valeur)))
-
-
-        # Ajouter la nouvelle ligne au DataFrame
-        # TODO : non pas sûr
-        df_REE = pd.concat([df_REE, pd.DataFrame([nouvelle_ligne])], ignore_index=True)
-
-
-        # On pré-rempli le fichier Excel fiche intervenant grâce aux CC et au dictionnaire
-        excel_ficheIntervenant._tableaux["QualificationsREE"].ecrit_dataFrame_dans_tableauStructure(df_REE, remplace_df_par_nouveau=True)
-
-
-        # On sauve la fiche intervenant
-        #excel_ficheIntervenant.save()
-        #excel_ficheIntervenant.close()
+        self._remplit_excel_avecInfos_word()
 
 
         # On ouvre l'Excel et le Word pour comparaison et adaptations manuelles
@@ -1786,6 +1787,49 @@ class REE:
             except Exception as e:
                 print(f"❌ Erreur avec {nom_fichier} : {e}")
 
+    def _remplit_excel_avecInfos_word(self) -> None:
+        """
+        Remplit le fichier Excel à transférer à Laetitia Da Mota à partir d'un modèle
+
+        Doit avoir lu un word avec les content control en amont
+        """
+        # On ouvre le fichier Excel à remplir pour Laetitia Da Mota (c'est un modèle, on l'enregistrera avec le bon nom dans le répertoire idoine)
+        excel_ficheIntervenant = FichierExcel.depuis_modele(
+            chemin_modele = self._chemin_modele_excel_ficheIntervenant,
+            chemin_fichier_sauv = os.path.join(self._repertoire_sauvegarde_fichiersREE, os.path.basename(self._chemin_modele_excel_ficheIntervenant)),
+            charger_df = True
+        )
+        
+        df_REE = excel_ficheIntervenant._tableaux["QualificationsREE"]._df  # Alias
+        print(df_REE)
+
+
+        # On pré-rempli le fichier Excel fiche intervenant grâce aux contecnt control du word et au dictionnaire
+        nouvelle_ligne = {}
+        for col_df, cc_key in self._dict_colExcel_cc.items():
+            if cc_key is None:
+                # Pas de clé correspondante => valeur vide dans la DataFrame
+                nouvelle_ligne[col_df] = None
+            else:
+                # Récupérer la valeur dans le dictionnaire Word, ou None si la clé absente
+                valeur = self._word_ficheAdministrative._cc.get(cc_key, None)
+                nouvelle_ligne[col_df] = convertir_si_possible(valeur)
+                print(col_df, cc_key, valeur, type(convertir_si_possible(valeur)))
+
+        print(pd.DataFrame([nouvelle_ligne]))
+
+        # Ajouter la nouvelle ligne au DataFrame
+        # TODO : non pas sûr
+        df_REE = pd.concat([df_REE, pd.DataFrame([nouvelle_ligne])], ignore_index=True)
+        print(df_REE)
+
+        # On écrit le dataframe dans le tableau structuré
+        excel_ficheIntervenant._tableaux["QualificationsREE"].ecrit_dataFrame_dans_tableauStructure(df_REE, remplace_df_par_nouveau=True)
+
+
+        # On sauve la fiche intervenant
+        excel_ficheIntervenant.save()
+        excel_ficheIntervenant.close()
 
 class Traiter_REE_BAK:
     def __init__(self):

@@ -26,13 +26,8 @@ def test():
     #ree._deplacer_fichiers(ree._repertoire_sauvegarde_fichiersREE)
 
 
-    # On ouvre le fichier Excel à remplir pour Laetitia Da Mota (c'est un modèle, on l'enregistre avec le bon nom dans le répertoire idoine)
-    excel_ficheIntervenant = FichierExcel.depuis_modele(
-        chemin_modele = ree._chemin_modele_excel_ficheIntervenant,
-        chemin_fichier_sauv = os.path.join(ree._repertoire_sauvegarde_fichiersREE, os.path.basename(ree._chemin_modele_excel_ficheIntervenant)),
-        charger_df = True
-    )
-    print(excel_ficheIntervenant._tableaux["QualificationsREE"]._df)
+    # === Remplit le fichier Excel à transférer à Laetitia Da Mota à partir d'un modèle
+    ree._remplit_excel_avecInfos_word()
 
 
 if __name__ == "__main__":
