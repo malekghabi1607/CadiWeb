@@ -1514,17 +1514,16 @@ class REE:
         ti = cls.TypeIntervenant(nom, docs)
         cls._typesIntervenants[nom] = ti
         return ti"""
-
-    
-    #destinataires=["CEA", "Vacataire", "Contrat spécifique", "Auto-entrepreneur", "Prestataire"]
-    
+    # === VARIABLES DE CLASSE ===
+    # --- Paramètres d'environnement
     _repertoire_documents_ree:str = r"\\harmonie\instn\uem\_Documents_communs\Formations\Formateurs\0.Docs à envoyer"
     _chemin_mailtype_informationsAdministratives = r"\\harmonie\instn\uem\_Documents_communs\Formations\Formateurs\Mails types\Demande des informations administratives.msg"
+    _repertoire_sauvegarde_fichiersREE:str = r"\\harmonie\INSTN\UEM\_Documents_communs\Formations\Formateurs\1.Intervenants - Documents administratifs" # Lieu où sauvegarder les fichiers de l'intervenant
+    _chemin_modele_excel_ficheIntervenant:str = r"\\harmonie\INSTN\UEM\_Documents_communs\Formations\Formateurs\P09-Pr01-Qualifier les ressources enseignantes\P09_Pr01_Ta.E_Grille des critères de qualification des compétences_V1.xlsx"  # Fichier Excel à remplir pour Laetitia Da Mota (RH INSTN qui s'occupe de rentrer les REE dans IRIS)
+    
 
-    _docsREE:dict[DocREE] = {}  # Dictionnaire des documents (fiche admin, CV...)
-    _typesIntervenants:dict[TypeIntervenant] = {}  # Dictionnaire des types d'intervenant (CEA, vacataire...)
 
-
+    # --- Paramètres utilisateur
     # Documents à envoyer / demander
     _docsREE:dict[DocREE] ={
         "Fiche administrative" : DocREE(
@@ -1568,6 +1567,13 @@ class REE:
     }
  
 
+
+    # --- Autres variables de la classe
+    _docsREE:dict[DocREE] = {}  # Dictionnaire des documents (fiche admin, CV...)
+    _typesIntervenants:dict[TypeIntervenant] = {}  # Dictionnaire des types d'intervenant (CEA, vacataire...)
+
+
+    # === CONSTRUCTEUR ===
     def __init__(self):
         """
         for doc in self._docsREE.values():
@@ -1576,6 +1582,9 @@ class REE:
                 doc.chemin_fichier = os.path.join(self._repertoire_documents_ree, doc.nom_fichier)"""
         print()
 
+
+
+    # === ENVOI MAIL REE ===
     def envoyerMail_REE(self, 
         statut:str, 
         destinataire:Optional[Union[str, List[str], pd.Series]] = None, 
@@ -1662,6 +1671,120 @@ class REE:
             pieces_jointes=listePJ,
             remplaceBalises=[["###statut###", statut], ["###listeInfos###", listeInfos]]
         )
+
+
+
+    # === RECEPTION / TRAITEMENT DOC REE
+    def traiter_docs_REE(self) -> None:
+
+
+        # On ouvre le word et on charge tous les command control (filedialog depuis "Download"). On le ferme
+        self._word_ficheAdministrative = FichierWord.depuisFichier()
+        #print(self._word_ficheAdministrative)
+
+        # On crée le répertoire dans le répertoire des REE s'il n'existe pas (ou assimilé) (NOM Prénom (Société - AAAA))
+        self._creer_repertoire_REE()
+
+        # On sélectionne tous les fichiers de la REE et on les déplace dans le répertoire idoine
+        self._deplacer_fichiers(self._repertoire_sauvegarde_fichiersREE)
+
+        # On ouvre le fichier Excel à remplir pour Laetitia Da Mota (c'est un modèle, on l'enregistre avec le bon nom dans le répertoire idoine)
+        excel_ficheIntervenant = FichierExcel.depuis_modele(
+            chemin_modele = self._chemin_modele_excel_ficheIntervenant,
+            chemin_fichier_sauv = os.path.join(self._repertoire_sauvegarde_fichiersREE, os.path.basename(self._chemin_modele_excel_ficheIntervenant)),
+            charger_df = True
+        )
+        #print(excel_ficheIntervenant._tableaux["QualificationsREE"]._df)
+
+
+        # On écrit le dataframe du tableau QualificationsREE avec les données de l'intervenant provenant du word
+        df_REE = excel_ficheIntervenant._tableaux["QualificationsREE"]._df  # Alias
+        nouvelle_ligne = {}
+        for col_df, cc_key in self._dict_colExcel_cc.items():
+            if cc_key is None:
+                # Pas de clé correspondante => valeur vide dans la DataFrame
+                nouvelle_ligne[col_df] = None
+            else:
+                # Récupérer la valeur dans le dictionnaire Word, ou None si la clé absente
+                valeur = self._word_ficheAdministrative._cc.get(cc_key, None)
+                nouvelle_ligne[col_df] = convertir_si_possible(valeur)
+                #print(valeur, type(convertir_si_possible(valeur)))
+
+
+        # Ajouter la nouvelle ligne au DataFrame
+        # TODO : non pas sûr
+        df_REE = pd.concat([df_REE, pd.DataFrame([nouvelle_ligne])], ignore_index=True)
+
+
+        # On pré-rempli le fichier Excel fiche intervenant grâce aux CC et au dictionnaire
+        excel_ficheIntervenant._tableaux["QualificationsREE"].ecrit_dataFrame_dans_tableauStructure(df_REE, remplace_df_par_nouveau=True)
+
+
+        # On sauve la fiche intervenant
+        #excel_ficheIntervenant.save()
+        #excel_ficheIntervenant.close()
+
+
+        # On ouvre l'Excel et le Word pour comparaison et adaptations manuelles
+
+
+        # Dès que l'Excel est fermé, on prépare le mail pour Laetitia
+
+
+        # On met à jour le fichier Excel Liste AI formateurs.xlsx : onglet intervenant, on cherche et remplace la date de validité de l'attestation employeur sinon nouvelle ligne (recopier formule + format)
+        # On met à jour le fichier Excel  avec la liste des intervenants :  on cherche et remplace les données mail, tel, Ville, la date de validité de l'attestation employeur... sinon nouvelle ligne (recopier formule + format)        
+
+    def _creer_repertoire_REE(self, test:bool=False) -> None:
+        """
+        Crée le répertoire du REE sur le réseau local
+        """
+        # TODO : comment faire si pas de content control ?
+        if all(k in self._word_ficheAdministrative.cc for k in ["Nom", "Prenoms", "RaisonSociale"]):
+            self._repertoire_sauvegarde_fichiersREE += f"\\{self._word_ficheAdministrative.cc['Nom'].upper()} {self._word_ficheAdministrative.cc['Prenoms'].title()} ({self._word_ficheAdministrative.cc['RaisonSociale'] if self._word_ficheAdministrative.cc['RaisonSociale'] != 'Raison sociale employeur principal' else 'CEA'} - {datetime.now().year})"
+        else :
+            print("⚠️ Certaines clés sont manquantes dans cc :", [k for k in ["Nom", "Prenoms", "RaisonSociale"] if k not in self._word_ficheAdministrative.cc])
+        #print(self._repertoire_sauvegarde_fichiersREE)
+        if not test:
+            os.makedirs(self._repertoire_sauvegarde_fichiersREE, exist_ok=True)
+        else :
+            print(self._repertoire_sauvegarde_fichiersREE)
+
+    def _deplacer_fichiers(self, destination: str = None) -> None:
+        """
+        Ouvre un dialogue pour sélectionner des fichiers, puis les déplace vers un dossier choisi.
+
+        Args:
+            destination (str, optional): Chemin du dossier de destination.
+                                        Si None, un dialogue s'ouvrira pour le choisir.
+        """
+
+        # Fenêtre Tkinter cachée
+        root = tk.Tk()
+        root.withdraw()
+
+        # Sélection des fichiers à déplacer
+        fichiers = filedialog.askopenfilenames(title="Sélectionner les fichiers à déplacer")
+        if not fichiers:
+            print("Aucun fichier sélectionné.")
+            return
+
+        # Sélection du dossier de destination
+        if destination is None:
+            destination = filedialog.askdirectory(title="Choisir le dossier de destination")
+            if not destination:
+                print("Aucun dossier de destination sélectionné.")
+                return
+
+        # Déplacement de chaque fichier
+        for fichier in fichiers:
+            nom_fichier = os.path.basename(fichier)
+            chemin_destination = os.path.join(destination, nom_fichier)
+
+            try:
+                shutil.move(fichier, chemin_destination)
+                print(f"✅ Déplacé : {nom_fichier}")
+            except Exception as e:
+                print(f"❌ Erreur avec {nom_fichier} : {e}")
 
 
 class Traiter_REE_BAK:
