@@ -1718,19 +1718,21 @@ class REE:
 
         # On crée le répertoire dans le répertoire des REE s'il n'existe pas (ou assimilé) (NOM Prénom (Société - AAAA))
         self._creer_repertoire_REE()
-
+        
         # On sélectionne tous les fichiers de la REE et on les déplace dans le répertoire idoine
         self._deplacer_fichiers(self._repertoire_sauvegarde_fichiersREE)
 
-
+        # On emplit le fichier Excel à transférer à Laetitia Da Mota à partir d'un modèle
         self._remplit_excel_avecInfos_word()
 
 
         # On ouvre l'Excel et le Word pour comparaison et adaptations manuelles
-
+        chemin_word = os.path.join(self._repertoire_sauvegarde_fichiersREE, os.path.basename(self._word_ficheAdministrative._chemin_fichier))
+        chemin_excel = os.path.join(self._repertoire_sauvegarde_fichiersREE, os.path.basename(self._chemin_modele_excel_ficheIntervenant))
+        self._ouvrir_word_et_excel_et_attendre(chemin_word, chemin_excel)
 
         # Dès que l'Excel est fermé, on prépare le mail pour Laetitia
-
+        print("Mail Laetitia")
 
         # On met à jour le fichier Excel Liste AI formateurs.xlsx : onglet intervenant, on cherche et remplace la date de validité de l'attestation employeur sinon nouvelle ligne (recopier formule + format)
         # On met à jour le fichier Excel  avec la liste des intervenants :  on cherche et remplace les données mail, tel, Ville, la date de validité de l'attestation employeur... sinon nouvelle ligne (recopier formule + format)        
@@ -1800,8 +1802,8 @@ class REE:
             charger_df = True
         )
         
-        df_REE = excel_ficheIntervenant._tableaux["QualificationsREE"]._df  # Alias
-        print(df_REE)
+        #df_REE = excel_ficheIntervenant._tableaux["QualificationsREE"]._df  # Alias
+        #print(df_REE)
 
 
         # On pré-rempli le fichier Excel fiche intervenant grâce aux contecnt control du word et au dictionnaire
@@ -1816,12 +1818,7 @@ class REE:
                 nouvelle_ligne[col_df] = convertir_si_possible(valeur)
                 #print(col_df, cc_key, valeur, type(convertir_si_possible(valeur)))
 
-        print(pd.DataFrame([nouvelle_ligne]))
-
-        # Ajouter la nouvelle ligne au DataFrame
-        # TODO : non pas sûr
-        #df_REE = pd.concat([df_REE, pd.DataFrame([nouvelle_ligne])], ignore_index=True)
-        #print(df_REE)
+        #print(pd.DataFrame([nouvelle_ligne]))
 
         # On écrit le dataframe dans le tableau structuré
         excel_ficheIntervenant._tableaux["QualificationsREE"].ecrit_dataFrame_dans_tableauStructure(pd.DataFrame([nouvelle_ligne]), supprimeDonneesEtRemplace=True, remplace_df_par_nouveau=True, copie_formules=True)

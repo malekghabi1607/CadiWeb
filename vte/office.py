@@ -35,11 +35,12 @@ from docx import Document
 from lxml import etree
 
 import win32com.client
+from win32com.client import CDispatch
 import extract_msg
 import os
 import shutil
 import sys
-import time
+import time as time_module     # pour time_module.sleep()
 import copy
 import json
 
@@ -52,6 +53,9 @@ import colorama
 from colorama import Fore, Style
 
 from tkinter import filedialog, Tk
+
+from screeninfo import get_monitors
+import ctypes
 
 ### --------------------------------------------------------------------
 #  Définitions classes et fonctions génériques
@@ -2495,6 +2499,126 @@ class RDV_Outlook:
                 lignes.append(f"  {k[1:]} : {v}")
         return header + "\n".join(lignes)
 
+
+def ouvrir_word(chemin_word: str) -> Tuple[CDispatch, CDispatch]:
+    """
+    Ouvre un document Word via COM et renvoie à la fois l'application Word et le document.
+
+    Args:
+        chemin_word (str): Chemin complet vers le fichier Word (.docx, .doc, etc.)
+
+    Returns:
+        Tuple[CDispatch, CDispatch]: Un tuple (word_app, word_doc)
+            - word_app : objet COM de l'application Word
+            - word_doc : objet COM du document ouvert
+    """
+    # Crée une instance de Word
+    word_app = win32com.client.Dispatch("Word.Application")
+
+    # Rendre visible
+    word_app.Visible = True
+
+    # Ouvre le document
+    word_doc = word_app.Documents.Open(os.path.abspath(chemin_word))
+
+    return word_app, word_doc
+    
+def ouvrir_excel(chemin_excel: str) -> Tuple[CDispatch, CDispatch]:
+    """
+    Ouvre un document Excel via COM et renvoie à la fois l'application Excel et le document.
+
+    Args:
+        chemin_excel (str): Chemin complet vers le fichier Excel (.xlsx, .xls, etc.)
+
+    Returns:
+        Tuple[CDispatch, CDispatch]: Un tuple (excel_app, excel_doc)
+            - excel_app : objet COM de l'application Excel
+            - excel_doc : objet COM du document ouvert
+    """
+        # Crée une instance d'Excel
+    excel_app = win32com.client.Dispatch("Excel.Application")
+
+    # Rendre visible
+    excel_app.Visible = True
+
+    # Ouvre le document
+    excel_wb = excel_app.Workbooks.Open(os.path.abspath(chemin_excel))
+
+    return excel_app, excel_wb
+
+SWP_NOZORDER = 0x4
+SWP_NOACTIVATE = 0x10
+
+def mettre_fenetre_premier_plan(hwnd):
+    ctypes.windll.user32.SetForegroundWindow(hwnd)
+
+def ouvrir_word_excel_cote_a_cote(chemin_word: str, chemin_excel: str, split_ecranPrincipal: bool = False):
+    """
+    Ouvre Word et Excel via COM, les positionne et les met au premier plan.
+    
+    Si 2 écrans ou plus et split_ecranPrincipal=False :
+        Word -> écran principal
+        Excel -> écran secondaire
+    Sinon :
+        Word et Excel côte à côte sur écran principal.
+
+    Args:
+        chemin_word (str): Chemin vers le fichier Word
+        chemin_excel (str): Chemin vers le fichier Excel
+        split_ecranPrincipal (bool): Si True, même avec plusieurs écrans, fait côte à côte sur écran principal.
+
+    Returns:
+        tuple: (word_app, word_doc, excel_app, excel_wb)
+    """
+
+    # --- Ouvrir Word ---
+    word_app = win32com.client.gencache.EnsureDispatch("Word.Application")
+    word_app.Visible = True
+    word_doc = word_app.Documents.Open(os.path.abspath(chemin_word))
+    word_hwnd = word_app.ActiveWindow.Hwnd
+
+    # --- Ouvrir Excel ---
+    excel_app = win32com.client.gencache.EnsureDispatch("Excel.Application")
+    excel_app.Visible = True
+    excel_wb = excel_app.Workbooks.Open(os.path.abspath(chemin_excel))
+    excel_hwnd = excel_app.ActiveWindow.Hwnd
+
+    # --- Détecter écrans ---
+    monitors = get_monitors()
+    nb_ecrans = len(monitors)
+    ecran_principal = monitors[0]
+    
+    # --- Cas multi-écran ---
+    if nb_ecrans > 1 and not split_ecranPrincipal:
+        ecran_secondaire = monitors[1]
+
+        # Word sur principal
+        ctypes.windll.user32.SetWindowPos(
+            word_hwnd, 0, ecran_principal.x, ecran_principal.y, ecran_principal.width, ecran_principal.height, SWP_NOZORDER)
+        mettre_fenetre_premier_plan(word_hwnd)
+
+        # Excel sur secondaire
+        ctypes.windll.user32.SetWindowPos(
+            excel_hwnd, 0, ecran_secondaire.x, ecran_secondaire.y, ecran_secondaire.width, ecran_secondaire.height, SWP_NOZORDER)
+        mettre_fenetre_premier_plan(excel_hwnd)
+
+    # --- Cas un écran ou split_ecranPrincipal ---
+    else:
+        w_half = ecran_principal.width // 2
+        h = ecran_principal.height
+
+        # Word à gauche
+        ctypes.windll.user32.SetWindowPos(
+            word_hwnd, 0, ecran_principal.x, ecran_principal.y, w_half, h, SWP_NOZORDER)
+        mettre_fenetre_premier_plan(word_hwnd)
+
+        # Excel à droite
+        ctypes.windll.user32.SetWindowPos(
+            excel_hwnd, 0, ecran_principal.x + w_half, ecran_principal.y, w_half, h, SWP_NOZORDER)
+        mettre_fenetre_premier_plan(excel_hwnd)
+
+    print("✅ Word et Excel positionnés et au premier plan.")
+    return word_app, word_doc, excel_app, excel_wb
 ### --------------------------------------------------------------------
 #  Initialisations variables globales communes
 ### --------------------------------------------------------------------

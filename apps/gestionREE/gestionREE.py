@@ -29,6 +29,22 @@ def test():
     # === Remplit le fichier Excel à transférer à Laetitia Da Mota à partir d'un modèle
     ree._remplit_excel_avecInfos_word()
 
+    # === On ouvre l'Excel et le Word pour comparaison et adaptations manuelles
+    chemin_word = os.path.join(ree._repertoire_sauvegarde_fichiersREE, os.path.basename(ree._word_ficheAdministrative._chemin_fichier))
+    #word_app, _ = ouvrir_word(chemin_word)
+    
+    chemin_excel = os.path.join(ree._repertoire_sauvegarde_fichiersREE, os.path.basename(ree._chemin_modele_excel_ficheIntervenant))
+    #excel_app, _ = ouvrir_excel(chemin_excel)
+
+    ouvrir_word_excel_cote_a_cote(chemin_word, chemin_excel, split_ecranPrincipal=True)
+    
+    #arranger_fenetres(word_app, excel_app)
+
+    # On attend pour avancer
+    input("🕒 Attente pour adaptations de l'Excel. Appuyez sur une touche pour continuer")
+
+    # Dès que l'Excel est fermé, on prépare le mail pour Laetitia
+    print("Mail Laetitia")
 
 if __name__ == "__main__":
     test()

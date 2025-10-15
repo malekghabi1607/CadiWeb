@@ -14,7 +14,7 @@ import os
 import platform
 import subprocess
 import re
-import time
+import time as time_module
 import copy
 import ctypes
 from ctypes import wintypes
@@ -604,6 +604,42 @@ def html_vers_texte(html: str) -> str:
 
     return texte_final
 
+
+### --------------------------------------------------------------------
+#  Fenêtres
+### --------------------------------------------------------------------
+
+
+def arranger_fenetres(word_app, excel_app):
+    """
+    Place Word à gauche et Excel à droite sur l'écran principal,
+    rend les fenêtres visibles et met Word au premier plan.
+    """
+    # Taille de l'écran principal
+    screen = gw.getWindowsWithTitle("Program Manager")[0]
+    screen_width, screen_height = screen.width, screen.height
+    w_half = screen_width // 2
+
+    # --- Word à gauche ---
+    word_app.Visible = True
+    word_window = word_app.ActiveWindow
+    word_window.WindowState = 0        # wdWindowStateNormal
+    word_window.Left = 0
+    word_window.Top = 0
+    word_window.Width = w_half
+    word_window.Height = screen_height
+    word_app.Activate()                 # Word au premier plan
+
+    # --- Excel à droite ---
+    excel_app.Visible = True
+    excel_window = excel_app.ActiveWindow
+    excel_window.WindowState = -4143   # xlNormal
+    excel_window.Left = w_half
+    excel_window.Top = 0
+    excel_window.Width = w_half
+    excel_window.Height = screen_height
+
+    # Note : Excel est visible et à côté, Word reste au premier plan
 
 
 
