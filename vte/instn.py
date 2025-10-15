@@ -1522,39 +1522,39 @@ class REE:
     _chemin_modele_excel_ficheIntervenant:str = r"\\harmonie\INSTN\UEM\_Documents_communs\Formations\Formateurs\P09-Pr01-Qualifier les ressources enseignantes\P09_Pr01_Ta.E_Grille des critères de qualification des compétences_V1.xlsx"  # Fichier Excel à remplir pour Laetitia Da Mota (RH INSTN qui s'occupe de rentrer les REE dans IRIS)
     
     # Association colonnes excel avec command control Word
-    # La préparation de ce ditionnaire peut être faite avec : fe = FichierExcel.depuis_fichier(chemin_fichier=r"T:\_Documents_communs\Formations\Formateurs\P09-Pr01-Qualifier les ressources enseignantes\P09_Pr01_Ta.E_Grille des critères de qualification des compétences_V1.xlsx", charger_df=True) ; fe._tableaux["QualificationsREE"].generer_dictionnaire_depuis_excel()
+    # La préparation de ce ditionnaire peut être faite avec : ree._generer_dictionnaire_depuis_excel()
     _dict_colExcel_cc:Dict[str, str] = {
         "NOM": "Nom",
         "Pr\u00e9nom": "Prenoms",
         "Dipl\u00f4me ou formation/exp\u00e9rience professionnelle": "Diplome",
         "Dur\u00e9e exp\u00e9rience professionnelle": "DureeExperiencePro",
         "Niveau d'expertise permettant une reconnaissance": "NiveauExpertise",
-        "Domaine / Sp\u00e9cialit\u00e9 \nde l'expertise": "DomaineExpertise",
+        "Domaine / Sp\u00e9cialit\u00e9 de l'expertise": "DomaineExpertise",
         "ATTRIBUTION Niveau comp\u00e9tences techniques": None,
         "Combien de jours anim\u00e9s, en moyenne par an": "formation_nbJoursAnimes",
         "Combien de jours de formations suivies en p\u00e9dagogie (=animation)": "formation_nbJoursFormationPedagogie",
         "Profils d'apprenants form\u00e9s": "formation_profilApprenants",
         "Taux consolid\u00e9 de la satisfaction des apprenants relativement \u00e0 l'enseignant-formateur consid\u00e9r\u00e9": None,
-        "Estimation par le RP de la capacit\u00e9 de l'enseignant-formateur \u00e0 animer \n(fond de salle)": None,
-        "Outils num\u00e9riques utilis\u00e9s durant les animations r\u00e9alis\u00e9es\n(serious game, blended-learning\u2026)": "formation_outilsNumeriques",
+        "Estimation par le RP de la capacit\u00e9 de l'enseignant-formateur \u00e0 animer (fond de salle)": None,
+        "Outils num\u00e9riques utilis\u00e9s durant les animations r\u00e9alis\u00e9es (serious game, blended-learning\u2026)": "formation_outilsNumeriques",
         "Combien de jours pass\u00e9s en conception de s\u00e9quence de formation, en moyenne par an": "IngPedago_nbJoursConception",
         "Combien de jours de formations suivies en ing\u00e9nierie p\u00e9dagogique (=conception de s\u00e9quences de formation)": "IngPedago_nbJoursFormationIngPedago",
-        "Estimation par le RP de la conception de la s\u00e9quence en fonction des objectifs p\u00e9dagogiques fournis par le RP\n(fond de salle, analyse des supports fournis)": None,
-        "Estimation par le RP de la pertinence de l'\u00e9valuation des acquis r\u00e9alis\u00e9e par l'enseignant-formateur sur sa s\u00e9quence\n(analyse de la progression des apprenants : tests avant/apr\u00e8s)": None,
-        "Estimation par le RP de l'utilisation des m\u00e9thodes actives\n(\u00e9tudes de cas, r\u00e9solution de probl\u00e8mes, classes invers\u00e9es, travaux de groupes\u2026)": None,
-        "Combien d'ann\u00e9es d'exp\u00e9rience en conception de dispositifs de formations\n(=cr\u00e9ation et coordination)": "IngFormation_nbJoursConception",
-        "Combien de jours de formations suivies en ing\u00e9nierie de formation\n(=conception de dispositifs de formation)": "IngFormation_nbJoursFormationIngFormation",
+        "Estimation par le RP de la conception de la s\u00e9quence en fonction des objectifs p\u00e9dagogiques fournis par le RP (fond de salle, analyse des supports fournis)": None,
+        "Estimation par le RP de la pertinence de l'\u00e9valuation des acquis r\u00e9alis\u00e9e par l'enseignant-formateur sur sa s\u00e9quence (analyse de la progression des apprenants : tests avant/apr\u00e8s)": None,
+        "Estimation par le RP de l'utilisation des m\u00e9thodes actives (\u00e9tudes de cas, r\u00e9solution de probl\u00e8mes, classes invers\u00e9es, travaux de groupes\u2026)": None,
+        "Combien d'ann\u00e9es d'exp\u00e9rience en conception de dispositifs de formations (=cr\u00e9ation et coordination)": "IngFormation_nbJoursConception",
+        "Combien de jours de formations suivies en ing\u00e9nierie de formation (=conception de dispositifs de formation)": "IngFormation_nbJoursFormationIngFormation",
         "Estimation par le chef de projet ou le CUE de la complexit\u00e9 des pr\u00e9c\u00e9dents dispositifs de formation con\u00e7us": None,
         "Profil des apprenants des dispositifs de formations prc\u00e9demment con\u00e7us": "IngFormation_profilApprenants",
-        "Estimation par le chef de projet ou le CUE de l'\u00e9valuation des acquis r\u00e9alis\u00e9 dans le dispositif de formation\n(mesure de la progression des apprenants=estimation de la qualit\u00e9 du dispositif de formation)": None,
+        "Estimation par le chef de projet ou le CUE de l'\u00e9valuation des acquis r\u00e9alis\u00e9 dans le dispositif de formation (mesure de la progression des apprenants=estimation de la qualit\u00e9 du dispositif de formation)": None,        
         "Combien d'ann\u00e9es d'exp\u00e9rience en tant que tuteur acad\u00e9mique": "IngFormation_nbAnneesTuteur",
-        "Combien de r\u00e9f\u00e9rentiels d'activit\u00e9, de comp\u00e9tence et d'\u00e9valuation r\u00e9alis\u00e9s": "IngFormation_nbAnneesTuteur",
-        "Combien de jours de formations suivies en ing\u00e9nierie de comp\u00e9tences": "IngCompetences_nbReferentiels",
-        "Estimation par la cellule p\u00e9dagogique de DPF de la complexit\u00e9 des pr\u00e9c\u00e9dentes r\u00e9alisations de l'ing\u00e9nieur/consultant en ing\u00e9nierie de comp\u00e9tences \n(complexit\u00e9 du m\u00e9tier et de son environnement : risques, r\u00e9glementation...)": "IngCompetences_nbJoursFormationIngCompetences",
+        "Combien de r\u00e9f\u00e9rentiels d'activit\u00e9, de comp\u00e9tence et d'\u00e9valuation r\u00e9alis\u00e9s": "IngCompetences_nbReferentiels",
+        "Combien de jours de formations suivies en ing\u00e9nierie de comp\u00e9tences": "IngCompetences_nbJoursFormationIngCompetences",
+        "Estimation par la cellule p\u00e9dagogique de DPF de la complexit\u00e9 des pr\u00e9c\u00e9dentes r\u00e9alisations de l'ing\u00e9nieur/consultant en ing\u00e9nierie de comp\u00e9tences (complexit\u00e9 du m\u00e9tier et de son environnement : risques, r\u00e9glementation...)": None,
         "ATTRIBUTION Niveau comp\u00e9tences p\u00e9dagogiques": None,
         "Evaluation CECRL ou \u00e9quivalence TOEIC, TOEFL": "ResultatLangue2",
         "ATTRIBUTION Niveau comp\u00e9tences linguistiques": None,
-        "Curriculum vitae": None,
+        "Curriculum vitae": None
     }
 
     # --- Paramètres utilisateur
@@ -1830,6 +1830,68 @@ class REE:
         # On sauve la fiche intervenant
         excel_ficheIntervenant.save()
         excel_ficheIntervenant.close()
+
+    def _generer_dictionnaire_depuis_excel(
+        self,
+        chemin_fichier: str=None,
+        nomOngletQualifications: str=None,
+        nomOngletAssociationCC: str=None,
+        nomColonneCC: str=None,
+    ) -> None:
+        """
+        Génère et affiche un dictionnaire Python liant les colonnes Excel de l'onglet 'nomOngletQualifications'
+        aux content controls Word listés dans l'onglet 'nomOngletAssociationCC'.
+        
+        Si un content control est vide, sa valeur sera 'None'.
+
+        Args:
+            chemin_fichier (str): Chemin du fichier Excel.
+            nomOngletQualifications (str): Nom de l’onglet contenant les colonnes de qualifications.
+            nomOngletAssociationCC (str): Nom de l’onglet contenant les correspondances CC.
+            nomColonneCC (str): Nom de la colonne dans l’onglet d’association qui contient les noms des content controls.
+        """
+        import json
+
+        if chemin_fichier is None :
+            chemin_fichier = self._chemin_modele_excel_ficheIntervenant
+        if nomOngletQualifications is None :
+            nomOngletQualifications = "QualificationsREE"
+        if nomOngletAssociationCC is None :
+            nomOngletAssociationCC = "AssociationCC"
+        if nomColonneCC is None :
+            nomColonneCC = "Nom CC"
+
+        # Charger le fichier Excel via ta classe personnalisée
+        fe = FichierExcel.depuis_fichier(chemin_fichier=chemin_fichier, charger_df=True)
+
+        # Récupérer le DataFrame des colonnes de qualifications
+        df_qualif = fe._tableaux[nomOngletQualifications].df
+        noms_colonnes = list(df_qualif.columns)
+
+        # Récupérer le DataFrame contenant les associations
+        df_assoc = fe._tableaux[nomOngletAssociationCC].df
+
+        if nomColonneCC not in df_assoc.columns:
+            raise ValueError(f"La colonne '{nomColonneCC}' n'existe pas dans l'onglet '{nomOngletAssociationCC}'.")
+
+        # Récupérer la colonne des content controls, en forçant la taille à celle des colonnes
+        liste_cc = df_assoc[nomColonneCC].tolist()
+        # Compléter si jamais il y a moins de lignes que de colonnes dans le premier onglet
+        while len(liste_cc) < len(noms_colonnes):
+            liste_cc.append(None)
+            raise ValueError(f"Le nombre de lignes de CC '{len(liste_cc)}' est plus petit que le nombre de colonnes du tableau principal '{len(noms_colonnes)}'.")
+
+        # Générer le dictionnaire
+        print("mon_dictionnaire = {")
+        for i, (nom_col, cc) in enumerate(zip(noms_colonnes, liste_cc)):
+            virgule = "," if i < len(noms_colonnes) - 1 else ""
+            # Si le CC est vide ou NaN → None
+            if cc is None or (isinstance(cc, float) and pd.isna(cc)) or str(cc).strip() == "":
+                cc_str = "None"
+            else:
+                cc_str = json.dumps(str(cc))
+            print(f"    {json.dumps(nom_col)}: {cc_str}{virgule}")
+        print("}")
 
 class Traiter_REE_BAK:
     def __init__(self):
