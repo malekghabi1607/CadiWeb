@@ -2546,17 +2546,16 @@ def ouvrir_excel(chemin_excel: str) -> Tuple[CDispatch, CDispatch]:
 
     return excel_app, excel_wb
 
-SWP_NOZORDER = 0x4
+OFFSET_HAUTEUR = 60  # espace pour barre de titre / barre des tâches
 SWP_NOACTIVATE = 0x10
-OFFSET_HAUTEUR = 60  # espace pour la barre des tâches et les titres de fenêtres
 
 def mettre_fenetre_premier_plan(hwnd):
     ctypes.windll.user32.SetForegroundWindow(hwnd)
 
 def ouvrir_word_excel_cote_a_cote(chemin_word: str, chemin_excel: str, split_ecranPrincipal: bool = False):
     """
-    Ouvre Word et Excel via COM, les place côte à côte ou sur deux écrans, avec un petit offset
-    pour que la barre de scroll horizontale soit visible sous Windows 11.
+    Ouvre Word et Excel via COM, les place côte à côte ou sur deux écrans, avec espace pour scrollbar.
+    Assure que les fenêtres sont au premier plan.
     """
 
     # --- Ouvrir Word ---
@@ -2579,21 +2578,22 @@ def ouvrir_word_excel_cote_a_cote(chemin_word: str, chemin_excel: str, split_ecr
     nb_ecrans = len(monitors)
 
     # Hauteur ajustée pour Windows 11
-    h = ecran_principal.height - OFFSET_HAUTEUR
+    h_principal = ecran_principal.height - OFFSET_HAUTEUR
 
     # --- Multi-écran et split=False ---
     if nb_ecrans > 1 and not split_ecranPrincipal:
+        # Écran secondaire
         ecran_secondaire = next((m for m in monitors if m != ecran_principal), monitors[1])
+        h_secondaire = ecran_secondaire.height - OFFSET_HAUTEUR
 
         # Word sur principal
-        ctypes.windll.user32.SetWindowPos(word_hwnd, 0, ecran_principal.x, ecran_principal.y, 
-                                          ecran_principal.width, h, SWP_NOZORDER)
+        ctypes.windll.user32.SetWindowPos(word_hwnd, 0, ecran_principal.x, ecran_principal.y,
+                                          ecran_principal.width, h_principal, 0)
         mettre_fenetre_premier_plan(word_hwnd)
 
         # Excel sur secondaire
-        h2 = ecran_secondaire.height - OFFSET_HAUTEUR
         ctypes.windll.user32.SetWindowPos(excel_hwnd, 0, ecran_secondaire.x, ecran_secondaire.y,
-                                          ecran_secondaire.width, h2, SWP_NOZORDER)
+                                          ecran_secondaire.width, h_secondaire, 0)
         mettre_fenetre_premier_plan(excel_hwnd)
 
     # --- Split écran principal ou un seul écran ---
@@ -2601,14 +2601,14 @@ def ouvrir_word_excel_cote_a_cote(chemin_word: str, chemin_excel: str, split_ecr
         w_half = ecran_principal.width // 2
 
         # Word à gauche
-        ctypes.windll.user32.SetWindowPos(word_hwnd, 0, ecran_principal.x, ecran_principal.y, w_half, h, SWP_NOZORDER)
+        ctypes.windll.user32.SetWindowPos(word_hwnd, 0, ecran_principal.x, ecran_principal.y, w_half, h_principal, 0)
         mettre_fenetre_premier_plan(word_hwnd)
 
         # Excel à droite
-        ctypes.windll.user32.SetWindowPos(excel_hwnd, 0, ecran_principal.x + w_half, ecran_principal.y, w_half, h, SWP_NOZORDER)
+        ctypes.windll.user32.SetWindowPos(excel_hwnd, 0, ecran_principal.x + w_half, ecran_principal.y, w_half, h_principal, 0)
         mettre_fenetre_premier_plan(excel_hwnd)
 
-    print("✅ Word et Excel positionnés avec espace pour barres de scroll.")
+    print("✅ Word et Excel positionnés et au premier plan avec espace pour scrollbars.")
     return word_app, word_doc, excel_app, excel_wb
 
 
