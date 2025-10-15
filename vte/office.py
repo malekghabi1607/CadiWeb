@@ -1340,7 +1340,9 @@ class FichierWord:
     def _lister_content_controls(doc_obj: Document) -> Dict[str, str]:
         """
         Extrait les Content Controls d'un Document python-docx.
-
+            - Pour les contrôles texte : retourne le texte.
+            - Pour les cases à cocher : retourne un booléen (True/False).
+        
         Args:
             doc_obj (Document): Objet Document python-docx.
 
@@ -1356,7 +1358,11 @@ class FichierWord:
         if doc_obj is None:
             return {}
 
-        NS = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'} # Cette URI sert uniquement d’identifiant unique, elle ne nécessite pas d’accès Internet pour fonctionner
+        NS = {
+            'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
+            'w14': 'http://schemas.microsoft.com/office/word/2010/wordml'
+        } # Cette URI sert uniquement d’identifiant unique, elle ne nécessite pas d’accès Internet pour fonctionner
+
         xml = doc_obj.part._element.xml
         root = etree.fromstring(xml.encode('utf-8'))
 
@@ -1364,21 +1370,35 @@ class FichierWord:
         dico_cc = {}
 
         for sdt in sdt_elements:
-            texte = ''.join(sdt.xpath('.//w:t/text()', namespaces=NS)).strip()
+            # --- Vérifie s’il s’agit d’une case à cocher ---
+            checkbox_elem = sdt.find('.//w14:checkbox', namespaces=NS)
+            if checkbox_elem is not None:
+                checked_elem = checkbox_elem.find('.//w14:checked', namespaces=NS)
+                valeur = None
+                if checked_elem is not None:
+                    valeur_str = checked_elem.attrib.get('{http://schemas.microsoft.com/office/word/2010/wordml}val', '0')
+                    valeur = valeur_str in ('1', 'true', 'True')
+                else:
+                    valeur = False
+            else:
+                # --- Sinon, c’est du texte standard ---
+                texte = ''.join(sdt.xpath('.//w:t/text()', namespaces=NS)).strip()
+                valeur = texte
 
+            # --- Récupère le titre (alias ou tag) ---
             alias_elem = sdt.find('.//w:sdtPr/w:alias', namespaces=NS)
             tag_elem = sdt.find('.//w:sdtPr/w:tag', namespaces=NS)
 
             titre = None
             if alias_elem is not None:
-                titre = alias_elem.attrib.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val') # Cette URI sert uniquement d’identifiant unique, elle ne nécessite pas d’accès Internet pour fonctionner
+                titre = alias_elem.attrib.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val')
             if titre is None and tag_elem is not None:
-                titre = tag_elem.attrib.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val') # Cette URI sert uniquement d’identifiant unique, elle ne nécessite pas d’accès Internet pour fonctionner
+                titre = tag_elem.attrib.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val')
 
-            if titre is None or titre == "":
+            if not titre:
                 titre = f"(sans titre {len(dico_cc) + 1})"
 
-            dico_cc[titre] = texte
+            dico_cc[titre] = valeur
 
         return dico_cc
 
