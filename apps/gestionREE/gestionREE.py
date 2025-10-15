@@ -8,8 +8,31 @@ def main():
 
 def test():
     ree = REE()
-    ree.envoyerMail_REE(statut = "auto-entrepreneur")
-    print("")
+
+    # === Envoyer mail : ok avec bon texte et PJ ===
+    # TODO : comment récupérer le statu depuis Excel ?
+    # TODO : comment faire une boucle auto sur les personnes à qui envoyer ?
+    #ree.envoyerMail_REE(statut = "auto-entrepreneur")
+
+
+    # === Ouvrir un ficheier word et récupérer les content control
+    ree._word_ficheAdministrative = FichierWord.depuisFichier()
+    print(ree._word_ficheAdministrative)
+
+    # === Créer le répertoire du REE sur le réseau
+    ree._creer_repertoire_REE(test=True)
+
+    # === Déplacer les fichiers du REE dans le répertoire
+    #ree._deplacer_fichiers(ree._repertoire_sauvegarde_fichiersREE)
+
+
+    # On ouvre le fichier Excel à remplir pour Laetitia Da Mota (c'est un modèle, on l'enregistre avec le bon nom dans le répertoire idoine)
+    excel_ficheIntervenant = FichierExcel.depuis_modele(
+        chemin_modele = ree._chemin_modele_excel_ficheIntervenant,
+        chemin_fichier_sauv = os.path.join(ree._repertoire_sauvegarde_fichiersREE, os.path.basename(ree._chemin_modele_excel_ficheIntervenant)),
+        charger_df = True
+    )
+    print(excel_ficheIntervenant._tableaux["QualificationsREE"]._df)
 
 
 if __name__ == "__main__":
