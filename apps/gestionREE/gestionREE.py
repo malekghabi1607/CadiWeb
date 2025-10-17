@@ -31,10 +31,7 @@ def test():
 
     # === On ouvre l'Excel et le Word pour comparaison et adaptations manuelles
     chemin_word = os.path.join(ree._repertoire_sauvegarde_fichiersREE, os.path.basename(ree._word_ficheAdministrative._chemin_fichier))
-    #word_app, _ = ouvrir_word(chemin_word)
-    
     chemin_excel = os.path.join(ree._repertoire_sauvegarde_fichiersREE, os.path.basename(ree._chemin_modele_excel_ficheIntervenant))
-    #excel_app, _ = ouvrir_excel(chemin_excel)
 
     ouvrir_word_excel_cote_a_cote(chemin_word, chemin_excel, split_ecranPrincipal=True)
     
