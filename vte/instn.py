@@ -1597,7 +1597,7 @@ class REE:
 
     }
 
-    _correspondance_frequence_texte = {
+    _correspondance_frequence_texte:dict[str] = {
         "Initialisation" : "initialisation du dossier",
         "Mise à jour" : "s'il y a une mise à jour",
         "Tous les ans" : "<strong><u>chaque année civile</u></strong>"
@@ -1721,6 +1721,8 @@ class REE:
         self._word_ficheAdministrative = FichierWord.depuisFichier()
         #print(self._word_ficheAdministrative)
 
+        # TODO : Peut-être afficher NOM et prénoms pour que l'utilisateur redéfinisse quel nom et quel prénom écrire (peut-être enlever les prénos en sus)
+
         # On crée le répertoire dans le répertoire des REE s'il n'existe pas (ou assimilé) (NOM Prénom (Société - AAAA))
         self._creer_repertoire_REE()
         
@@ -1734,6 +1736,7 @@ class REE:
         # On ouvre l'Excel et le Word pour comparaison et adaptations manuelles
         chemin_word = os.path.join(self._repertoire_sauvegarde_fichiersREE, os.path.basename(self._word_ficheAdministrative._chemin_fichier))
         chemin_excel = os.path.join(self._repertoire_sauvegarde_fichiersREE, os.path.basename(self._chemin_modele_excel_ficheIntervenant))
+        fichiers_sortie.append(chemin_excel)
         ouvrir_word_excel_cote_a_cote(chemin_word, chemin_excel, split_ecranPrincipal=True)  # on peut rajouter split_ecranPrincipal=True
 
         # On attend que l'utilisateur ait adapté/validé le fichier Excel pour avancer
@@ -1745,6 +1748,9 @@ class REE:
         # On met à jour le fichier Excel Liste AI formateurs.xlsx : onglet intervenant, on cherche et remplace la date de validité de l'attestation employeur sinon nouvelle ligne (recopier formule + format)
         # On met à jour le fichier Excel  avec la liste des intervenants :  on cherche et remplace les données mail, tel, Ville, la date de validité de l'attestation employeur... sinon nouvelle ligne (recopier formule + format)        
 
+
+
+    # === Méthodes internes à la classe
     def _creer_repertoire_REE(self, test:bool=False) -> None:
         """
         Crée le répertoire du REE sur le réseau local
@@ -1843,6 +1849,30 @@ class REE:
         excel_ficheIntervenant.save()
         excel_ficheIntervenant.close()
 
+    def _envoyer_mail_gestionnaire_ree_instn(self, pj:Optional[List[str]] = None, delai: Optional[timedelta] = None):
+        """
+        Envoie un mail au gestionnaire des REE de l'INSTN (Laëtitia Da Mota)
+
+        Pour les PJ, si elles ne sont pas données en argument, alors on récupère automatiquement tous les documents qui ont été mis dans le répertoire de l'intervenant il y a moins de 'delai'
+        """
+
+        if (pj is None) and (delai is not None):
+            pj = lister_fichiers_repertoire(
+                self._repertoire_sauvegarde_fichiersREE,
+                delai=delai,
+                inclure_sous_dossiers=True,        # Inclut les sous-dossiers
+            )
+        
+
+        Mail.creer_mail(
+            destinataires=self._adresse_mail_gestionnaire_ree_INSTN,
+            sujet="Documents pour mise à jour IRIS", # Pimper avec le nom de l'intervenant
+            corps_html=self._corps_html_mail_gestionnaire_ree_INSTN.replace("###", self._word_ficheAdministrative.cc['Prenoms'].title()+" "+self._word_ficheAdministrative.cc['Nom'].upper()),
+            pieces_jointes=pj,
+            envoyer_mail=False  # envoie directement sans afficher
+        )  
+
+    #  Pour aider à générer le dictionnaire des noms de colonne du fichier Excel REE
     def _generer_dictionnaire_depuis_excel(
         self,
         chemin_fichier: str=None,
@@ -1904,29 +1934,6 @@ class REE:
                 cc_str = json.dumps(str(cc))
             print(f"    {json.dumps(nom_col)}: {cc_str}{virgule}")
         print("}")
-
-    def _envoyer_mail_gestionnaire_ree_instn(self, pj:Optional[List[str]] = None, delai: Optional[timedelta] = None):
-        """
-        Envoie un mail au gestionnaire des REE de l'INSTN (Laëtitia Da Mota)
-
-        Pour les PJ, si elles ne sont pas données en argument, alors on récupère automatiquement tous les documents qui ont été mis dans le répertoire de l'intervenant il y a moins de 'delai'
-        """
-
-        if (pj is None) and (delai is not None):
-            pj = lister_fichiers_repertoire(
-                self._repertoire_sauvegarde_fichiersREE,
-                delai=delai,
-                inclure_sous_dossiers=True,        # Inclut les sous-dossiers
-            )
-        
-
-        Mail.creer_mail(
-            destinataires=self._adresse_mail_gestionnaire_ree_INSTN,
-            sujet="Documents pour mise à jour IRIS", # Pimper avec le nom de l'intervenant
-            corps_html=self._corps_html_mail_gestionnaire_ree_INSTN.replace("###", self._word_ficheAdministrative.cc['Prenoms'].title()+" "+self._word_ficheAdministrative.cc['Nom'].upper()),
-            pieces_jointes=pj,
-            envoyer_mail=False  # envoie directement sans afficher
-        )  
 
 class Traiter_REE_BAK:
     def __init__(self):
