@@ -19,7 +19,8 @@ import copy
 import ctypes
 from ctypes import wintypes
 
-from datetime import date, datetime, time
+import time as time_module
+from datetime import date, datetime, time, timedelta
 
 from tqdm import tqdm
 import colorama
@@ -387,6 +388,80 @@ def ouvrir_dossier(path) -> str:
     else:  # Linux
         subprocess.run(["xdg-open", path])
 
+def lister_fichiers_repertoire(
+    dossier: str,
+    delai: timedelta | None = None,
+    inclure_sous_dossiers: bool = False,
+    extensions: list[str] | None = None,
+    trier_par_date: bool = False
+) -> list[str]:
+    """
+    Liste les fichiers d'un répertoire selon certains critères de date, d'extension,
+    et optionnellement les trie par date de modification.
+
+    Args:
+        dossier (str): Chemin du répertoire à analyser.
+        delai (timedelta | None, optional): Durée limite. 
+            Si None, tous les fichiers sont listés.  
+            Exemple : `timedelta(days=30)` pour les fichiers modifiés depuis 30 jours.
+        inclure_sous_dossiers (bool, optional): 
+            Si True, parcourt aussi les sous-dossiers (par défaut False).
+        extensions (list[str] | None, optional): 
+            Liste d'extensions à filtrer (ex: ['.txt', '.py']). 
+            Si None, aucun filtrage d'extension n'est appliqué.
+        trier_par_date (bool, optional): 
+            Si True, trie les fichiers du plus récent au plus ancien (par défaut False).
+
+    Returns:
+        list[str]: Liste des chemins complets des fichiers correspondant aux critères.
+
+    Exemple:
+        >>> from datetime import timedelta
+        >>> fichiers = lister_fichiers_repertoire(
+        ...     dossier="/chemin/vers/dossier",
+        ...     delai=timedelta(days=30),
+        ...     inclure_sous_dossiers=True,
+        ...     extensions=[".py", ".txt"],
+        ...     trier_par_date=True
+        ... )
+        >>> for f in fichiers:
+        ...     print(f)
+        /chemin/vers/dossier/script.py
+        /chemin/vers/dossier/notes.txt
+    """
+    fichiers = []
+    maintenant = time_module.time()
+    limite_secondes = delai.total_seconds() if delai is not None else None
+
+    def fichier_valide(chemin: str) -> bool:
+        # Vérifie l'extension
+        if extensions is not None:
+            if not any(chemin.lower().endswith(ext.lower()) for ext in extensions):
+                return False
+        # Vérifie la date
+        if limite_secondes is not None:
+            if (maintenant - os.path.getmtime(chemin)) > limite_secondes:
+                return False
+        return True
+
+    # Parcours du répertoire
+    if inclure_sous_dossiers:
+        for racine, _, fichiers_local in os.walk(dossier):
+            for f in fichiers_local:
+                chemin = os.path.join(racine, f)
+                if os.path.isfile(chemin) and fichier_valide(chemin):
+                    fichiers.append(chemin)
+    else:
+        for f in os.listdir(dossier):
+            chemin = os.path.join(dossier, f)
+            if os.path.isfile(chemin) and fichier_valide(chemin):
+                fichiers.append(chemin)
+
+    # Tri par date de modification (du plus récent au plus ancien)
+    if trier_par_date:
+        fichiers.sort(key=lambda f: os.path.getmtime(f), reverse=True)
+
+    return fichiers
 
 ### --------------------------------------------------------------------
 #  Réseau
