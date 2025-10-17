@@ -14,34 +14,14 @@ def test():
     # TODO : comment faire une boucle auto sur les personnes à qui envoyer ?
     #ree.envoyerMail_REE(statut = "auto-entrepreneur")
 
-
-    # === Ouvrir un ficheier word et récupérer les content control
-    ree._word_ficheAdministrative = FichierWord.depuisFichier()
-    print(ree._word_ficheAdministrative)
-
-    # === Créer le répertoire du REE sur le réseau
-    ree._creer_repertoire_REE(test=True)
-
-    # === Déplacer les fichiers du REE dans le répertoire
-    #ree._deplacer_fichiers(ree._repertoire_sauvegarde_fichiersREE)
-
-
-    # === Remplit le fichier Excel à transférer à Laetitia Da Mota à partir d'un modèle
-    ree._remplit_excel_avecInfos_word()
-
-    # === On ouvre l'Excel et le Word pour comparaison et adaptations manuelles
-    chemin_word = os.path.join(ree._repertoire_sauvegarde_fichiersREE, os.path.basename(ree._word_ficheAdministrative._chemin_fichier))
-    chemin_excel = os.path.join(ree._repertoire_sauvegarde_fichiersREE, os.path.basename(ree._chemin_modele_excel_ficheIntervenant))
-
-    ouvrir_word_excel_cote_a_cote(chemin_word, chemin_excel, split_ecranPrincipal=True)
     
-    #arranger_fenetres(word_app, excel_app)
+    # Réception / traitement REE
+    ree.traiter_docs_REE()
+    # TODO : mettre à jour le fichier Excel des coordonnées des intervenants
+    # TODO : mettre à jour le fichier Excel des AI
 
-    # On attend pour avancer
-    input("🕒 Attente pour adaptations de l'Excel. Appuyez sur une touche pour continuer")
 
-    # Dès que l'Excel est fermé, on prépare le mail pour Laetitia
-    print("Mail Laetitia")
+    
 
 if __name__ == "__main__":
     test()

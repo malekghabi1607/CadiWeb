@@ -1496,6 +1496,7 @@ class TypeIntervenant:
     docs:List[REE.DocREE]
 
 class REE:
+    
     @dataclass
     class DocREE:
         frequence_maj:Optional[List[str]] = None
@@ -1516,10 +1517,12 @@ class REE:
         return ti"""
     # === VARIABLES DE CLASSE ===
     # --- Paramètres d'environnement
-    _repertoire_documents_ree:str = r"\\harmonie\instn\uem\_Documents_communs\Formations\Formateurs\0.Docs à envoyer"
-    _chemin_mailtype_informationsAdministratives = r"\\harmonie\instn\uem\_Documents_communs\Formations\Formateurs\Mails types\Demande des informations administratives.msg"
+    _repertoire_documents_ree:str = r"\\harmonie\instn\uem\_Documents_communs\Formations\Formateurs\0.Docs à envoyer"  # Répertoire de la GED où sont 
+    _chemin_mailtype_informationsAdministratives = r"\\harmonie\instn\uem\_Documents_communs\Formations\Formateurs\Mails types\Demande des informations administratives.msg"  # Message type à envoyer aux intervenants
     _repertoire_sauvegarde_fichiersREE:str = r"\\harmonie\INSTN\UEM\_Documents_communs\Formations\Formateurs\1.Intervenants - Documents administratifs" # Lieu où sauvegarder les fichiers de l'intervenant
     _chemin_modele_excel_ficheIntervenant:str = r"\\harmonie\INSTN\UEM\_Documents_communs\Formations\Formateurs\P09-Pr01-Qualifier les ressources enseignantes\P09_Pr01_Ta.E_Grille des critères de qualification des compétences_V1.xlsx"  # Fichier Excel à remplir pour Laetitia Da Mota (RH INSTN qui s'occupe de rentrer les REE dans IRIS)
+    _adresse_mail_gestionnaire_ree_INSTN:str = "vacataires.instn@cea.fr"
+    _corps_html_mail_gestionnaire_ree_INSTN:str = "<p>Bonjour Laëtitia,</p><p>Je t’ai mis en PJ les documents pour intégrer/mettre à jour la fiche IRIS de ###.</p><p>Je te remercie, passe une excellente journée,</p>"
     
     # Association colonnes excel avec command control Word
     # La préparation de ce ditionnaire peut être faite avec : ree._generer_dictionnaire_depuis_excel()
@@ -1603,8 +1606,8 @@ class REE:
 
 
     # --- Autres variables de la classe
-    _docsREE:dict[DocREE] = {}  # Dictionnaire des documents (fiche admin, CV...)
-    _typesIntervenants:dict[TypeIntervenant] = {}  # Dictionnaire des types d'intervenant (CEA, vacataire...)
+    #_docsREE:dict[DocREE] = {}  # Dictionnaire des documents (fiche admin, CV...)
+    #_typesIntervenants:dict[TypeIntervenant] = {}  # Dictionnaire des types d'intervenant (CEA, vacataire...)
 
 
     # === CONSTRUCTEUR ===
@@ -1711,6 +1714,8 @@ class REE:
     # === RECEPTION / TRAITEMENT DOC REE
     def traiter_docs_REE(self) -> None:
 
+        # TODO : mettre à jour le fichier Excel des coordonnées des intervenants
+        # TODO : mettre à jour le fichier Excel des AI
 
         # On ouvre le word et on charge tous les command control (filedialog depuis "Download"). On le ferme
         self._word_ficheAdministrative = FichierWord.depuisFichier()
@@ -1719,8 +1724,8 @@ class REE:
         # On crée le répertoire dans le répertoire des REE s'il n'existe pas (ou assimilé) (NOM Prénom (Société - AAAA))
         self._creer_repertoire_REE()
         
-        # On sélectionne tous les fichiers de la REE et on les déplace dans le répertoire idoine
-        self._deplacer_fichiers(self._repertoire_sauvegarde_fichiersREE)
+        # L'utilisateur sélectionne tous les fichiers de la REE et on les déplace dans le répertoire idoine
+        fichiers_sortie = self._deplacer_fichiers(self._repertoire_sauvegarde_fichiersREE)
 
         # On emplit le fichier Excel à transférer à Laetitia Da Mota à partir d'un modèle
         self._remplit_excel_avecInfos_word()
@@ -1729,10 +1734,13 @@ class REE:
         # On ouvre l'Excel et le Word pour comparaison et adaptations manuelles
         chemin_word = os.path.join(self._repertoire_sauvegarde_fichiersREE, os.path.basename(self._word_ficheAdministrative._chemin_fichier))
         chemin_excel = os.path.join(self._repertoire_sauvegarde_fichiersREE, os.path.basename(self._chemin_modele_excel_ficheIntervenant))
-        self._ouvrir_word_et_excel_et_attendre(chemin_word, chemin_excel)
+        ouvrir_word_excel_cote_a_cote(chemin_word, chemin_excel, split_ecranPrincipal=True)  # on peut rajouter split_ecranPrincipal=True
+
+        # On attend que l'utilisateur ait adapté/validé le fichier Excel pour avancer
+        input("🕒 Attente pour adaptations de l'Excel.\nAppuyez sur une touche après adaptation/sauvegarde de l'Excel REE pour continuer")
 
         # Dès que l'Excel est fermé, on prépare le mail pour Laetitia
-        print("Mail Laetitia")
+        self._envoyer_mail_gestionnaire_ree_instn(pj=fichiers_sortie)  # On peut aussi mettre delai=timedelta(days=30)
 
         # On met à jour le fichier Excel Liste AI formateurs.xlsx : onglet intervenant, on cherche et remplace la date de validité de l'attestation employeur sinon nouvelle ligne (recopier formule + format)
         # On met à jour le fichier Excel  avec la liste des intervenants :  on cherche et remplace les données mail, tel, Ville, la date de validité de l'attestation employeur... sinon nouvelle ligne (recopier formule + format)        
@@ -1752,7 +1760,7 @@ class REE:
         else :
             print(self._repertoire_sauvegarde_fichiersREE)
 
-    def _deplacer_fichiers(self, destination: str = None) -> None:
+    def _deplacer_fichiers(self, destination: str = None) -> List[str]:
         """
         Ouvre un dialogue pour sélectionner des fichiers, puis les déplace vers un dossier choisi.
 
@@ -1760,6 +1768,8 @@ class REE:
             destination (str, optional): Chemin du dossier de destination.
                                         Si None, un dialogue s'ouvrira pour le choisir.
         """
+
+        fichiers_sortie:List[str] = []
 
         # Fenêtre Tkinter cachée
         root = tk.Tk()
@@ -1785,9 +1795,14 @@ class REE:
 
             try:
                 shutil.move(fichier, chemin_destination)
+                fichiers_sortie.append(chemin_destination)
                 print(f"✅ Déplacé : {nom_fichier}")
             except Exception as e:
                 print(f"❌ Erreur avec {nom_fichier} : {e}")
+
+        
+        print(fichiers_sortie)
+        return fichiers_sortie
 
     def _remplit_excel_avecInfos_word(self) -> None:
         """
@@ -1889,6 +1904,29 @@ class REE:
                 cc_str = json.dumps(str(cc))
             print(f"    {json.dumps(nom_col)}: {cc_str}{virgule}")
         print("}")
+
+    def _envoyer_mail_gestionnaire_ree_instn(self, pj:Optional[List[str]] = None, delai: Optional[timedelta] = None):
+        """
+        Envoie un mail au gestionnaire des REE de l'INSTN (Laëtitia Da Mota)
+
+        Pour les PJ, si elles ne sont pas données en argument, alors on récupère automatiquement tous les documents qui ont été mis dans le répertoire de l'intervenant il y a moins de 'delai'
+        """
+
+        if (pj is None) and (delai is not None):
+            pj = lister_fichiers_repertoire(
+                self._repertoire_sauvegarde_fichiersREE,
+                delai=delai,
+                inclure_sous_dossiers=True,        # Inclut les sous-dossiers
+            )
+        
+
+        Mail.creer_mail(
+            destinataires=self._adresse_mail_gestionnaire_ree_INSTN,
+            sujet="Documents pour mise à jour IRIS", # Pimper avec le nom de l'intervenant
+            corps_html=self._corps_html_mail_gestionnaire_ree_INSTN.replace("###", self._word_ficheAdministrative.cc['Prenoms'].title()+" "+self._word_ficheAdministrative.cc['Nom'].upper()),
+            pieces_jointes=pj,
+            envoyer_mail=False  # envoie directement sans afficher
+        )  
 
 class Traiter_REE_BAK:
     def __init__(self):
