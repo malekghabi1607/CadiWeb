@@ -1801,7 +1801,7 @@ class REE:
                 print(f"❌ Erreur avec {nom_fichier} : {e}")
 
         
-        print(fichiers_sortie)
+        #print(fichiers_sortie)
         return fichiers_sortie
 
     def _remplit_excel_avecInfos_word(self) -> None:
