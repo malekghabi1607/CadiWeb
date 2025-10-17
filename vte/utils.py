@@ -31,6 +31,8 @@ from tkinter import filedialog
 
 from bs4 import BeautifulSoup
 
+import pygetwindow as gw
+
 ### --------------------------------------------------------------------
 #  Tests (log et timer)
 ### --------------------------------------------------------------------
