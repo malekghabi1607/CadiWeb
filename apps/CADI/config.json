@@ -1,0 +1,17 @@
+{
+    "Extractions d'IRIS": {
+        "Fichier sessions R04110": "C:/Users/vt238770/Documents/_CEA/_Formations/Extracts IRIS - Faits/Extracts complets/R04110_Sessions-COMPLET-2025.08.24.xlsx",
+        "Fichier formations R0304": "C:/Users/vt238770/Documents/_CEA/_Formations/Extracts IRIS - Faits/Extracts originaux/R0304_Formations-COMPLET-2025.08.24.xlsx",
+        "Fichier inscriptions R04500": "C:/Users/vt238770/Documents/_CEA/_Formations/Extracts IRIS - Faits/Extracts originaux/R04500_Inscriptions-COMPLET-2025.08.24.xlsx",
+        "Fichier ventes R04301": "C:/Users/vt238770/Documents/_CEA/_Formations/Extracts IRIS - Faits/Extracts originaux/R04301_Ventes-COMPLET-2025.08.24.xlsx"
+    },
+    "EvalStat": {
+        "Sauvegarde des évaluations d'une formation": "//INSTNT/partage/FORMATIONS_C/###/P07-bilan-sessions-et-bilan-formation/rapports-sessions-CSV-evaluations/Evaluation-Stagiaires-Global-###.xlsx",
+        "Modèle Excel des évaluations" : "C:/Users/vt238770/Documents/_CEA/Prog/Modèles/Evaluation-Stagiaires-Modèle.xlsx"
+    },
+    "Bilans": {
+        "Répertoire par défaut fiche de coûts": "//instnt/partage/FORMATIONS_C/###/P05-P06-dossier-conception-referentiel/fiche-de-cout-et-code-de-formation",
+        "Répertoire par défaut specs pédagogiques": "//instnt/partage/FORMATIONS_C/###/P05-P06-dossier-conception-referentiel/specifications-pedagogiques-et-referentiel",
+        "Modèle Word du bilan": "C:/Users/vt238770/Documents/_CEA/Prog/Modèles/Bilan formation.docx"
+    }
+}
