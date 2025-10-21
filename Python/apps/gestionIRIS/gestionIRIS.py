@@ -2,8 +2,6 @@ from vte.instn import *
 #from vte.ihm_console import IHM_console
 #from vte.ihm_tkinter import IHMTkinter
 
-from mailmerge import MailMerge
-
 def main():
     # === Importer données fichier(s) IRIS dans un seul Dataframe
     #env = IRIS.avecLecture(sessions, (r'C:/Users/vt238770/Documents/_CEA/_Formations/Extracts IRIS - Faits/Extracts originaux/R04110_Sessions-2021 FINAL.xlsx', r'C:/Users/vt238770/Documents/_CEA/_Formations/Extracts IRIS - Faits/Extracts originaux/R04110_Sessions-2022 FINAL.xlsx'))  # OK
