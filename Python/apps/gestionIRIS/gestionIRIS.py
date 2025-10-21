@@ -56,6 +56,7 @@ def test():
     #    - faire export formations
     # COPIER-COLLER ventes depuis référence (GED) sans écraser car petits bugs sur en-têtes de certains fichiers
     # IRIS.mettreAJourTousLesExportsIRIS_fileDialog(("Sessions", "Inscriptions"))
+    print()
 
 
 
