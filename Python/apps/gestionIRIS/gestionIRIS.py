@@ -20,6 +20,14 @@ def main():
     # IRIS.mettreAJourTousLesExportsIRIS_fileDialog(("Sessions", "Formations", "Ventes", "Inscriptions"))
 
 
+    # TODO Mettre à jour extracts IRIS complets
+    # Lire les extracts
+    # Faire un ls du répertoire cible des extracts
+    # Ouvrir extract vomplet et regarder les fichiers inclus
+    # Comparer fichiers inclus et ls
+    # Supprimer des lign,es (si besoin)
+    # Ajouter fichiers nécessaires 
+
     print("")
 
 
