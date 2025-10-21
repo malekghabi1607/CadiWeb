@@ -1,6 +1,8 @@
 README.md
 pyproject.toml
 vte/__init__.py
+vte/ihm_console.py
+vte/ihm_tkinter.py
 vte/instn.py
 vte/office.py
 vte/utils.py

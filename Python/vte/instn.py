@@ -154,19 +154,74 @@ class IRIS:
         nom_fichier_output = "R04500_Inscriptions-COMPLET.xlsx"
         )
 
-    dict_DE_IRIS = {}
-    dict_DE_IRIS["CodesExports"] = {
+    _dict_DE_IRIS = {}
+    _dict_DE_IRIS["CodesExports"] = {
             "Sessions" : "R04110",
             "Formations" : "R0304",
             "Ventes" : "R04301",
             "Inscriptions" : "R04500",
         }
-    dict_DE_IRIS["PropExportIRIS"] = {
+    _dict_DE_IRIS["PropExportIRIS"] = {
             "Sessions" : _sessions, 
             "Formations" : _formations,
             "Ventes" : _ventes,
             "Inscriptions" : _inscriptions}
 
+    _tSessions = (
+        'R04110_Sessions-2011 à 2014 FINAL.xlsx',
+        'R04110_Sessions-2015 FINAL.xlsx',
+        'R04110_Sessions-2016 FINAL.xlsx',
+        'R04110_Sessions-2017 FINAL.xlsx',
+        'R04110_Sessions-2018 FINAL.xlsx',
+        'R04110_Sessions-2019 FINAL.xlsx',
+        'R04110_Sessions-2020 FINAL.xlsx',
+        'R04110_Sessions-2021 FINAL.xlsx',
+        'R04110_Sessions-2022 FINAL.xlsx',
+        'R04110_Sessions-2023 FINAL.xlsx',
+        'R04110_Sessions-2024 FINAL.xlsx',
+        'R04110_Sessions-2025 au 2025.10.21.xlsx')
+
+    _tFormations = (
+        "R0304_Ref_Formation-Listedesformations-2025.10.22.xlsx", )
+
+    _tVentes = (
+        'R04301_Sessions-Ventes-FC2020 FINAL.xlsx',
+        'R04301_Sessions-Ventes-FC2021 FINAL.xlsx',
+        'R04301_Sessions-Ventes-FC2022 FINAL.xlsx',
+        'R04301_Sessions-Ventes-FC2023 FINAL.xlsx',
+        'R04301_Sessions-Ventes-FC2024 FINAL.xlsx',
+        'R04301_Sessions-Ventes-filtre sur FC-2025 au 2025-02-05 LG.xlsx',
+        'R04301_Sessions-Ventes-filtre sur FC-2025 au 2025-03-03 LG.xlsx',
+        'R04301_Sessions-Ventes-filtre sur FC-2025 au 2025-04-01 LG.xlsx',
+        'R04301_Sessions-Ventes-filtre sur FC-2025 au 2025-05-12 LG.xlsx',
+        'R04301_Sessions-Ventes-filtre sur FC-2025 au 2025-06-02 LG.xlsx',
+        'R04301_Sessions-Ventes-filtre sur FC-2025 au 2025-07-01 LG.xlsx',
+        'R04301_Sessions-Ventes-filtre sur FC-2025 au 2025-08-01 LG.xlsx',
+        'R04301_Sessions-Ventes-filtre sur FC-2025 au 2025-09-01 LG.xlsx',
+        'R04301_Sessions-Ventes-filtre sur FC-2025 au 2025-10-01 LG.xlsx')
+        
+    _tInscriptions = (
+        'R04500_Sessions-Inscriptions-FC2020 FINAL.xlsx',
+        'R04500_Sessions-Inscriptions-FC2021 FINAL.xlsx',
+        'R04500_Sessions-Inscriptions-FC2022 FINAL.xlsx',
+        'R04500_Sessions-Inscriptions-FC2023 FINAL.xlsx',
+        'R04500_Sessions-Inscriptions-FC2024 FINAL.xlsx',
+        'R04500_Sessions-Inscriptions-filtre sur FC-2025 au 2025-02-05.xlsx',
+        'R04500_Sessions-Inscriptions-filtre sur FC-2025 au 2025-03-03.xlsx',
+        'R04500_Sessions-Inscriptions-filtre sur FC-2025 au 2025-04-01.xlsx',
+        'R04500_Sessions-Inscriptions-filtre sur FC-2025 au 2025-05-12.xlsx',
+        'R04500_Sessions-Inscriptions-filtre sur FC-2025 au 2025-06-02.xlsx',
+        'R04500_Sessions-Inscriptions-filtre sur FC-2025 au 2025-07-01.xlsx',
+        'R04500_Sessions-Inscriptions-filtre sur FC-2025 au 2025-08-01.xlsx',
+        'R04500_Sessions-Inscriptions-filtre sur FC-2025 au 2025-09-01.xlsx',
+        'R04500_Sessions-Inscriptions-filtre sur FC-2025 au 2025-10-01.xlsx')
+
+    _dict_DE_IRIS["Fichiers"] = {
+        "Sessions" : _tSessions,
+        "Formations" : _tFormations,
+        "Ventes" : _tVentes,
+        "Inscriptions" : _tInscriptions
+    }
 
 
     # Association colonnes excel avec command control Word
@@ -208,14 +263,122 @@ class IRIS:
 
     @classmethod
     def avecLecture(cls, propExportIRIS:PropExportIRIS, chemins_fichiersInput:Optional[str|tuple[str, ...]]=None) -> IRIS:
-        """On lit le/les extract IRIS et on stocke dans self._df_tableau"""
+        """
+        On lit le/les extract(s) IRIS et on le/les stocke dans un seul dataframe self._df_tableau
+        """
         instance = cls(prop=propExportIRIS, chemins_fichiersInput=chemins_fichiersInput)
         instance._lire_extractIRIS()
         return instance
 
 
+    @classmethod
+    def avecEcritureOutputDefaut(cls, propExportIRIS:PropExportIRIS, chemins_fichiersInput:Optional[str|tuple[str, ...]]=None) -> IRIS:
+        
+        instance = cls.avecLecture(propExportIRIS, chemins_fichiersInput)
 
-     # === Méthodes internes ===
+        # On récupère le chemin du modèle à ouvrir
+        chemin_fichier = instance._modele.chemin_fichier
+        #nom_onglet = instance._output.nom_onglet
+
+        # Création du chemin pour l'output
+        chemin_fichier_output = os.path.join(instance._output.repertoire, instance._output.nom_fichier[:-5] + "-" + date.today().strftime("%Y.%m.%d") + ".xlsx") #ou f"{datetime.now():%Y.%m.%d}")
+
+        # On ouvre le modèle et tous ses tableaux structurés
+        #fe_modele = FichierExcel.depuis_fichier(chemin_fichier=chemin_fichier)
+        fe_modele = FichierExcel.depuis_modele(chemin_modele=chemin_fichier, chemin_fichier_sauv=chemin_fichier_output)
+
+        # On copie le DataFrame instance._df_tableau (le dataframe créé par cls.avecLecture) avec les nouvelles données dans le modèle
+        fe_modele._tableaux[instance._nom_typeExport].ecrit_dataFrame_dans_tableauStructure(instance._df_tableau, supprimeDonneesEtRemplace=True)
+        
+        # On écrit les références des fichiers copiés dans le tableau structuré "Imports"
+        instance._df_chemins = pd.DataFrame(instance._chemins_fichiersInput, columns=['Chemin fichier'])
+        fe_modele._tableaux["Imports"].ecrit_dataFrame_dans_tableauStructure(df=instance._df_chemins, supprimeDonneesEtRemplace=True)
+        
+        #On enregistre et on ferme (par précaution car copieformat xlwings sauvegarde)
+        fe_modele.save()    
+        fe_modele.close()
+
+        return instance
+ 
+
+    # === Méthodes statiques
+    @staticmethod
+    def mettreAJourTousLesExportsIRIS_auto(tuple_types:Tuple(str)) -> None:
+        """
+        Permet de créer un seul fichier Excel à partir de plusieurs exports d'IRIS.
+        Les fichiers à traités sont initialisés par la fonction initialisationListeFichiersExportsIRIS() qui permet à l'utilisateur de tout lister à la main (ça peut être plus pratique dans certains cas afin d'éviter de passer par une sélection manuelle)
+        
+        Les fichiers output sont des modèles avec les mêmes colonnes que les extracts d'IRIS mais avec de meilleures formes (format, couleurs...) + des colonnes adjointes à la fin pour extraire et séparer les infos du n° de session ou de la référence de la formation (ex. : trigramme formation, trigramme RP, trigramme AF...)
+
+        Les tuples des fichiers Excel à traiter sont enregistrés dans des instances de TravauxFichiersIRIS et on emploie les méthodes de cette classe
+
+        :param tuple_types: tuple de strings avec les noms des extracts 
+        :type donnees: Tuple[str, ...]
+
+        :Example:
+        
+        >>> mettreAJourTousLesExportsIRIS_auto(("Formations", ))
+        >>> mettreAJourTousLesExportsIRIS_auto(("Formations", "Sessions", "Ventes", "Inscriptions"))
+
+
+        .. seealso:: Rien du tout.
+        .. warning:: Si une seule valeur pour tuple_types, bien mettre sous cette forme : ("Formations",) car sans la virgule Python interprête juste comme un string
+        .. note:: Rien du tout.
+        .. todo:: Rien du tout.
+        """
+
+        # On traite à la suite
+        for clef in IRIS._dict_DE_IRIS["CodesExports"].keys():
+            if clef in tuple_types:
+                print(Style.BRIGHT + Fore.YELLOW + "\nTraitement des exports " + clef)
+                fichiers_formates = ["\n\t" + f for f in IRIS._dict_DE_IRIS["Fichiers"][clef]]
+                print("Liste des fichiers traités : " + ", ".join(fichiers_formates))
+                chemins_fichiersInput = tuple(os.path.join(IRIS._dict_DE_IRIS["PropExportIRIS"][clef]._input.repertoire, nom) for nom in IRIS._dict_DE_IRIS["Fichiers"][clef])
+                IRIS.avecEcritureOutputDefaut(IRIS._dict_DE_IRIS["PropExportIRIS"][clef], chemins_fichiersInput=chemins_fichiersInput)
+
+    @staticmethod
+    def mettreAJourTousLesExportsIRIS_fileDialog(tuple_types:Tuple[str, ...]):
+        """
+        Permet de créer un seul fichier Excel à partir de plusieurs exports d'IRIS.
+        Les fichiers à traités sont sélectionnés à la suite par l'utilisateur à travers un filedialog dans l'ordre du doctionnaire d'entrée, puis tous les fichiers sont traités successivement après.
+        
+        Les fichiers output sont des modèles avec les mêmes colonnes que les extracts d'IRIS mais avec de meilleures formes (format, couleurs...) + des colonnes adjointes à la fin pour extraire et séparer les infos du n° de session ou de la référence de la formation (ex. : trigramme formation, trigramme RP, trigramme AF...)
+
+        Les tuples des fichiers Excel à traiter sont enregistrés dans des instances de ExtractIRIS et on emploie les méthodes de cette classe
+
+        :param tuple_types: tuple de strings avec les noms des extracts 
+        :type donnees: Tuple[str, ...]
+
+        :Example:
+        >>> mettreAJourTousLesExportsIRIS_fileDialog(("Formations", ))
+        >>> mettreAJourTousLesExportsIRIS_fileDialog(("Formations", "Sessions", "Ventes", "Inscriptions"))
+
+
+        .. seealso:: Rien du tout.
+        .. warning:: Si une seule valeur pour tuple_types, bien mettre sous cette forme : ("Formations",) car sans la virgule Python interprête juste comme un string
+        .. note:: Rien du tout.
+        .. todo:: Rien du tout.
+        """
+        # On fait choisir les fichiers à l'utilisateur
+        dict_traitements = {}
+        for clef, codeIRIS in IRIS._dict_DE_IRIS["CodesExports"].items():
+            if clef in tuple_types:
+                traitement = IRIS(IRIS._dict_DE_IRIS["PropExportIRIS"][clef])
+                dict_traitements[clef] = traitement
+
+        # On traite à la suite
+        for clef in dict_traitements.keys():
+            print(Style.BRIGHT + Fore.YELLOW + "\nTraitement des exports " + clef)
+            fichiers_formates = ["\n\t" + f for f in dict_traitements[clef]._chemins_fichiersInput]
+            print("Liste des fichiers traités : " + ", ".join(fichiers_formates))
+            #print("Liste des fichiers traités : " + ", ".join(dictEI[clef].nomsFichiers_exportIRIS))
+            #dict_traitements[clef].lire_extractIRIS()
+            #dict_traitements[clef].ecrit_dataFrame_dans_tableauStructure(df=instance._df_chemins, supprimeDonneesEtRemplace=True)
+            IRIS.avecEcritureOutputDefaut(IRIS._dict_DE_IRIS["PropExportIRIS"][clef], chemins_fichiersInput=dict_traitements[clef]._chemins_fichiersInput)
+
+
+
+    # === Méthodes internes ===
     def _choisirFichiers_filedialog(self):
         # Lister/sélectionner les documents à concaténer
         cheminsExcel = filedialog.askopenfilenames(title="Sélectionner les fichiers " + self._nom_typeExport + " (" + self._codeExport + ") Excel à concaténer", filetype=[("Fichiers Excel", "*.xlsx")], initialdir=self._input.repertoire)
@@ -225,9 +388,9 @@ class IRIS:
             vlog("click sur cancel du filedialog → Pas de chemins de fichier")
         self._chemins_fichiersInput = cheminsExcel
 
-    def lire_extractIRIS(self):
+    def _lire_extractIRIS(self):
         """
-        Crée le DataFrame pour l'export IRIS. On le stocke dans self.__df_tableau
+        Crée le DataFrame pour l'export IRIS. On le stocke dans self._df_tableau
         On selectionne la bonne methode en fonction du type d'export
 
         :Example:
@@ -269,7 +432,7 @@ class IRIS:
             # Cas Sessions ou Inscriptions ou Ventes (sensiblement comme 'Inscription R04500' mais groupé par Client (pas de détail de chaque stagiaire))
             case "R04110" | "R04500" | "R04301":
                 # On extrait / retravaille les informations de la colonne 'N° Session'
-                df_colonnes_sup = self._df_tableau['N° Session'].apply(self.extraire_infos_numSessionIRIS)
+                df_colonnes_sup = self._df_tableau['N° Session'].apply(self._extraire_infos_numSessionIRIS)
                 # A cause de certains éléments None ou NaN, Pandas type la colonne en float. Je la retype en Int64 qui permet de stocker des NaN avec des entiers, contrairement au type int standard.
                 df_colonnes_sup['Année'] = df_colonnes_sup['Année'].astype('Int64')
                 #print(df_colonnes_sup)
@@ -277,7 +440,7 @@ class IRIS:
             # Cas Formations
             case "R0304":
                 # On extrait / retravaille les informations de la colonne 'Référence'
-                df_colonnes_sup = self._df_tableau['Référence'].apply(self.extraire_infos_referenceFormationIRIS)
+                df_colonnes_sup = self._df_tableau['Référence'].apply(self._extraire_infos_referenceFormationIRIS)
                 # A cause de certains éléments None ou NaN, Pandas type la colonne en float. Je la retype en Int64 qui permet de stocker des NaN avec des entiers, contrairement au type int standard.
                 df_colonnes_sup['Année'] = df_colonnes_sup['Année'].astype('Int64')
                 #print(df_colonnes_sup)
@@ -286,7 +449,7 @@ class IRIS:
         if df_colonnes_sup is not None:
             self._df_tableau = pd.concat([self._df_tableau, df_colonnes_sup], axis=1)
     
-    def extraire_infos_numSessionIRIS(self, reference:str):
+    def _extraire_infos_numSessionIRIS(self, reference:str):
         """
         Fonction pour extraire les colonnes à partir de la colonne 'Référence'. Je dois faire une fonction interne car j'emploie Split qui ne s'applique que sur des string. Je dois donc faire appel à cette fonction ligne par ligne et donc créer une fonction que j'appelle par DataFrame[colonne].apply().
 
@@ -367,7 +530,7 @@ class IRIS:
             '3ème élément de la référence': troisieme_bloc
         })
 
-    def extraire_infos_referenceFormationIRIS(self, reference):
+    def _extraire_infos_referenceFormationIRIS(self, reference):
         """
         Fonction pour extraire les colonnes à partir de la colonne 'Référence'. Je dois faire une fonction interne car j'emploie Split qui ne s'applique que sur des string. Je dois donc faire appel à cette fonction ligne par ligne et donc créer une fonction que j'appelle par DataFrame[colonne].apply().
         """
@@ -418,6 +581,30 @@ class IRIS:
         })
    
 
+    # === Affichage ===
+    def __str__(self):
+        if self._chemins_fichiersInput:
+            # Pour aff_repertoire et chemin 
+            aff_cheminsFichiers = ""
+            for cfichier in self._chemins_fichiersInput:
+                aff_cheminsFichiers = aff_cheminsFichiers + "\n    " + cfichier
+        else:
+            aff_cheminsFichiers = "Aucun fichier spécifié"
+
+        # Pour aff_df
+        from io import StringIO
+        buffer = StringIO()
+        if self._df_tableau is not None:
+            print(self._df_tableau, file=buffer)
+            aff_df = buffer.getvalue()
+        else:
+            aff_df = "Non défini"
+
+        return (
+            f"TravauxFichiersIRIS\n"
+            f"  Chemins fichiers à exploiter : {aff_cheminsFichiers}\n"
+            f"  df_tableau :\n{aff_df}"
+            )
 
 
 class TravauxFichiersIRIS_BAK:
@@ -3824,145 +4011,6 @@ class Traiter_contactsApprentis:
 ### --------------------------------------------------------------------
 #  Fonctions globales INSTN
 ### --------------------------------------------------------------------
-
-def initialisationListeFichiersExportsIRIS():
-    """
-    Initialise les tuples des fichiers Excel (extracttions d'IRIS) à concaténer / traiter
-
-    :Example:
-
-    >>> initialisationListeFichiersExportsIRIS()
-
-    .. seealso:: Rien du tout.
-    .. warning:: Rien du tout.
-    .. note:: Rien du tout.
-    .. todo:: Rien du tout.
-    """
-    tSessions = (
-        'R04110_Sessions-2011 à 2014 FINAL.xlsx',
-        'R04110_Sessions-2015 FINAL.xlsx',
-        'R04110_Sessions-2016 FINAL.xlsx',
-        'R04110_Sessions-2017 FINAL.xlsx',
-        'R04110_Sessions-2018 FINAL.xlsx',
-        'R04110_Sessions-2019 FINAL.xlsx',
-        'R04110_Sessions-2020 FINAL.xlsx',
-        'R04110_Sessions-2021 FINAL.xlsx',
-        'R04110_Sessions-2022 FINAL.xlsx',
-        'R04110_Sessions-2023 FINAL.xlsx',
-        'R04110_Sessions-2024 FINAL.xlsx',
-        'R04110_Sessions-2025 au 2025.08.07.xlsx')
-
-    tFormations = (
-        "R0304_Ref_Formation-Listedesformations-2025.06.06.xlsx", )
-
-    tVentes = (
-        'R04301_Sessions-Ventes-FC2020 FINAL.xlsx',
-        'R04301_Sessions-Ventes-FC2021 FINAL.xlsx',
-        'R04301_Sessions-Ventes-FC2022 FINAL.xlsx',
-        'R04301_Sessions-Ventes-FC2023 FINAL.xlsx',
-        'R04301_Sessions-Ventes-FC2024 FINAL.xlsx',
-        'R04301_Sessions-Ventes-filtre sur FC-2025 au 2025-02-05 LG.xlsx',
-        'R04301_Sessions-Ventes-filtre sur FC-2025 au 2025-03-03 LG.xlsx',
-        'R04301_Sessions-Ventes-filtre sur FC-2025 au 2025-04-01 LG.xlsx',
-        'R04301_Sessions-Ventes-filtre sur FC-2025 au 2025-05-12 LG.xlsx',
-        'R04301_Sessions-Ventes-filtre sur FC-2025 au 2025-06-02 LG.xlsx',
-        'R04301_Sessions-Ventes-filtre sur FC-2025 au 2025-07-01 LG.xlsx',
-        'R04301_Sessions-Ventes-filtre sur FC-2025 au 2025-08-01 LG.xlsx')
-        
-    tInscriptions = (
-        'R04500_Sessions-Inscriptions-FC2020 FINAL.xlsx',
-        'R04500_Sessions-Inscriptions-FC2021 FINAL.xlsx',
-        'R04500_Sessions-Inscriptions-FC2022 FINAL.xlsx',
-        'R04500_Sessions-Inscriptions-FC2023 FINAL.xlsx',
-        'R04500_Sessions-Inscriptions-FC2024 FINAL.xlsx',
-        'R04500_Sessions-Inscriptions-filtre sur FC-2025 au 2025-02-05.xlsx',
-        'R04500_Sessions-Inscriptions-filtre sur FC-2025 au 2025-03-03.xlsx',
-        'R04500_Sessions-Inscriptions-filtre sur FC-2025 au 2025-04-01.xlsx',
-        'R04500_Sessions-Inscriptions-filtre sur FC-2025 au 2025-05-12.xlsx',
-        'R04500_Sessions-Inscriptions-filtre sur FC-2025 au 2025-06-02.xlsx',
-        'R04500_Sessions-Inscriptions-filtre sur FC-2025 au 2025-07-01.xlsx',
-        'R04500_Sessions-Inscriptions-filtre sur FC-2025 au 2025-08-01.xlsx')
-
-    return {
-        "Sessions" : tSessions,
-        "Formations" : tFormations,
-        "Ventes" : tVentes,
-        "Inscriptions" : tInscriptions
-    }
-
-def mettreAJourTousLesExportsIRIS_auto(tuple_types:Tuple(str)):
-    """
-    Permet de créer un seul fichier Excel à partir de plusieurs exports d'IRIS.
-    Les fichiers à traités sont initialisés par la fonction initialisationListeFichiersExportsIRIS() qui permet à l'utilisateur de tout lister à la main (ça peut être plus pratique dans certains cas afin d'éviter de passer par une sélection manuelle)
-    
-    Les fichiers output sont des modèles avec les mêmes colonnes que les extracts d'IRIS mais avec de meilleures formes (format, couleurs...) + des colonnes adjointes à la fin pour extraire et séparer les infos du n° de session ou de la référence de la formation (ex. : trigramme formation, trigramme RP, trigramme AF...)
-
-    Les tuples des fichiers Excel à traiter sont enregistrés dans des instances de TravauxFichiersIRIS et on emploie les méthodes de cette classe
-
-    :param tuple_types: tuple de strings avec les noms des extracts 
-    :type donnees: Tuple[str, ...]
-
-    :Example:
-    
-    >>> mettreAJourTousLesExportsIRIS_auto(("Formations", ))
-    >>> mettreAJourTousLesExportsIRIS_auto(("Formations", "Sessions", "Ventes", "Inscriptions"))
-
-
-    .. seealso:: Rien du tout.
-    .. warning:: Si une seule valeur pour tuple_types, bien mettre sous cette forme : ("Formations",) car sans la virgule Python interprête juste comme un string
-    .. note:: Rien du tout.
-    .. todo:: Rien du tout.
-    """
-    # On initialise tous les chemins des fichiers à concaténer
-    dict_DE_IRIS["Fichiers"] = initialisationListeFichiersExportsIRIS()
-
-    # On traite à la suite
-    for clef in dict_DE_IRIS["CodesExports"].keys():
-        if clef in tuple_types:
-            print(Style.BRIGHT + Fore.YELLOW + "\nTraitement des exports " + clef)
-            fichiers_formates = ["\n\t" + f for f in dict_DE_IRIS["Fichiers"][clef]]
-            print("Liste des fichiers traités : " + ", ".join(fichiers_formates))
-            chemins_fichiersInput = tuple(os.path.join(dict_DE_IRIS["PropExportIRIS"][clef]._input.repertoire, nom) for nom in dict_DE_IRIS["Fichiers"][clef])
-            TravauxFichiersIRIS.avecEcritureOutputDefaut(dict_DE_IRIS["PropExportIRIS"][clef], chemins_fichiersInput=chemins_fichiersInput)
-
-def mettreAJourTousLesExportsIRIS_fileDialog(tuple_types:Tuple[str, ...]):
-    """
-    Permet de créer un seul fichier Excel à partir de plusieurs exports d'IRIS.
-    Les fichiers à traités sont sélectionnés à la suite par l'utilisateur à travers un filedialog dans l'ordre du doctionnaire d'entrée, puis tous les fichiers sont traités successivement après.
-    
-    Les fichiers output sont des modèles avec les mêmes colonnes que les extracts d'IRIS mais avec de meilleures formes (format, couleurs...) + des colonnes adjointes à la fin pour extraire et séparer les infos du n° de session ou de la référence de la formation (ex. : trigramme formation, trigramme RP, trigramme AF...)
-
-    Les tuples des fichiers Excel à traiter sont enregistrés dans des instances de ExtractIRIS et on emploie les méthodes de cette classe
-
-    :param tuple_types: tuple de strings avec les noms des extracts 
-    :type donnees: Tuple[str, ...]
-
-    :Example:
-    >>> mettreAJourTousLesExportsIRIS_fileDialog(("Formations", ))
-    >>> mettreAJourTousLesExportsIRIS_fileDialog(("Formations", "Sessions", "Ventes", "Inscriptions"))
-
-
-    .. seealso:: Rien du tout.
-    .. warning:: Si une seule valeur pour tuple_types, bien mettre sous cette forme : ("Formations",) car sans la virgule Python interprête juste comme un string
-    .. note:: Rien du tout.
-    .. todo:: Rien du tout.
-    """
-    # On fait choisir les fichiers à l'utilisateur
-    dict_traitements = {}
-    for clef, codeIRIS in dict_DE_IRIS["CodesExports"].items():
-        if clef in tuple_types:
-            traitement = TravauxFichiersIRIS(dict_DE_IRIS["PropExportIRIS"][clef])
-            dict_traitements[clef] = traitement
-
-    # On traite à la suite
-    for clef in dict_traitements.keys():
-        print(Style.BRIGHT + Fore.YELLOW + "\nTraitement des exports " + clef)
-        fichiers_formates = ["\n\t" + f for f in dict_traitements[clef]._chemins_fichiersInput]
-        print("Liste des fichiers traités : " + ", ".join(fichiers_formates))
-        #print("Liste des fichiers traités : " + ", ".join(dictEI[clef].nomsFichiers_exportIRIS))
-        #dict_traitements[clef].lire_extractIRIS()
-        #dict_traitements[clef].ecrit_dataFrame_dans_tableauStructure(df=instance._df_chemins, supprimeDonneesEtRemplace=True)
-        TravauxFichiersIRIS.avecEcritureOutputDefaut(dict_DE_IRIS["PropExportIRIS"][clef], chemins_fichiersInput=dict_traitements[clef]._chemins_fichiersInput)
 
 def lire_fdc(chemin_fdc):
 
