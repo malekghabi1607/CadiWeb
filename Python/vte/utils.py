@@ -682,6 +682,12 @@ def html_vers_texte(html: str) -> str:
 
     return texte_final
 
+def convertir_tuple_str(input:str|Tuple[str]) -> Tuple[str]:
+        if isinstance(input, str):
+            return (input,)
+        else:
+            return input
+
 
 ### --------------------------------------------------------------------
 #  Fenêtres

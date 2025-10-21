@@ -82,7 +82,345 @@ class PropExportIRIS:
             f"{afficher_infos('Output', self._output)}"
         )
 
-class TravauxFichiersIRIS:
+class IRIS:
+    "C'est la classe qui contient l'environnement pour bosser sur des fichiers Exports IRIS"
+
+    # === VARIABLES DE CLASSE ===
+    # --- Paramètres d'environnement - exports IRIS
+    _dictCodesIRIS:dict[str] = {
+            "Sessions" : "R04110",
+            "Formations" : "R0304",
+            "Ventes" : "R04301",
+            "Inscriptions" : "R04500",
+        }
+
+    _sessions:PropExportIRIS = PropExportIRIS(
+        nom_typeExport = "Sessions",
+        codeExport = "R04110",
+
+        repertoire_input = r"C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Extracts originaux",
+        nom_onglet_input = "Data",
+        nbLignes_avantET_input = 1,
+
+        repertoire_modele = r"C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Modèles",
+        nom_fichier_modele = "R04110_Sessions-Modèle.xlsx",
+
+        repertoire_output = r"C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Extracts complets",
+        nom_fichier_output = "R04110_Sessions-COMPLET.xlsx"
+        )
+
+    _formations:PropExportIRIS = PropExportIRIS(
+        nom_typeExport = "Formations",
+        codeExport = "R0304",
+
+        repertoire_input = r"C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Extracts originaux",
+        nom_onglet_input = "Data",
+        nbLignes_avantET_input = 0,
+
+        repertoire_modele = r"C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Modèles",
+        nom_fichier_modele = "R0304_Formations-Modèle.xlsx",
+
+        repertoire_output = r"C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Extracts complets",
+        nom_fichier_output = "R0304_Formations-COMPLET.xlsx"
+        )
+
+    _ventes:PropExportIRIS = PropExportIRIS(
+        nom_typeExport = "Ventes",
+        codeExport = "R04301",
+
+        repertoire_input = r"C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Extracts originaux", #Car il y a des petits bugs sur certains CSV
+        nom_onglet_input = "Data",
+        nbLignes_avantET_input = 1,
+
+        repertoire_modele = r"C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Modèles",
+        nom_fichier_modele = "R04301_Ventes-Modèle.xlsx",
+
+        repertoire_output = r"C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Extracts complets",
+        nom_fichier_output = "R04301_Ventes-COMPLET.xlsx"
+        )
+
+    _inscriptions:PropExportIRIS = PropExportIRIS(
+        nom_typeExport = "Inscriptions",
+        codeExport = "R04500",
+
+        repertoire_input = r"\\instnt\HOME\REFERENC\IRIS - rapports de synthese",
+        nom_onglet_input = "Data",
+        nbLignes_avantET_input = 1,
+
+        repertoire_modele = r"C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Modèles",
+        nom_fichier_modele = "R04500_Inscriptions-Modèle.xlsx",
+
+        repertoire_output = r"C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Extracts complets",
+        nom_fichier_output = "R04500_Inscriptions-COMPLET.xlsx"
+        )
+
+    dict_DE_IRIS = {}
+    dict_DE_IRIS["CodesExports"] = {
+            "Sessions" : "R04110",
+            "Formations" : "R0304",
+            "Ventes" : "R04301",
+            "Inscriptions" : "R04500",
+        }
+    dict_DE_IRIS["PropExportIRIS"] = {
+            "Sessions" : _sessions, 
+            "Formations" : _formations,
+            "Ventes" : _ventes,
+            "Inscriptions" : _inscriptions}
+
+
+
+    # Association colonnes excel avec command control Word
+
+    # --- Paramètres utilisateur
+ 
+
+    # --- Autres variables de la classe
+    # Type d'export
+    _nom_typeExport:str
+    _codeExport:str
+
+    # Informations génériques sur les exports, modèles et output (dépend du type d'export)
+    _input:InfosExportsIRIS  # Informations input données
+    _modele:InfosExportsIRIS  # Informations sur le modèle Excel à employer pour remplir l'output
+    _output:InfosExportsIRIS  # Informations output
+
+    _df_tableau:DataFrame = None  # dataframe du fichier IRIS
+    _df_chemins:Tuple[str] = None  # Tuple des chemins CSV à traiter
+
+    # === CONSTRUCTEUR ===
+    def __init__(self, prop:PropExportIRIS, chemins_fichiersInput:Optional[str|tuple[str, ...]]=None):
+        # Type d'export
+        self._nom_typeExport = prop._nom_typeExport
+        self._codeExport = prop._codeExport
+
+        # Informations génériques sur les exports, modèles et output (dépend du type d'export)
+        self._input = prop._input  # Informations input données
+        self._modele = prop._modele  # Informations sur le modèle Excel à employer pour remplir l'output
+        self._output = prop._output  # Informations output
+
+
+        # S'il n'y a pas de chemin_fichiersInput de donné, c'est qu'il faut les sélectionner manuellement
+        if not chemins_fichiersInput:
+            self._choisirFichiers_filedialog()
+        else:
+            self._chemins_fichiersInput = convertir_tuple_str(chemins_fichiersInput)
+
+
+    @classmethod
+    def avecLecture(cls, propExportIRIS:PropExportIRIS, chemins_fichiersInput:Optional[str|tuple[str, ...]]=None) -> IRIS:
+        """On lit le/les extract IRIS et on stocke dans self._df_tableau"""
+        instance = cls(prop=propExportIRIS, chemins_fichiersInput=chemins_fichiersInput)
+        instance._lire_extractIRIS()
+        return instance
+
+
+
+     # === Méthodes internes ===
+    def _choisirFichiers_filedialog(self):
+        # Lister/sélectionner les documents à concaténer
+        cheminsExcel = filedialog.askopenfilenames(title="Sélectionner les fichiers " + self._nom_typeExport + " (" + self._codeExport + ") Excel à concaténer", filetype=[("Fichiers Excel", "*.xlsx")], initialdir=self._input.repertoire)
+        
+        # Gestion du cas où il y a non-sélection de fichiers
+        if not cheminsExcel:
+            vlog("click sur cancel du filedialog → Pas de chemins de fichier")
+        self._chemins_fichiersInput = cheminsExcel
+
+    def lire_extractIRIS(self):
+        """
+        Crée le DataFrame pour l'export IRIS. On le stocke dans self.__df_tableau
+        On selectionne la bonne methode en fonction du type d'export
+
+        :Example:
+        >>> self.lire_extractIRIS()
+
+
+        .. seealso:: Rien du tout.
+        .. warning:: Rien du tout.
+        .. note:: Rien du tout.
+        .. todo:: Rien du tout.
+        """
+
+        # Initialisation : on crée un DataFrame vide pour recevoir (peut-être) des infos que l'on traitera et qui nécessitera d'adjoindre des colonnes à self.__df_tableau
+        df_colonnes_sup = None
+
+        # On parcourt le tuple des fichiers à lire
+        df_list = [] # Liste des DataFrame qui contiendra chaque fichier Excel séparément
+        taille_totale = sum(os.path.getsize(fichier) for fichier in self._chemins_fichiersInput) # Calcul taille totale pour barre de progression
+
+        with tqdm(total=taille_totale, unit='o', unit_scale=True, desc=Fore.CYAN+"Lecture des fichiers Excel" + Style.RESET_ALL) as pbar:
+            #for i, ifichier in enumerate((os.path.basename(chemin) for chemin in self._chemins_fichiersInput), 1):
+            for i, chemin in enumerate(self._chemins_fichiersInput, 1):
+                # Données pour tqdm
+                fichier = os.path.basename(chemin)
+                taille = os.path.getsize(chemin)  
+                pbar.set_postfix(file=fichier, progress=f"{i}/{len(self._chemins_fichiersInput)}")  # Affichage dynamique dans la barre
+                
+                df = pd.read_excel(chemin, skiprows=self._input.nbLignes_avantET)
+                df_list.append(df)  # On ajoute le DataFrame à notre liste de DataFrame
+                
+                # Mise à jour de la barre avec la taille du fichier
+                pbar.update(taille)
+
+        # Concaténation finale (note : toute la fin de la méthode se fait quasi-instantanément)
+        self._df_tableau = pd.concat(df_list, ignore_index=True) 
+
+        # Selon le type d'export à traiter, on va faire des traitements spécifiques (extraction d'info des colonnes référence formation ou n° Iris)
+        match self._codeExport:
+            # Cas Sessions ou Inscriptions ou Ventes (sensiblement comme 'Inscription R04500' mais groupé par Client (pas de détail de chaque stagiaire))
+            case "R04110" | "R04500" | "R04301":
+                # On extrait / retravaille les informations de la colonne 'N° Session'
+                df_colonnes_sup = self._df_tableau['N° Session'].apply(self.extraire_infos_numSessionIRIS)
+                # A cause de certains éléments None ou NaN, Pandas type la colonne en float. Je la retype en Int64 qui permet de stocker des NaN avec des entiers, contrairement au type int standard.
+                df_colonnes_sup['Année'] = df_colonnes_sup['Année'].astype('Int64')
+                #print(df_colonnes_sup)
+
+            # Cas Formations
+            case "R0304":
+                # On extrait / retravaille les informations de la colonne 'Référence'
+                df_colonnes_sup = self._df_tableau['Référence'].apply(self.extraire_infos_referenceFormationIRIS)
+                # A cause de certains éléments None ou NaN, Pandas type la colonne en float. Je la retype en Int64 qui permet de stocker des NaN avec des entiers, contrairement au type int standard.
+                df_colonnes_sup['Année'] = df_colonnes_sup['Année'].astype('Int64')
+                #print(df_colonnes_sup)
+
+        # Ajouter les colonnes supplémentaires au DataFrame principal ssi le DataFrame df_colonnes_sup exite
+        if df_colonnes_sup is not None:
+            self._df_tableau = pd.concat([self._df_tableau, df_colonnes_sup], axis=1)
+    
+    def extraire_infos_numSessionIRIS(self, reference:str):
+        """
+        Fonction pour extraire les colonnes à partir de la colonne 'Référence'. Je dois faire une fonction interne car j'emploie Split qui ne s'applique que sur des string. Je dois donc faire appel à cette fonction ligne par ligne et donc créer une fonction que j'appelle par DataFrame[colonne].apply().
+
+        Exemples de cas à traiter  :
+        #S-04934-FI1516-1512-GI_VBE_GBO
+        #S-05251-FI1516-1510-AMS-LCH-CLE
+        #S-05246-F1516-1510-OPE-HGR-NNO
+        #S-04178-FC15-604-SES-CCO
+
+        ANCIENNE METHODE DE TRAITEMENT
+        self.__df_tableau['Numéro IRIS'] = self.__df_tableau['N° Session'].astype(str).str[2:7]
+        self.__df_tableau['Type formation'] = self.__df_tableau['N° Session'].astype(str).str[8:10]
+        self.__df_tableau['Trigramme AF'] = self.__df_tableau['N° Session'].astype(str).str[-3:] #tout sauf 3 derniers caract
+        self.__df_tableau['Trigramme RP'] = self.__df_tableau['N° Session'].astype(str).str[-7:-4] #De -7 à -4
+        self.__df_tableau['Trigramme formation'] = self.__df_tableau['N° Session'].astype(str).str[-11:-8]        
+        """
+        # Vérifier que la référence est une chaîne de caractères
+        if not isinstance(reference, str):
+            #print("Problème : la référence n'est pas une instance : ")
+            #print(reference)
+            return pd.Series({
+                'Trigramme formation': None,
+                'Code IRIS': None,
+                'Type de formation': None,
+                'Année': None,
+                'Trigramme RP': None,
+                'Trigramme AF': None,
+                '3ème élément de la référence': None
+            })
+
+        blocs = reference.split('-')
+
+        # Sécurité : vérifier qu'on n'a pas plus de 8 blocs
+        if len(blocs) > 8:
+            print("Problème : il y a plus de 8 blocs : ")
+            print(reference)
+            return pd.Series({
+                'Trigramme formation': None,
+                'Code IRIS': None,
+                'Type de formation': None,
+                'Année': None,
+                'Trigramme RP': None,
+                'Trigramme AF': None,
+                '3ème élément de la référence': None
+            })
+
+        # Traitement commun aux cas 6, 7 et 8 blocs
+        # le blocs[0] c'est "S" ça sert à rien
+        code_IRIS = blocs[1] if len(blocs) >= 2 else None
+        #print(reference)
+        if len(blocs) > 2:
+            type_formation = blocs[2][:2]
+            annee_match = re.search(r'\d+', blocs[2][2:])
+            annee = int(annee_match.group()) if annee_match else None
+        else :
+            type_formation = None
+            annee = None
+
+        if len(blocs) > 5:
+            trigramme_AF = blocs[-1].rstrip('_')
+            trigramme_RP = blocs[-2].rstrip('_')
+            trigramme = blocs[-3].rstrip('_')
+        else:
+            trigramme_RP = None
+            trigramme_AF = None
+            trigramme = None
+
+        # 3e élément uniquement si on a 7 ou 8 blocs
+        troisieme_bloc = '-'.join(blocs[3:-3]) if len(blocs) in [7, 8] else None
+        
+        return pd.Series({
+            'Trigramme formation': trigramme,
+            'Code IRIS': code_IRIS,
+            'Type de formation': type_formation,
+            'Année': annee,
+            'Trigramme RP': trigramme_RP,
+            'Trigramme AF': trigramme_AF,
+            '3ème élément de la référence': troisieme_bloc
+        })
+
+    def extraire_infos_referenceFormationIRIS(self, reference):
+        """
+        Fonction pour extraire les colonnes à partir de la colonne 'Référence'. Je dois faire une fonction interne car j'emploie Split qui ne s'applique que sur des string. Je dois donc faire appel à cette fonction ligne par ligne et donc créer une fonction que j'appelle par DataFrame[colonne].apply().
+        """
+        
+        # Vérifier que la référence est une chaîne de caractères
+        if not isinstance(reference, str):
+            #print("Problème : la référence n'est pas une instance : ")
+            #print(reference)
+            return pd.Series({
+                'Trigramme formation': None,
+                'Type de formation': None,
+                'Année': None,
+                'Unité de formation': None,
+                '3ème élément de la référence': None
+            })
+
+        blocs = reference.split('-')
+
+        # Sécurité : vérifier qu'on a au moins 4 blocs
+        if len(blocs) < 3:
+            print("Problème : il y a moins de 3 blocs : ")
+            print(reference)
+            return pd.Series({
+                'Trigramme formation': None,
+                'Type de formation': None,
+                'Année': None,
+                'Unité de formation': None,
+                '3ème élément de la référence': None
+            })
+
+        # Traitement commun aux cas 3 et 4+ blocs
+        type_formation = blocs[0][:2]
+        annee_match = re.search(r'\d+', blocs[0][2:])
+        annee = int(annee_match.group()) if annee_match else None
+
+        trigramme = blocs[1].rstrip('_')
+        unite_formation = blocs[-1].rstrip('_')
+
+        # 3e élément uniquement si on a 4 blocs ou plus
+        troisieme_bloc = '-'.join(blocs[2:-1]) if len(blocs) > 3 else None
+        
+        return pd.Series({
+            'Trigramme formation': trigramme,
+            'Type de formation': type_formation,
+            'Année': annee,
+            'Unité de formation': unite_formation,
+            '3ème élément de la référence': troisieme_bloc
+        })
+   
+
+
+
+class TravauxFichiersIRIS_BAK:
     "C'est la classe qui contient l'environnement pour bosser sur des fichiers Exports IRIS"
     def __init__(self, prop:PropExportIRIS, chemins_fichiersInput:str|tuple[str, ...]=None):
         
