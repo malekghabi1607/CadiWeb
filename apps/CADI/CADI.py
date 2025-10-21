@@ -8,8 +8,9 @@ import os, json, copy, re
 from datetime import datetime
 from typing import List, Tuple
 
-import INSTN
-from INSTN import Traiter_evalStat, FichierExcel, chemin_vers_unc, vlog
+#import INSTN
+from vte.instn import *
+#from INSTN import Traiter_evalStat, FichierExcel, chemin_vers_unc, vlog
 
 
 # Todo CADI : faire un truc pour la lecture sessions qui peut changer (dernière version de GLOBAL)

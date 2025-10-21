@@ -11,13 +11,14 @@ def test():
     # === Envoyer mail : ok avec bon texte et PJ ===
     # TODO : comment récupérer le statu depuis Excel ?
     # TODO : comment faire une boucle auto sur les personnes à qui envoyer ?
-    #ree.envoyerMail_REE(statut = "auto-entrepreneur")
+    # statut=["CEA", "vacataire", "contrat spécifique de collaboration", "auto-entrepreneur"]
+    #ree.envoyerMail_REE(statut = "vacataire")
 
     
     # Réception / traitement REE
-    ree.traiter_docs_REE()
     # TODO : mettre à jour le fichier Excel des coordonnées des intervenants
     # TODO : mettre à jour le fichier Excel des AI
+    ree.traiter_docs_REE()
 
 
     
