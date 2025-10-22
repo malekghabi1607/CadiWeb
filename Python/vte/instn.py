@@ -606,305 +606,14 @@ class IRIS:
             f"  df_tableau :\n{aff_df}"
             )
 
-
-class TravauxFichiersIRIS_BAK:
-    "C'est la classe qui contient l'environnement pour bosser sur des fichiers Exports IRIS"
-    def __init__(self, prop:PropExportIRIS, chemins_fichiersInput:str|tuple[str, ...]=None):
-        
-        # Type d'export
-        self._nom_typeExport = prop._nom_typeExport
-        self._codeExport = prop._codeExport
-
-        # Informations génériques sur les exports, modèles et output (dépend du type d'export)
-        self._input = prop._input  # Informations input données
-        self._modele = prop._modele  # Informations sur le modèle Excel à employer pour remplir l'output
-        self._output = prop._output  # Informations output
-
-        self._df_tableau = None
-        self._df_chemins = None
-
-        # S'il n'y a pas de chemin_fichiersInput de donné, c'est qu'il faut les sélectionner manuellement
-        if not chemins_fichiersInput:
-            self.choisirFichiers_filedialog()
-        else:
-            self._chemins_fichiersInput = chemins_fichiersInput
-
-        # self._chemins_fichiersInput doit être un tuple de strings. Si c'est un string c'est qu'un seul fichier a été donné. Alors on convertit en tuple
-        if isinstance(self._chemins_fichiersInput, str):
-            self._chemins_fichiersInput = (chemins_fichiersInput,)
-
-    @classmethod
-    def avecLecture(cls, propExportIRIS:PropExportIRIS, chemins_fichiersInput:str|tuple[str, ...]=None):
-        """On lit le/les extract IRIS et on stocke dans self._df_tableau"""
-        instance = cls(prop=propExportIRIS, chemins_fichiersInput=chemins_fichiersInput)
-        instance.lire_extractIRIS()
-        return instance
-
-    @classmethod
-    def avecEcritureOutputDefaut(cls, propExportIRIS:PropExportIRIS, chemins_fichiersInput:str|tuple[str, ...]=None):
-        
-        instance = cls.avecLecture(propExportIRIS, chemins_fichiersInput)
-
-        # Création des paramètres pour l'ouverture du modèle
-        chemin_fichier = instance._modele.chemin_fichier
-        #nom_onglet = instance._output.nom_onglet
-
-        # Création des paramètres pour l'output
-        chemin_fichier_output = os.path.join(instance._output.repertoire, instance._output.nom_fichier[:-5] + "-" + date.today().strftime("%Y.%m.%d") + ".xlsx") #ou f"{datetime.now():%Y.%m.%d}")
-
-        # On ouvre le modèle et tous ses tableaux structurés
-        #fe_modele = FichierExcel.depuis_fichier(chemin_fichier=chemin_fichier)
-        fe_modele = FichierExcel.depuis_modele(chemin_modele=chemin_fichier, chemin_fichier_sauv=chemin_fichier_output)
-
-        # On copie le DataFrame avec les nouvelles données dans le modèle
-        fe_modele._tableaux[instance._nom_typeExport].ecrit_dataFrame_dans_tableauStructure(instance._df_tableau, supprimeDonneesEtRemplace=True)
-        
-        # On écrit les références des fichiers copiés dans le tableau structuré "Imports"
-        instance._df_chemins = pd.DataFrame(instance._chemins_fichiersInput, columns=['Chemin fichier'])
-        fe_modele._tableaux["Imports"].ecrit_dataFrame_dans_tableauStructure(df=instance._df_chemins, supprimeDonneesEtRemplace=True)
-        
-        #On enregistre et on ferme (par précaution car copieformat xlwings sauvegarde)
-        fe_modele.save()    
-        fe_modele.close()
-
-        return instance
- 
-     # === Méthodes ===
-    def choisirFichiers_filedialog(self):
-        # Lister/sélectionner les documents à concaténer
-        cheminsExcel = filedialog.askopenfilenames(title="Sélectionner les fichiers " + self._nom_typeExport + " (" + self._codeExport + ") Excel à concaténer", filetype=[("Fichiers Excel", "*.xlsx")], initialdir=self._input.repertoire)
-        
-        # Gestion du cas où il y a non-sélection de fichiers
-        if not cheminsExcel:
-            log_erreur("click sur cancel du filedialog → Pas de chemins de fichier")
-        self._chemins_fichiersInput = cheminsExcel
-    
-    def lire_extractIRIS(self):
-        """
-        Crée le DataFrame pour l'export IRIS. On le stocke dans self.__df_tableau
-        On selectionne la bonne methode en fonction du type d'export
-
-        :Example:
-        >>> self.lire_extractIRIS()
-
-
-        .. seealso:: Rien du tout.
-        .. warning:: Rien du tout.
-        .. note:: Rien du tout.
-        .. todo:: Rien du tout.
-        """
-
-        # Initialisation : on crée un DataFrame vide pour recevoir (peut-être) des infos que l'on traitera et qui nécessitera d'adjoindre des colonnes à self.__df_tableau
-        df_colonnes_sup = None
-
-        # On parcourt le tuple des fichiers à lire
-        df_list = [] # Liste des DataFrame qui contiendra chaque fichier Excel séparément
-        taille_totale = sum(os.path.getsize(fichier) for fichier in self._chemins_fichiersInput) # Calcul taille totale pour barre de progression
-
-        with tqdm(total=taille_totale, unit='o', unit_scale=True, desc=Fore.CYAN+"Lecture des fichiers Excel" + Style.RESET_ALL) as pbar:
-            #for i, ifichier in enumerate((os.path.basename(chemin) for chemin in self._chemins_fichiersInput), 1):
-            for i, chemin in enumerate(self._chemins_fichiersInput, 1):
-                # Données pour tqdm
-                fichier = os.path.basename(chemin)
-                taille = os.path.getsize(chemin)  
-                pbar.set_postfix(file=fichier, progress=f"{i}/{len(self._chemins_fichiersInput)}")  # Affichage dynamique dans la barre
-                
-                df = pd.read_excel(chemin, skiprows=self._input.nbLignes_avantET)
-                df_list.append(df)  # On ajoute le DataFrame à notre liste de DataFrame
-                
-                # Mise à jour de la barre avec la taille du fichier
-                pbar.update(taille)
-
-        # Concaténation finale (note : toute la fin de la méthode se fait quasi-instantanément)
-        self._df_tableau = pd.concat(df_list, ignore_index=True) 
-
-        # Selon le type d'export à traiter, on va faire des traitements spécifiques (extraction d'info des colonnes référence formation ou n° Iris)
-        match self._codeExport:
-            # Cas Sessions ou Inscriptions ou Ventes (sensiblement comme 'Inscription R04500' mais groupé par Client (pas de détail de chaque stagiaire))
-            case "R04110" | "R04500" | "R04301":
-                # On extrait / retravaille les informations de la colonne 'N° Session'
-                df_colonnes_sup = self._df_tableau['N° Session'].apply(self.extraire_infos_numSessionIRIS)
-                # A cause de certains éléments None ou NaN, Pandas type la colonne en float. Je la retype en Int64 qui permet de stocker des NaN avec des entiers, contrairement au type int standard.
-                df_colonnes_sup['Année'] = df_colonnes_sup['Année'].astype('Int64')
-                #print(df_colonnes_sup)
-
-            # Cas Formations
-            case "R0304":
-                # On extrait / retravaille les informations de la colonne 'Référence'
-                df_colonnes_sup = self._df_tableau['Référence'].apply(self.extraire_infos_referenceFormationIRIS)
-                # A cause de certains éléments None ou NaN, Pandas type la colonne en float. Je la retype en Int64 qui permet de stocker des NaN avec des entiers, contrairement au type int standard.
-                df_colonnes_sup['Année'] = df_colonnes_sup['Année'].astype('Int64')
-                #print(df_colonnes_sup)
-
-        # Ajouter les colonnes supplémentaires au DataFrame principal ssi le DataFrame df_colonnes_sup exite
-        if df_colonnes_sup is not None:
-            self._df_tableau = pd.concat([self._df_tableau, df_colonnes_sup], axis=1)
-    
-    def extraire_infos_numSessionIRIS(self, reference:str):
-        """
-        Fonction pour extraire les colonnes à partir de la colonne 'Référence'. Je dois faire une fonction interne car j'emploie Split qui ne s'applique que sur des string. Je dois donc faire appel à cette fonction ligne par ligne et donc créer une fonction que j'appelle par DataFrame[colonne].apply().
-
-        Exemples de cas à traiter  :
-        #S-04934-FI1516-1512-GI_VBE_GBO
-        #S-05251-FI1516-1510-AMS-LCH-CLE
-        #S-05246-F1516-1510-OPE-HGR-NNO
-        #S-04178-FC15-604-SES-CCO
-
-        ANCIENNE METHODE DE TRAITEMENT
-        self.__df_tableau['Numéro IRIS'] = self.__df_tableau['N° Session'].astype(str).str[2:7]
-        self.__df_tableau['Type formation'] = self.__df_tableau['N° Session'].astype(str).str[8:10]
-        self.__df_tableau['Trigramme AF'] = self.__df_tableau['N° Session'].astype(str).str[-3:] #tout sauf 3 derniers caract
-        self.__df_tableau['Trigramme RP'] = self.__df_tableau['N° Session'].astype(str).str[-7:-4] #De -7 à -4
-        self.__df_tableau['Trigramme formation'] = self.__df_tableau['N° Session'].astype(str).str[-11:-8]        
-        """
-        # Vérifier que la référence est une chaîne de caractères
-        if not isinstance(reference, str):
-            #print("Problème : la référence n'est pas une instance : ")
-            #print(reference)
-            return pd.Series({
-                'Trigramme formation': None,
-                'Code IRIS': None,
-                'Type de formation': None,
-                'Année': None,
-                'Trigramme RP': None,
-                'Trigramme AF': None,
-                '3ème élément de la référence': None
-            })
-
-        blocs = reference.split('-')
-
-        # Sécurité : vérifier qu'on n'a pas plus de 8 blocs
-        if len(blocs) > 8:
-            print("Problème : il y a plus de 8 blocs : ")
-            print(reference)
-            return pd.Series({
-                'Trigramme formation': None,
-                'Code IRIS': None,
-                'Type de formation': None,
-                'Année': None,
-                'Trigramme RP': None,
-                'Trigramme AF': None,
-                '3ème élément de la référence': None
-            })
-
-        # Traitement commun aux cas 6, 7 et 8 blocs
-        # le blocs[0] c'est "S" ça sert à rien
-        code_IRIS = blocs[1] if len(blocs) >= 2 else None
-        #print(reference)
-        if len(blocs) > 2:
-            type_formation = blocs[2][:2]
-            annee_match = re.search(r'\d+', blocs[2][2:])
-            annee = int(annee_match.group()) if annee_match else None
-        else :
-            type_formation = None
-            annee = None
-
-        if len(blocs) > 5:
-            trigramme_AF = blocs[-1].rstrip('_')
-            trigramme_RP = blocs[-2].rstrip('_')
-            trigramme = blocs[-3].rstrip('_')
-        else:
-            trigramme_RP = None
-            trigramme_AF = None
-            trigramme = None
-
-        # 3e élément uniquement si on a 7 ou 8 blocs
-        troisieme_bloc = '-'.join(blocs[3:-3]) if len(blocs) in [7, 8] else None
-        
-        return pd.Series({
-            'Trigramme formation': trigramme,
-            'Code IRIS': code_IRIS,
-            'Type de formation': type_formation,
-            'Année': annee,
-            'Trigramme RP': trigramme_RP,
-            'Trigramme AF': trigramme_AF,
-            '3ème élément de la référence': troisieme_bloc
-        })
-
-    def extraire_infos_referenceFormationIRIS(self, reference):
-        """
-        Fonction pour extraire les colonnes à partir de la colonne 'Référence'. Je dois faire une fonction interne car j'emploie Split qui ne s'applique que sur des string. Je dois donc faire appel à cette fonction ligne par ligne et donc créer une fonction que j'appelle par DataFrame[colonne].apply().
-        """
-        
-        # Vérifier que la référence est une chaîne de caractères
-        if not isinstance(reference, str):
-            #print("Problème : la référence n'est pas une instance : ")
-            #print(reference)
-            return pd.Series({
-                'Trigramme formation': None,
-                'Type de formation': None,
-                'Année': None,
-                'Unité de formation': None,
-                '3ème élément de la référence': None
-            })
-
-        blocs = reference.split('-')
-
-        # Sécurité : vérifier qu'on a au moins 4 blocs
-        if len(blocs) < 3:
-            print("Problème : il y a moins de 3 blocs : ")
-            print(reference)
-            return pd.Series({
-                'Trigramme formation': None,
-                'Type de formation': None,
-                'Année': None,
-                'Unité de formation': None,
-                '3ème élément de la référence': None
-            })
-
-        # Traitement commun aux cas 3 et 4+ blocs
-        type_formation = blocs[0][:2]
-        annee_match = re.search(r'\d+', blocs[0][2:])
-        annee = int(annee_match.group()) if annee_match else None
-
-        trigramme = blocs[1].rstrip('_')
-        unite_formation = blocs[-1].rstrip('_')
-
-        # 3e élément uniquement si on a 4 blocs ou plus
-        troisieme_bloc = '-'.join(blocs[2:-1]) if len(blocs) > 3 else None
-        
-        return pd.Series({
-            'Trigramme formation': trigramme,
-            'Type de formation': type_formation,
-            'Année': annee,
-            'Unité de formation': unite_formation,
-            '3ème élément de la référence': troisieme_bloc
-        })
-   
-   
-    # === Affichage ===
-    def __str__(self):
-        if self._chemins_fichiersInput:
-            # Pour aff_repertoire et chemin 
-            aff_cheminsFichiers = ""
-            for cfichier in self._chemins_fichiersInput:
-                aff_cheminsFichiers = aff_cheminsFichiers + "\n    " + cfichier
-        else:
-            aff_cheminsFichiers = "Aucun fichier spécifié"
-
-        # Pour aff_df
-        from io import StringIO
-        buffer = StringIO()
-        if self._df_tableau is not None:
-            print(self._df_tableau, file=buffer)
-            aff_df = buffer.getvalue()
-        else:
-            aff_df = "Non défini"
-
-        return (
-            f"TravauxFichiersIRIS\n"
-            f"  Chemins fichiers à exploiter : {aff_cheminsFichiers}\n"
-            f"  df_tableau :\n{aff_df}"
-            )
-
 class EvalStat:
 
 
-    # Valeurs actuellement écrites en dur
-    _chemin_excel_evaluations_defaut = r'\\instnt\partage\FORMATIONS_C\###\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\Evaluation-Stagiaires-Global-###.xlsx'
-    _chemin_modeleExcel_stagiaires = r"C:\Users\vt238770\Documents\_CEA\Prog\Modèles\Evaluation-Stagiaires-Modèle.xlsx"
-    _chemin_excel_sessions = r"C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Extracts complets\R04110_Sessions-COMPLET-2025.08.24.xlsx" 
-    #instance._chemin_excel_stagiaires_output = r"C:\Users\vt238770\Documents\_CEA\Prog\Modèles\Evaluation-Stagiaires-testOut.xlsx"
+    # === VARIABLES DE CLASSE ===
+    # --- Paramètres d'environnement
+    _chemin_excel_evaluations_defaut:str = r'\\instnt\partage\FORMATIONS_C\###\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\Evaluation-Stagiaires-Global-###.xlsx'
+    _chemin_modeleExcel_stagiaires:str = r"C:\Users\vt238770\Documents\_CEA\Prog\Python\Modèles\Evaluation-Stagiaires-Modèle.xlsx"
+    _chemin_excel_sessions:str = r"C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Extracts complets\R04110_Sessions-COMPLET-2025.08.24.xlsx" # TODO faire une méthode pour chercher automatiquement le dernier fichier
 
     # === Colonnes du CSV selon traitement à avoir ===
     # Colonnes descriptives à recopier
@@ -949,55 +658,49 @@ class EvalStat:
         "Nb. Présents"]
 
     
-    
+
+
+    # --- Autres variables de la classe
+    _chemin_csv_stagiaires:Optional[str] = None  # Fichier csv EvalStat stagiaire individuel
+
+    _trigrammeFormation:Optional[str] = None
+    _codeIRIS:Optional[str] = None
+
+    _chemin_excel_evaluations_formation:Optional[str] = None  # Chemin du fichier Excel qui contient tous les CSV d'évaluation d'une formation
+    _fe_evaluations_formation:Optional[FichierExcel] = None # Fichier Excel qui contient tous les CSV d'évaluation d'une formation
+    _df_formation_stagiaires:Optional[pd.DataFrame] = None # DataFrame de self._fe_evaluations_formation (Alias)
+
+    _chemin_excel_stagiaires_output:Optional[str] = None  # Fichier xlsx EvalStat stagiaire individuel qu'on va créer à partir du CSV
+    _fe_stagiaires:Optional[FichierExcel] = None  # Objet contenant les données EvalStat stagiaire individuel
+
+    _fe_sessions:Optional[FichierExcel] = None  # Fichier Excel qui contient les extracts IRIS Sessions (ou a minima celles de la période en cours)
+
+    _chemins_csv_traites:List[str] = []
+    _chemins_csv_exclus:List[str] = []
+
+    # === CONSTRUCTEUR ===
     def __init__(self) -> None:
         
-        self._chemin_csv_stagiaires:str|None = None  # Fichier csv EvalStat stagiaire individuel
-        self._chemin_excel_stagiaires_output:str|None = None  # Fichier xlsx EvalStat stagiaire individuel qu'on va créer à partir du CSV
-        self._fe_stagiaires:FichierExcel|None = None  # Objet contenant les données EvalStat stagiaire individuel
 
-        self._chemin_modeleExcel_stagiaires:str|None = None  # Modèle Excel dans lequel importer le CSV
-        
-        self._chemin_excel_sessions:str|None = None  # Chemin du fichier Excel qui contient les extracts IRIS Sessions (ou a minima celles de la période en cours) dans lequel on a les informations des sessions (permet de compélter les CSV)
-        self._fe_sessions:FichierExcel|None = None  # Fichier Excel qui contient les extracts IRIS Sessions (ou a minima celles de la période en cours)
 
-        self._trigrammeFormation:str|None = None
-        self._codeIRIS:int|None = None
+        print()
 
-        self._chemin_excel_evaluations_formation:Optional[str] = None  # Chemin du fichier Excel qui contient tous les CSV d'évaluation d'une formation
-        self._fe_evaluations_formation:Optional[FichierExcel] = None # Fichier Excel qui contient tous les CSV d'évaluation d'une formation
-        self._df_formation_stagiaires:Optional[pd.DataFrame] = None # DataFrame de self._fe_evaluations_formation (Alias)
-
-        self._chemins_csv_traites:List[str] = []
-        self._chemins_csv_exclus:List[str] = []
-
-    @classmethod
-    def depuis_fe_evaluations_formation(cls, trigramme:str) -> Traiter_evalStat:
-        """
-        A partir d'un trigramme de foramtion, on ouvre et on charge le fichier excel qui concatène tous les CSV d'une formation 
-        """
-        # On crée l'instance et on complète les infos avec les valeurs facultatives
-        instance = Traiter_evalStat()
-        # On définit le chemin vers les évaluations de la formation (le fichier qui va concaténer toutes les évaluation d'une formation)
-        instance._chemin_excel_evaluations_formation = instance._chemin_excel_evaluations_defaut.replace("###", trigramme)
-
-        instance.ouvrir_fe_evaluations_formation()
-
-        return instance
         
     @classmethod
-    def depuis_chemin_csv_stagiaires(cls, chemin_csv_stagiaires:str, fe_sessions:FichierExcel=None, ouvrirDossier:bool=False, remplace_df:bool=False) -> Traiter_evalStat:
+    def depuis_chemin_csv_stagiaires(cls, chemin_csv_stagiaires:str, fe_sessions:Optional[FichierExcel]=None, ouvrirDossier:bool=False, remplace_df:bool=False) -> EvalStat:
         timer.debut(f"Traitement du CSV {os.path.basename(chemin_csv_stagiaires)}")
         # On créée l'instance
-        instance = Traiter_evalStat()
-        instance._chemin_csv_stagiaires = chemin_csv_stagiaires
+        instance = EvalStat()
+        
+        instance._chemin_csv_stagiaires = chemin_vers_unc(chemin_csv_stagiaires)
+
         if fe_sessions is not None:
             instance._fe_sessions = fe_sessions
             # Quand je ferai la jointure plus tard sur "Code IRIS", il faudra que ce soit avec des strings
             instance._fe_sessions._tableaux["Sessions"]._df["Code IRIS"] = instance._fe_sessions._tableaux["Sessions"]._df["Code IRIS"].astype(str)
 
         # On récupère le trigramme de la formation depuis le chemin du CSV
-        instance._trigrammeFormation = instance.recupere_trig_formation_depuis_chemin(chemin_csv_stagiaires)
+        instance._trigrammeFormation = instance._recupere_trig_formation_depuis_chemin(chemin_csv_stagiaires)
         
         # Pour le nom de l'Excel output : on reprend le nom du csv et on remplace par xlsx
         instance._chemin_excel_stagiaires_output = os.path.join(os.path.dirname(instance._chemin_csv_stagiaires), os.path.basename(instance._chemin_csv_stagiaires).replace(".csv", ".xlsx"))
@@ -1016,7 +719,14 @@ class EvalStat:
         return instance        
 
     @classmethod
-    def depuis_tuple_csv_stagiaires(cls, tuple_csv_stagiaires:Tuple(str), chemin_excel_evaluations_defaut:str=None, chemin_modeleExcel_stagiaires:str=None, chemin_excel_sessions:str=None, fe_sessions:FichierExcel=None, ouvrirDossier:bool=False) -> Traiter_evalStat:
+    def depuis_tuple_csv_stagiaires(cls, 
+                                    tuple_csv_stagiaires:Tuple(str), 
+                                    chemin_excel_evaluations_defaut:Optional[str]=None,
+                                    chemin_modeleExcel_stagiaires:Optional[str]=None, 
+                                    chemin_excel_sessions:Optional[str]=None, 
+                                    fe_sessions:Optional[FichierExcel]=None, 
+                                    ouvrirDossier:bool=False
+        ) -> EvalStat:
         """
         A partir d'un tuple de chemins de CSV stagiaire (il peut il y avoir plusieurs trigrammes de formations différents)
         Permet de générer :
@@ -1029,7 +739,7 @@ class EvalStat:
 
         
         # On crée l'instance et on complète les infos avec les valeurs facultatives
-        instance = Traiter_evalStat()
+        instance = EvalStat()
 
         if chemin_excel_evaluations_defaut is not None:
             instance._chemin_excel_evaluations_defaut = chemin_excel_evaluations_defaut
@@ -1055,7 +765,7 @@ class EvalStat:
         # On convertit le tuple de strings en dictionnaire avec les trigrammes formation en clef
         dico_chemins_csv_session = defaultdict(list)  #Dictionnaire spécial : lorsqu’on accède à une clé qui n’existe pas encore, il va automatiquement créer une nouvelle entrée avec une valeur par défaut, ici une liste vide (list())
         for chemin in tuple_csv_stagiaires:
-            trigramme = instance.recupere_trig_formation_depuis_chemin(chemin)
+            trigramme = instance._recupere_trig_formation_depuis_chemin(chemin)
             dico_chemins_csv_session[trigramme].append(chemin)
         dico_chemins_csv_session = dict(dico_chemins_csv_session)  # Optionnel : conversion en dict normal
 
@@ -1065,7 +775,7 @@ class EvalStat:
             print(f"\n\n{Style.BRIGHT}{Fore.RED}Gestion des formations {trigramme}")
 
             # On ouvre ou on créée (si inexistant) le fichier Excel qui concatène toutes les sessions d'une formation
-            supprimeDonneesEtRemplace_evaluations_formation = instance.ouvrir_ou_creer_evaluationsFormation(trigramme)
+            instance._fe_evaluations_formation, instance._df_formation_stagiaires, supprimeDonneesEtRemplace_evaluations_formation = instance._ouvrir_ou_creer_evaluationsFormation(trigramme)
 
             # Pour chaque chemin de session, on crée le fe_stagiaire dédié de la session et on ajoute les lignes de son dataframe au dataframe de fe_evaluations_formation
             for chemin_csv_session in chemins_csv_session:
@@ -1083,7 +793,7 @@ class EvalStat:
                 # Traitement du CSV
                 if traiterCSV:  
                     #timer.debut("Traiter_evalStat.depuis_chemin_csv_stagiaires")
-                    traite_csv_session = Traiter_evalStat.depuis_chemin_csv_stagiaires(chemin_csv_session, fe_sessions=instance._fe_sessions, ouvrirDossier=ouvrirDossier, remplace_df=True)
+                    traite_csv_session = EvalStat.depuis_chemin_csv_stagiaires(chemin_csv_session, fe_sessions=instance._fe_sessions, ouvrirDossier=ouvrirDossier, remplace_df=True)
 
                     #timer.debut("Copie des Dataframe csv et stagiaires")
                     # #Si df_formation_csv est vide, il faut l'initialiser avec le premier df sinon on concatène
@@ -1114,15 +824,150 @@ class EvalStat:
 
         return instance
 
-    # ===  (getter / setter) ===
-    @property
-    def chemins_csv_traites(self):
-        return self._chemins_csv_traites
 
+    # === Méthodes internes ===
+    def _recupere_trig_formation_depuis_chemin(self, chemin:Optional[str]) -> str:
+        """
+        Extrait un trigramme (3 lettres/chiffres) depuis un chemin, ou le demande à l'utilisateur si introuvable.
+        Gère les slashs / et \\ de manière robuste.
+        """
+        # On récupère le trigramme de la formation depuis le chemin du CSV ou alors on demande à l'utilisateur via tkinter
+        trigramme = None
 
-    ######
-    #  === Méthodes internes ===
-    ######
+        if chemin:
+            # Normalise les slashs pour s'assurer que le chemin est cohérent
+            chemin_normalise = chemin.replace("\\", "/")
+
+            # Découpe le chemin en parties
+            parties = chemin_normalise.split("/")
+
+            # Recherche un segment de 3 caractères alphanumériques
+            for part in parties:
+                if re.fullmatch(r"[a-zA-Z0-9]{3}", part):
+                    trigramme = part
+                    break
+
+            # Si rien trouvé, on demande à l'utilisateur
+            if not trigramme:
+                trigramme = self._demander_code("Trigramme formation")
+
+        else:
+            trigramme = self._demander_code("Trigramme formation")
+
+        #print(instance._trigrammeFormation)
+
+        return trigramme
+
+    def _demander_code(self, typeCode:str) -> int|str:
+        # Initialisation en fonction du type de code
+        match typeCode:
+            case "Code IRIS":
+                print("Cas code IRIS")
+                nbCaracteres = 5
+                chemin_a_tester = self._chemin_csv_stagiaires
+            case "Trigramme formation":
+                print("Cas trigramme formation")
+                nbCaracteres = 3
+                chemin_a_tester = self._chemin_csv_stagiaires
+            case _:
+                log_erreur(f"cas non valide : soit 'IRIS' soit 'Trigramme formation', demandé : {typeCode} → exit()")
+                exit()
+
+            
+        def verifier_entree(*args):
+            val = entry_code.get()
+            bouton_valider.config(state="normal" if val.isdigit() and len(val) == nbCaracteres else "disabled")
+            if typeCode=="Code IRIS":
+                bouton_renommer.config(state="normal" if val.isdigit() and len(val) == nbCaracteres else "disabled")
+
+        def valider():
+            nonlocal code # Adaptation : changer en "code"
+            code = entry_code.get()            
+            fenetre.destroy()
+
+        # Cas IRIS uniquement : ne pas toucher / ne pas afficher si cas Trigramme formation
+        def valider_et_renommer():
+            nonlocal code
+            code = entry_code.get()
+            nouveau_nom = f"S-{code}-Stagiaires.csv"
+            nouveau_chemin = os.path.join(
+                os.path.dirname(self._chemin_csv_stagiaires),
+                nouveau_nom
+            )
+
+            try:
+                os.rename(self._chemin_csv_stagiaires, nouveau_chemin)
+                self._chemin_csv_stagiaires = nouveau_chemin
+            except Exception as e:
+                tk.messagebox.showerror("Erreur", f"Impossible de renommer le fichier :\n{e}")
+                log_erreur("Erreur", f"Impossible de renommer le fichier :\n{e}")
+                return  # Ne pas fermer la fenêtre si erreur
+
+            fenetre.destroy()
+
+        def annuler():
+            fenetre.destroy()
+            log_erreur(f"{typeCode} non renseignée pour {chemin_a_tester} → exit()")
+            exit()
+
+        code = None
+
+        fenetre = tk.Tk()
+        fenetre.title(f"{typeCode} à renseigner manuellement")
+        fenetre.resizable(False, False)
+        fenetre.geometry("500x180")
+        fenetre.eval('tk::PlaceWindow . center')
+
+        # Fermer avec Échap
+        fenetre.bind("<Escape>", lambda e: annuler())
+        # Entrée = bouton Valider
+        fenetre.bind("<Return>", lambda e: bouton_valider.invoke())
+
+        label_warning = tk.Label(
+            fenetre,
+            text=f"⚠ {typeCode} non trouvé automatiquement.\nVeuillez le spécifier manuellement",
+            font=("Segoe UI", 10, "bold"),
+            fg="orange"
+        )
+        label_warning.pack(pady=(10, 5))
+
+        label_chemin = tk.Label(
+            fenetre,
+            text=f"Chemin du fichier source :\n  *{chemin_a_tester}*",
+            font=("Segoe UI", 9),
+            justify="left",
+            wraplength=480
+        )
+        label_chemin.pack(pady=(0, 10))
+
+        frame_saisie = tk.Frame(fenetre)
+        frame_saisie.pack()
+
+        entry_code = tk.Entry(frame_saisie, width=10, justify="center", font=("Segoe UI", 12))
+        entry_code.pack()
+        entry_code.focus()
+
+        entry_code_var = tk.StringVar()
+        entry_code["textvariable"] = entry_code_var
+        entry_code_var.trace_add("write", verifier_entree)
+
+        frame_boutons = tk.Frame(fenetre)
+        frame_boutons.pack(pady=10)
+
+        bouton_valider = tk.Button(frame_boutons, text="Valider", state="disabled", width=20, command=valider)
+        bouton_valider.grid(row=0, column=0, padx=5)
+
+        if typeCode == "Code IRIS":
+            bouton_renommer = tk.Button(frame_boutons, text="Valider et remplacer le nom du CSV", state="disabled", width=30, command=valider_et_renommer)
+            bouton_renommer.grid(row=0, column=1, padx=5)
+
+        bouton_annuler = tk.Button(frame_boutons, text="Annuler", width=10, command=annuler)
+        bouton_annuler.grid(row=0, column=2, padx=5)
+
+        fenetre.mainloop()
+
+        code = int(code) if code.isdigit() else str(code)
+        return code
 
     def _construit_FichierExcel_depuis_CSV(self, fe_sessions:FichierExcel=None, remplace_df:bool=False):
         ######
@@ -1152,7 +997,7 @@ class EvalStat:
             if match:
                 self._codeIRIS = match.group(0)
             else:
-                self.demander_code_iris()
+                self._demander_code("Code IRIS")
 
         # Met à jour ou crée la colonne "Code session" avec self._codeIRIS
         df_csv_stagiaires["Code session"] = self._codeIRIS
@@ -1303,243 +1148,7 @@ class EvalStat:
         self._fe_stagiaires.actualiser_TCD()
         #timer.fin()
 
-    def demander_code_iris(self):
-        print("TODO : demander_code_iris appelé → Essayer de généraliser avec demander_code")
-        def verifier_entree(*args):
-            val = entry_code.get()
-            bouton_valider.config(state="normal" if val.isdigit() and len(val) == 5 else "disabled")
-            bouton_renommer.config(state="normal" if val.isdigit() and len(val) == 5 else "disabled")
-
-        def valider():
-            nonlocal code_iris
-            self._codeIRIS = int(entry_code.get())
-            fenetre.destroy()
-
-        def valider_et_renommer():
-            nonlocal code_iris
-            self._codeIRIS = int(entry_code.get())
-            nouveau_nom = f"S-{code_iris}-Stagiaires.csv"
-            nouveau_chemin = os.path.join(
-                os.path.dirname(self._chemin_csv_stagiaires),
-                nouveau_nom
-            )
-
-            try:
-                os.rename(self._chemin_csv_stagiaires, nouveau_chemin)
-                self._chemin_csv_stagiaires = nouveau_chemin
-            except Exception as e:
-                tk.messagebox.showerror("Erreur", f"Impossible de renommer le fichier :\n{e}")
-                log_erreur(f"impossible de renommer le fichier :\n{e}")
-                return  # Ne pas fermer la fenêtre si erreur
-
-            fenetre.destroy()
-
-        def annuler():
-            fenetre.destroy()
-            log_erreur("code IRIS non renseignée pour " + self._chemin_csv_stagiaires + " → exit()")
-            exit()
-
-        code_iris = None
-
-        fenetre = tk.Tk()
-        fenetre.title("Code IRIS à renseigner manuellement")
-        fenetre.resizable(False, False)
-        fenetre.geometry("500x180")
-        fenetre.eval('tk::PlaceWindow . center')
-
-        # Fermer avec Échap
-        fenetre.bind("<Escape>", lambda e: annuler())
-        # Entrée = bouton Valider
-        fenetre.bind("<Return>", lambda e: bouton_valider.invoke())
-
-        label_warning = tk.Label(
-            fenetre,
-            text="⚠ Code IRIS non trouvé automatiquement, veuillez le spécifier manuellement",
-            font=("Segoe UI", 10, "bold"),
-            fg="orange"
-        )
-        label_warning.pack(pady=(10, 5))
-
-        label_chemin = tk.Label(
-            fenetre,
-            text=f"Chemin du fichier source :\n  *{self._chemin_csv_stagiaires}*",
-            font=("Segoe UI", 9),
-            justify="left",
-            wraplength=480
-        )
-        label_chemin.pack(pady=(0, 10))
-
-        frame_saisie = tk.Frame(fenetre)
-        frame_saisie.pack()
-
-        entry_code = tk.Entry(frame_saisie, width=10, justify="center", font=("Segoe UI", 12))
-        entry_code.pack()
-        entry_code.focus()
-
-        entry_code_var = tk.StringVar()
-        entry_code["textvariable"] = entry_code_var
-        entry_code_var.trace_add("write", verifier_entree)
-
-        frame_boutons = tk.Frame(fenetre)
-        frame_boutons.pack(pady=10)
-
-        bouton_valider = tk.Button(frame_boutons, text="Valider", state="disabled", width=20, command=valider)
-        bouton_valider.grid(row=0, column=0, padx=5)
-
-        bouton_renommer = tk.Button(frame_boutons, text="Valider et remplacer le nom du CSV", state="disabled", width=30, command=valider_et_renommer)
-        bouton_renommer.grid(row=0, column=1, padx=5)
-
-        bouton_annuler = tk.Button(frame_boutons, text="Annuler", width=10, command=annuler)
-        bouton_annuler.grid(row=0, column=2, padx=5)
-
-        fenetre.mainloop()
-
-        return code_iris
-    
-    def demander_code(self, typeCode) -> int|str:
-        # Initialisation en fonction du type de code
-        match typeCode:
-            case "Code IRIS":
-                print("Cas code IRIS")
-                nbCaracteres = 5
-                chemin_a_tester = self._chemin_csv_stagiaires
-            case "Trigramme formation":
-                print("Cas trigramme formation")
-                nbCaracteres = 3
-                chemin_a_tester = self._chemin_csv_stagiaires
-            case _:
-                log_erreur(f"cas non valide : soit 'IRIS' soit 'Trigramme formation', demandé : {typeCode} → exit()")
-                exit()
-
-            
-        def verifier_entree(*args):
-            val = entry_code.get()
-            bouton_valider.config(state="normal" if val.isdigit() and len(val) == nbCaracteres else "disabled")
-            if typeCode=="Code IRIS":
-                bouton_renommer.config(state="normal" if val.isdigit() and len(val) == nbCaracteres else "disabled")
-
-        def valider():
-            nonlocal code # Adaptation : changer en "code"
-            code = entry_code.get()            
-            fenetre.destroy()
-
-        # Cas IRIS uniquement : ne pas toucher / ne pas afficher si cas Trigramme formation
-        def valider_et_renommer():
-            nonlocal code
-            code = entry_code.get()
-            nouveau_nom = f"S-{code}-Stagiaires.csv"
-            nouveau_chemin = os.path.join(
-                os.path.dirname(self._chemin_csv_stagiaires),
-                nouveau_nom
-            )
-
-            try:
-                os.rename(self._chemin_csv_stagiaires, nouveau_chemin)
-                self._chemin_csv_stagiaires = nouveau_chemin
-            except Exception as e:
-                tk.messagebox.showerror("Erreur", f"Impossible de renommer le fichier :\n{e}")
-                log_erreur("Erreur", f"Impossible de renommer le fichier :\n{e}")
-                return  # Ne pas fermer la fenêtre si erreur
-
-            fenetre.destroy()
-
-        def annuler():
-            fenetre.destroy()
-            log_erreur(f"{typeCode} non renseignée pour {chemin_a_tester} → exit()")
-            exit()
-
-        code = None
-
-        fenetre = tk.Tk()
-        fenetre.title(f"{typeCode} à renseigner manuellement")
-        fenetre.resizable(False, False)
-        fenetre.geometry("500x180")
-        fenetre.eval('tk::PlaceWindow . center')
-
-        # Fermer avec Échap
-        fenetre.bind("<Escape>", lambda e: annuler())
-        # Entrée = bouton Valider
-        fenetre.bind("<Return>", lambda e: bouton_valider.invoke())
-
-        label_warning = tk.Label(
-            fenetre,
-            text=f"⚠ {typeCode} non trouvé automatiquement.\nVeuillez le spécifier manuellement",
-            font=("Segoe UI", 10, "bold"),
-            fg="orange"
-        )
-        label_warning.pack(pady=(10, 5))
-
-        label_chemin = tk.Label(
-            fenetre,
-            text=f"Chemin du fichier source :\n  *{chemin_a_tester}*",
-            font=("Segoe UI", 9),
-            justify="left",
-            wraplength=480
-        )
-        label_chemin.pack(pady=(0, 10))
-
-        frame_saisie = tk.Frame(fenetre)
-        frame_saisie.pack()
-
-        entry_code = tk.Entry(frame_saisie, width=10, justify="center", font=("Segoe UI", 12))
-        entry_code.pack()
-        entry_code.focus()
-
-        entry_code_var = tk.StringVar()
-        entry_code["textvariable"] = entry_code_var
-        entry_code_var.trace_add("write", verifier_entree)
-
-        frame_boutons = tk.Frame(fenetre)
-        frame_boutons.pack(pady=10)
-
-        bouton_valider = tk.Button(frame_boutons, text="Valider", state="disabled", width=20, command=valider)
-        bouton_valider.grid(row=0, column=0, padx=5)
-
-        if typeCode == "Code IRIS":
-            bouton_renommer = tk.Button(frame_boutons, text="Valider et remplacer le nom du CSV", state="disabled", width=30, command=valider_et_renommer)
-            bouton_renommer.grid(row=0, column=1, padx=5)
-
-        bouton_annuler = tk.Button(frame_boutons, text="Annuler", width=10, command=annuler)
-        bouton_annuler.grid(row=0, column=2, padx=5)
-
-        fenetre.mainloop()
-
-        code = int(code) if code.isdigit() else str(code)
-        return code
-
-    def recupere_trig_formation_depuis_chemin(self, chemin:str|None) -> str:
-        """
-        Extrait un trigramme (3 lettres/chiffres) depuis un chemin, ou le demande à l'utilisateur si introuvable.
-        Gère les slashs / et \\ de manière robuste.
-        """
-        # On récupère le trigramme de la formation depuis le chemin du CSV ou alors on demande à l'utilisateur via tkinter
-        trigramme = None
-
-        if chemin:
-            # Normalise les slashs pour s'assurer que le chemin est cohérent
-            chemin_normalise = chemin.replace("\\", "/")
-
-            # Découpe le chemin en parties
-            parties = chemin_normalise.split("/")
-
-            # Recherche un segment de 3 caractères alphanumériques
-            for part in parties:
-                if re.fullmatch(r"[a-zA-Z0-9]{3}", part):
-                    trigramme = part
-                    break
-
-            # Si rien trouvé, on demande à l'utilisateur
-            if not trigramme:
-                trigramme = self.demander_code("Trigramme formation")
-
-        else:
-            trigramme = self.demander_code("Trigramme formation")
-
-        #print(instance._trigrammeFormation)
-
-        return trigramme
-
-    def ouvrir_ou_creer_evaluationsFormation(self, trigramme:str) -> bool:
+    def _ouvrir_ou_creer_evaluationsFormation(self, trigramme:str) -> Tuple[FichierExcel, pd.DataFrame, bool] :
         """
         Ouvre ou crée le fichier Excel d'évaluations globales pour une formation donnée.
 
@@ -1564,7 +1173,7 @@ class EvalStat:
         # On regarde si Evaluation-Stagiaires-Global-XXX.xlsx existe
         if os.path.isfile(self._chemin_excel_evaluations_formation):
             # Alors on l'ouvre
-            self.ouvrir_fe_evaluations_formation()
+            fe_evaluations_formation, df_formation_stagiaires = self._ouvrir_fe_evaluations_formation()
             
             # On récupère la liste des sessions déjà intégrées (liste des codes et des chemins) → Ce sera pour écrire dans le tkinter
             #dico_sessionsDejaTraitees = dict(
@@ -1588,867 +1197,14 @@ class EvalStat:
 
         return fe_evaluations_formation, df_formation_stagiaires, supprimeDonneesEtRemplace
 
-    def ouvrir_fe_evaluations_formation(self) -> None:
-        self._fe_evaluations_formation = FichierExcel.depuis_fichier(chemin_fichier=self._chemin_excel_evaluations_formation)
-        self._fe_evaluations_formation._tableaux["CSV_stagiaires"].charge_df()
+
+    def _ouvrir_fe_evaluations_formation(self) -> Tuple[FichierExcel, pd.DataFrame]:
+        fe_evaluations_formation = FichierExcel.depuis_fichier(chemin_fichier=self._chemin_excel_evaluations_formation)
+        fe_evaluations_formation._tableaux["CSV_stagiaires"].charge_df()
         #self._fe_evaluations_formation._tableaux["Stagiaires"]._df['Trigramme formation'] = self._fe_evaluations_formation._tableaux["Stagiaires"]._df['Trigramme formation'].astype(str)
-        self._df_formation_stagiaires = self._fe_evaluations_formation._tableaux["Stagiaires"]._df  # Alias
+        df_formation_stagiaires = fe_evaluations_formation._tableaux["Stagiaires"]._df  # Alias
+        return fe_evaluations_formation, df_formation_stagiaires
 
-    def filedialog_csv(self, code_IRIS:int, trigramme:Optional[str] = None) -> str|None:
-        root = tk.Tk()
-        root.withdraw()  # Ne pas afficher la fenêtre principale
-
-        if (trigramme is None) and (self._chemin_excel_evaluations_formation is not None):
-            trigramme = self._chemin_excel_evaluations_formation
-        
-        if trigramme:
-            # On pré-définit le chemin où sont sensés être stockés les CSV d'évaluation des stagiaires
-            chemin_repertoire_csv = optimiseCheminRepertoire(os.path.dirname(self._chemin_excel_evaluations_defaut.replace("###", trigramme)))
-
-        while True:
-            chemin = filedialog.askopenfilename(title=f"Sélectionner le fichier CSV de la session {code_IRIS}", initialdir=chemin_repertoire_csv or os.getcwd, filetypes=[("Fichiers CSV", "*.csv")])
-
-            if chemin:
-                print(f"Fichier sélectionné : {chemin}")
-                return chemin  # ✅ Fichier sélectionné → on retourne
-
-            # ❌ Aucun fichier sélectionné → boîte personnalisée
-            reponse = self.filedialog_csv_pasDeReponse()
-
-            if reponse == "choisir":
-                continue  # 🔁 Re-ouvrir le file dialog
-            elif reponse == "absent":
-                print("Pas de CSV disponible pour cette session.")
-                return None
-            elif reponse == "quitter":
-                print("Traitement interrompu par l'utilisateur.")
-                sys.exit()
-            else:
-                print("Réponse inattendue. Fermeture.")
-                sys.exit()
-    
-    @staticmethod
-    def filedialog_csv_pasDeReponse():
-        choix = {} # Astuce : les dictionnaires sont dispo dans les sous-fonctions sans avoir à les déclarer nonlocal (plutôt qu'un str par ex.)
-
-        def choisir_nouveau():
-            choix["reponse"] = "choisir"
-            fenetre.destroy()
-
-        def pas_disponible():
-            choix["reponse"] = "absent"
-            fenetre.destroy()
-
-        def quitter():
-            choix["reponse"] = "quitter"
-            fenetre.destroy()
-
-        fenetre = tk.Tk()
-        fenetre.title("Aucun fichier sélectionné")
-        fenetre.geometry("400x150")
-        fenetre.resizable(False, False)
-        fenetre.eval('tk::PlaceWindow . center')  # Centrer la fenêtre
-
-        label = tk.Label(fenetre, text="Aucun fichier n'a été sélectionné.\nQue souhaitez-vous faire ?", pady=20)
-        label.pack()
-
-        bouton_frame = tk.Frame(fenetre)
-        bouton_frame.pack()
-
-        tk.Button(bouton_frame, text="Pas de CSV pour cette session", width=35, command=pas_disponible).grid(row=0, column=0, padx=5, pady=5)
-        tk.Button(bouton_frame, text="Choisir CSV à nouveau", width=25, command=choisir_nouveau).grid(row=1, column=0, padx=5, pady=5)
-        tk.Button(bouton_frame, text="Quitter traitement", width=20, command=quitter).grid(row=2, column=0, padx=5, pady=5)
-
-        fenetre.mainloop()
-        return choix.get("reponse")
-
-class Traiter_evalStat_OLD:
-    # Obtenir :
-    #   - Taux de recommandation en 2025 :	100%
-    #   - Satisfaction sur l’année 2025 :	4,75 sur 5
-    #   - Taux de retour (facultatif)
-
-    # Enlever ligne total avant traitement
-    # Remise ligne total après fin traitement
-
-    # Aller chercher CSV (sélectionner le fichier à partir du chemin standard)
-    # chemin standard vers CSV = "\\Instnt\partage\FORMATIONS_C\"&codeFormation&"\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\CSV\"
-
-    # Importer le CSV dans le modèle Excel (onglet "CSV")
-    # Ecrire nb d'inscrits (vient de sessions) + code formation et code IRIS + changer chemin CSV → Voir si je ne peux pas urtiliser des plages nommées
-    # coller infos dans tableau travaillé
-    #   - depuis colonne H jusqu'à la fin (AG) on copie et on va transposer
-    #   - pour toutes les 2 colonnes ça fait critère puis commentaire
-    #   - sauf pour "Recommanderiez-vous cette formation ?" (AD) + "Commentaires, remarques, suggestions " (AH)
-    #   - transformer valeurs de Recommanderiez-vous cette formation ? et Avez-vous d'autres besoins de formation ? en oui = 5 et non = 0
-    # Actualiser les TCD
-    # Sauvegarder au bon endroit
-    # TODO : pour l'instant à cause de pandas, je casse les segments
-
-    # Possibilité d'importer plusieurs CSV pour une même année
-    # Attention : impact sur nombre total de stagiaire (sommer dans sessions)
-    
-    def __init__(self) -> None:
-        
-        self._chemin_csv_stagiaires:str|None = None  # Fichier csv EvalStat stagiaire individuel
-        self._chemin_excel_stagiaires_output:str|None = None  # Fichier xlsx EvalStat stagiaire individuel qu'on va créer à partir du CSV
-        self._fe_stagiaires:FichierExcel|None = None  # Objet contenant les données EvalStat stagiaire individuel
-
-        self._chemin_modeleExcel_stagiaires:str|None = None  # Modèle Excel dans lequel importer le CSV
-        
-        self._chemin_excel_sessions:str|None = None  # Chemin du fichier Excel qui contient les extracts IRIS Sessions (ou a minima celles de la période en cours) dans lequel on a les informations des sessions (permet de compélter les CSV)
-        self._fe_sessions:FichierExcel|None = None  # Fichier Excel qui contient les extracts IRIS Sessions (ou a minima celles de la période en cours)
-
-        self._trigrammeFormation:str|None = None
-        self._codeIRIS:int|None = None
-
-        self._chemin_excel_evaluations_formation:Optional[str] = None  # Chemin du fichier Excel qui contient tous les CSV d'évaluation d'une formation
-        self._fe_evaluations_formation:Optional[FichierExcel] = None # Fichier Excel qui contient tous les CSV d'évaluation d'une formation
-        self._df_formation_stagiaires:Optional[pd.DataFrame] = None # DataFrame de self._fe_evaluations_formation (Alias)
-
-        self._chemins_csv_traites:List[str] = []
-        self._chemins_csv_exclus:List[str] = []
-
-        # Valeurs actuellement écrites en dur
-        self._chemin_excel_evaluations_defaut = r'\\instnt\partage\FORMATIONS_C\###\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\Evaluation-Stagiaires-Global-###.xlsx'
-        self._chemin_modeleExcel_stagiaires = r"C:\Users\vt238770\Documents\_CEA\Prog\Modèles\Evaluation-Stagiaires-Modèle.xlsx"
-        self._chemin_excel_sessions = r"C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Extracts complets\R04110_Sessions-COMPLET-2025.08.24.xlsx" 
-        #instance._chemin_excel_stagiaires_output = r"C:\Users\vt238770\Documents\_CEA\Prog\Modèles\Evaluation-Stagiaires-testOut.xlsx"
-
-        # === Colonnes du CSV selon traitement à avoir ===
-        # Colonnes descriptives à recopier
-        self._colonnes_csv_fixes = [
-            "Chemin fichier CSV", "Prénom", "Nom", "Entreprise", "Code session"]
-
-        # Colonnes avec note/commentaire en binôme
-        self._colonnes_csv_avec_commentaires = [
-            "Accueil, organisation et qualité des informations délivrées",
-            "Conseils et orientation avant l'inscription",
-            "Informations après l'inscription",
-            "Accueil à l'arrivée sur site",
-            "Prise en compte de vos besoins et attentes",
-            "Qualité des animations",
-            "Logique d'enchainement des interventions",
-            "Qualité des supports de cours utilisés",
-            "Qualité des moyens pédagogique",
-            "Accès aux outils digitaux",
-            "Satisfaction globale",
-            "Avez-vous d'autres besoins de formation ?"]
-
-        # Colonnes à valeur texte seule
-        self._colonnes_csv_commentaires_seuls = [
-            "Comment avez-vous connu cette formation ?",
-            "Commentaires, remarques, suggestions"]
-
-        # Colonnes note seule (il se trouve que je vais aussi devoir convertir le booléen)
-        self._colonnes_csv_bool = [
-            "Recommanderiez-vous cette formation ?"]
-        
-        
-        # === Colonnes de l'extract IRIS Sessions à récupérer ===
-        self._colonnes_sessions = [
-            "N° Session",
-            "Formation",
-            "Trigramme formation",
-            "Code IRIS",
-            "Date début ses.",
-            "Année début ses.",
-            "Type de formation",
-            "Trigramme RP",
-            "Trigramme AF",
-            "Nb. Présents"]
-
-     
-    @classmethod
-    def depuis_fe_evaluations_formation(cls, trigramme:str) -> Traiter_evalStat:
-        """
-        A partir d'un trigramme de foramtion, on ouvre et on charge le fichier excel qui concatène tous les CSV d'une formation 
-        """
-        # On crée l'instance et on complète les infos avec les valeurs facultatives
-        instance = Traiter_evalStat()
-        # On définit le chemin vers les évaluations de la formation (le fichier qui va concaténer toutes les évaluation d'une formation)
-        instance._chemin_excel_evaluations_formation = instance._chemin_excel_evaluations_defaut.replace("###", trigramme)
-
-        instance.ouvrir_fe_evaluations_formation()
-
-        return instance
-        
-    @classmethod
-    def depuis_chemin_csv_stagiaires(cls, chemin_csv_stagiaires:str, fe_sessions:FichierExcel=None, ouvrirDossier:bool=False, remplace_df:bool=False) -> Traiter_evalStat:
-        timer.debut(f"Traitement du CSV {os.path.basename(chemin_csv_stagiaires)}")
-        # On créée l'instance
-        instance = Traiter_evalStat()
-        instance._chemin_csv_stagiaires = chemin_csv_stagiaires
-        if fe_sessions is not None:
-            instance._fe_sessions = fe_sessions
-            # Quand je ferai la jointure plus tard sur "Code IRIS", il faudra que ce soit avec des strings
-            instance._fe_sessions._tableaux["Sessions"]._df["Code IRIS"] = instance._fe_sessions._tableaux["Sessions"]._df["Code IRIS"].astype(str)
-
-        # On récupère le trigramme de la formation depuis le chemin du CSV
-        instance._trigrammeFormation = instance.recupere_trig_formation_depuis_chemin(chemin_csv_stagiaires)
-        
-        # Pour le nom de l'Excel output : on reprend le nom du csv et on remplace par xlsx
-        instance._chemin_excel_stagiaires_output = os.path.join(os.path.dirname(instance._chemin_csv_stagiaires), os.path.basename(instance._chemin_csv_stagiaires).replace(".csv", ".xlsx"))
-
-        # On génère le fichier Excel du CSV à partir du modèle
-        instance._construit_FichierExcel_depuis_CSV(fe_sessions = fe_sessions, remplace_df=remplace_df)
-
-        # Ouverture du dossier à la fin
-        if ouvrirDossier:
-            ouvrir_dossier(os.path.dirname(instance._chemin_excel_stagiaires_output))
-
-        # On ajoute le chemin au tuple des éléments traités
-        instance._chemins_csv_traites.append(chemin_csv_stagiaires)
-        
-        timer.fin()
-        return instance        
-
-    @classmethod
-    def depuis_tuple_csv_stagiaires(cls, tuple_csv_stagiaires:Tuple(str), chemin_excel_evaluations_defaut:str=None, chemin_modeleExcel_stagiaires:str=None, chemin_excel_sessions:str=None, fe_sessions:FichierExcel=None, ouvrirDossier:bool=False) -> Traiter_evalStat:
-        """
-        A partir d'un tuple de chemins de CSV stagiaire (il peut il y avoir plusieurs trigrammes de formations différents)
-        Permet de générer :
-           - le fichier excel stagiaires de chaque session (via le CSV)
-           - le fichier excel stagiaires de chaque formation (celui qui concatène tous les CSV d'une session) [Il est créé ou on l'append avec les nouvelles valeurs]
-        
-        On exclue du traitement les chemin_csv_session qui sont déjà dans le FE formation (on considère que le CSV a déjà été traité)
-
-        """
-
-        
-        # On crée l'instance et on complète les infos avec les valeurs facultatives
-        instance = Traiter_evalStat()
-
-        if chemin_excel_evaluations_defaut is not None:
-            instance._chemin_excel_evaluations_defaut = chemin_excel_evaluations_defaut
-        if chemin_modeleExcel_stagiaires is not None:
-            instance._chemin_modeleExcel_stagiaires = chemin_modeleExcel_stagiaires
-        if chemin_excel_sessions is not None:
-            instance._chemin_excel_sessions = chemin_excel_sessions
-        if fe_sessions is not None:
-            instance._fe_sessions = fe_sessions
-        
-        df_formation_csv = None
-        df_formation_stagiaires = None
-        #dico_sessionsDejaTraitees = None
-        #timer = Timer()
-
-        # On récupère les données de Sessions (on en aura besoin plus tard)
-        if instance._fe_sessions is None:
-            timer.debut("Lecture fichier session")
-            instance._fe_sessions = FichierExcel.depuis_fichier(instance._chemin_excel_sessions)
-            timer.fin()
-        
-
-        # On convertit le tuple de strings en dictionnaire avec les trigrammes formation en clef
-        dico_chemins_csv_session = defaultdict(list)  #Dictionnaire spécial : lorsqu’on accède à une clé qui n’existe pas encore, il va automatiquement créer une nouvelle entrée avec une valeur par défaut, ici une liste vide (list())
-        for chemin in tuple_csv_stagiaires:
-            trigramme = instance.recupere_trig_formation_depuis_chemin(chemin)
-            dico_chemins_csv_session[trigramme].append(chemin)
-        dico_chemins_csv_session = dict(dico_chemins_csv_session)  # Optionnel : conversion en dict normal
-
-
-        # Pour chaque trigramme on va traiter chaque session et soit créer soit append le fichier excel global de la formation
-        for trigramme, chemins_csv_session in dico_chemins_csv_session.items(): #chemins est la liste des chemins des évaluations pour chaque sessions de ce trigramme formation
-            print(f"\n\n{Style.BRIGHT}{Fore.RED}Gestion des formations {trigramme}")
-
-            # On ouvre ou on créée (si inexistant) le fichier Excel qui concatène toutes les sessions d'une formation
-            supprimeDonneesEtRemplace_evaluations_formation = instance.ouvrir_ou_creer_evaluationsFormation(trigramme)
-
-            # Pour chaque chemin de session, on crée le fe_stagiaire dédié de la session et on ajoute les lignes de son dataframe au dataframe de fe_evaluations_formation
-            for chemin_csv_session in chemins_csv_session:
-                print(f"\n{Style.BRIGHT}{Fore.YELLOW}Gestion de la session {chemin_csv_session}")
-                traiterCSV = True  # Par défaut, on traite le CSV
-
-                # On vérifie que chemin_csv_session n'est pas déjà dans le fichier session pour savoir si on l'exclue du traitement
-                if df_formation_stagiaires is not None:
-                    if chemin_csv_session in df_formation_stagiaires["Chemin fichier CSV"].drop_duplicates().tolist():  
-                        traiterCSV = False
-                        instance._chemins_csv_exclus.append(chemin_csv_session)
-                        print(f"Exclusion car csv déjà dans le fichier global : {chemin_csv_session}")
-                        vlog.ajouter_message("Exclusion car csv déjà dans le fichier global", chemin_csv_session, style=["orange"])
-
-                # Traitement du CSV
-                if traiterCSV:  
-                    #timer.debut("Traiter_evalStat.depuis_chemin_csv_stagiaires")
-                    traite_csv_session = Traiter_evalStat.depuis_chemin_csv_stagiaires(chemin_csv_session, fe_sessions=instance._fe_sessions, ouvrirDossier=ouvrirDossier, remplace_df=True)
-
-                    #timer.debut("Copie des Dataframe csv et stagiaires")
-                    # #Si df_formation_csv est vide, il faut l'initialiser avec le premier df sinon on concatène
-                    if df_formation_csv is None:
-                        df_formation_csv = traite_csv_session._fe_stagiaires._tableaux["CSV_stagiaires"]._df.copy()
-                        df_formation_stagiaires = traite_csv_session._fe_stagiaires._tableaux["Stagiaires"]._df.copy()
-                    else:
-                        df_formation_csv = pd.concat([df_formation_csv, traite_csv_session._fe_stagiaires._tableaux["CSV_stagiaires"]._df], ignore_index=True)
-                        df_formation_stagiaires = pd.concat([df_formation_stagiaires, traite_csv_session._fe_stagiaires._tableaux["Stagiaires"]._df], ignore_index=True)
-                    
-                    # On ajoute le chemin au tuple des éléments traités
-                    instance._chemins_csv_traites.append(chemin_csv_session)
-                    vlog.ajouter_message("Fichiers traités", chemin_csv_session, style=["vert"])
-
-            # On concatène, on sauve et on ferme le fe de tous les CSV de la formation
-            if instance._chemins_csv_traites :
-                print(f"\n\n{Style.BRIGHT}{Fore.RED}Écriture du fichier global des évaluations de la formation {trigramme}")
-                timer.debut("Écriture, sauvegarde et fermeture")
-                instance._fe_evaluations_formation._tableaux["CSV_stagiaires"].ecrit_dataFrame_dans_tableauStructure(df_formation_csv, supprimeDonneesEtRemplace = supprimeDonneesEtRemplace_evaluations_formation)
-                instance._fe_evaluations_formation._tableaux["Stagiaires"].ecrit_dataFrame_dans_tableauStructure(df_formation_stagiaires, supprimeDonneesEtRemplace = supprimeDonneesEtRemplace_evaluations_formation)
-
-                instance._fe_evaluations_formation.save()
-                instance._fe_evaluations_formation.close()
-                timer.fin()
-            
-                # Actualisation des TCD
-                instance._fe_evaluations_formation.actualiser_TCD()
-
-        return instance
-
-    # ===  (getter / setter) ===
-    @property
-    def chemins_csv_traites(self):
-        return self._chemins_csv_traites
-
-
-    ######
-    #  === Méthodes internes ===
-    ######
-
-    def _construit_FichierExcel_depuis_CSV(self, fe_sessions:FichierExcel=None, remplace_df:bool=False):
-        ######
-        # === Import et traitement du CSV d'evalStat ===
-        ######
-        # On récupère l'encodage et on importe le CSV dans un DataFrame
-        #timer = Timer()
-        codage_csv = trouve_encodage_csv(self._chemin_csv_stagiaires)
-        #print(f"\nConstruction de l'Excel pour {os.path.basename(self._chemin_csv_stagiaires)} ; codage : {codage_csv}")
-        #timer.debut("Import du CSV et traitement du DataFrame")
-        df_csv_stagiaires = pd.read_csv(self._chemin_csv_stagiaires, sep=';', encoding=codage_csv)  # Ouverture du CSV et mise dans un DataFrame
-        
-        # Prise en compte qu'on a plusieurs formats de CSV : on doit traiter des colonnes en + ou - en conséquences
-        if "Date de fin" in df_csv_stagiaires.columns:
-            # Cas 1 (nouveau format de csv) : supprimer "Date de fin" → Test : r"P:\FORMATIONS_C\54C\P07-bilan-sessions-et-bilan-formation\rapports-sessions-evaluations\2023-06-S14317 UEM\S-14317-FC23-54C-VTE-LRA-Stagiaires.csv"
-            df_csv_stagiaires = df_csv_stagiaires.drop(columns=["Date de fin"])
-        else:
-            # Cas 2 (ancien format de csv) : supprimer la 2e et 3e colonne (indices 1 et 2) → Test : r"P:\FORMATIONS_C\22B\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-17606 - 22B - 06-2025\S-17606-FC25-22B-VTE-CAR-Stagiaires.csv"
-            df_csv_stagiaires = df_csv_stagiaires.drop(df_csv_stagiaires.columns[[1, 2]], axis=1)
-        
-        # On rajoute le chemin du CSV en première colonne
-        df_csv_stagiaires.insert(0, "Chemin fichier CSV", self._chemin_csv_stagiaires)
-
-        # Définition self._codeIRIS. Sinon Non existant, on récupère le numéro IRIS depuis le CSV (c'est la plus sur)
-        if self._codeIRIS is None:
-            match = re.search(r"\b\d{5}\b", self._chemin_csv_stagiaires)
-            if match:
-                self._codeIRIS = match.group(0)
-            else:
-                self.demander_code_iris()
-
-        # Met à jour ou crée la colonne "Code session" avec self._codeIRIS
-        df_csv_stagiaires["Code session"] = self._codeIRIS
-
-        # Mise au format jj/mm/aaaa de la colonne "Date" (si elle existe)
-        if "Date" in df_csv_stagiaires.columns:
-            try:
-                df_csv_stagiaires["Date"] = pd.to_datetime(df_csv_stagiaires["Date"], dayfirst=True, errors="coerce").dt.strftime("%d/%m/%Y")  # dayfirst=True indique que le premier nombre correspond au jour (format jj/mm/aaaa)
-            except Exception as e:
-                print(f"Erreur de conversion de la colonne Date : {e}")
-
-        # A cause des espaces à la con qui trainent dans les noms des colonnes des CSV, je vais reload le dataframe depuis l'excel que je viens de créer car les colonnes du modèle sont bien nommées
-        # Ainsi on sauve ici plutôt qu'à la fin et on reload le DataFrame
-        self._fe_stagiaires = FichierExcel.depuis_modele(chemin_modele=self._chemin_modeleExcel_stagiaires, chemin_fichier_sauv=self._chemin_excel_stagiaires_output)
-        if remplace_df:
-            self._fe_stagiaires._tableaux["CSV_stagiaires"].remplace_df(df_csv_stagiaires)
-        self._fe_stagiaires._tableaux["CSV_stagiaires"].ecrit_dataFrame_dans_tableauStructure(df_csv_stagiaires, supprimeDonneesEtRemplace=True)
-        self._fe_stagiaires.save(self._chemin_excel_stagiaires_output)
-        self._fe_stagiaires.close()
-        self._fe_stagiaires = FichierExcel.depuis_fichier(self._chemin_excel_stagiaires_output)
-        self._fe_stagiaires._tableaux["CSV_stagiaires"].charge_df()
-        df_csv_stagiaires = self._fe_stagiaires._tableaux["CSV_stagiaires"]._df
-        
-        ######
-        # === On crée la seconde partie du DataFrame qui sera dans l'onglet "Stagiaire" ===
-        # On va découper le dataframe du CSV selon les différents critères et mettre dans un dataframe qu'on pourra exploiter par un TCD
-        ######
-        # Nouveau DataFrame à remplir
-        df_long = []
-
-        # Parcours des lignes
-        for _, row in df_csv_stagiaires.iterrows():
-            #print("Ligne en cours : ")
-            #print(row)
-            base = {col: row[col] for col in self._colonnes_csv_fixes}  # Création des colonnes qui seront répétées à chaque fois
-            base["NOM Prénom"] = f"{str(row['Nom']).upper()} {row['Prénom']}".strip()  # Création du champ "NOM Prénom"
-
-            # Cas 1 : colonnes avec note + commentaire associé
-            for critere in self._colonnes_csv_avec_commentaires:
-                if critere in row:
-                    #print(f"'{critere}'")
-                    if(critere == "Avez-vous d'autres besoins de formation ?"):  # Il faut changer le booléen en 0 ou 5
-                        val = str(row[critere]).strip().lower()
-                        row[critere] = 5 if val == "oui" else (0 if val == "non" else None)
-                    commentaire_col = row.index[row.index.get_loc(critere) + 1]
-                    if(pd.notna(row[critere]) or pd.notna(row.get(commentaire_col, None))) :
-                        df_long.append({
-                            **base,
-                            "Critère": critere,
-                            "Note": row[critere],
-                            "Commentaires": row.get(commentaire_col, None)
-                        })
-
-            # Cas 2 : colonnes texte seules
-            for critere in self._colonnes_csv_commentaires_seuls:
-                if critere in row:
-                    if(pd.notna(row[critere])) :
-                        df_long.append({
-                            **base,
-                            "Critère": critere,
-                            "Note": None,
-                            "Commentaires": row[critere]
-                        })
-
-            # Cas 3 : Note seule + booléens convertis
-            for critere in self._colonnes_csv_bool:
-                if critere in row:
-                    if(pd.notna(row[critere])) :
-                        val = str(row[critere]).strip().lower()
-                        note = 5 if val == "oui" else (0 if val == "non" else None)
-                        df_long.append({
-                            **base,
-                            "Critère": critere,
-                            "Note": note,
-                            "Commentaires": None
-                        })
-
-        # Construction du DataFrame final
-        df_stagiaires = pd.DataFrame(df_long)
-
-        # Réorganise les colonnes pour placer "NOM Prénom" juste après "Nom"
-        colonnes = list(df_stagiaires.columns)
-        if "NOM Prénom" in colonnes and "Nom" in colonnes:
-            colonnes.remove("NOM Prénom")
-            index_nom = colonnes.index("Nom")
-            colonnes.insert(index_nom + 1, "NOM Prénom")
-            df_stagiaires = df_stagiaires[colonnes]
-
-        # Supprime les colonnes "Prénom" et "Nom" devenues inutiles
-        df_stagiaires.drop(columns=["Prénom", "Nom"], inplace=True)
-
-
-        ######
-        # === On fait le left join entre df_stagiaires et les données qui proviennent de l'extract IRIS Sessions ===
-        ######
-        # On récupère les données de Sessions
-        if fe_sessions is None:
-            timer.debut("Lecture fichier session")
-            self._fe_sessions = FichierExcel.depuis_fichier(self._chemin_excel_sessions)
-            self._fe_sessions._tableaux["Sessions"]._df["Code IRIS"] = self._fe_sessions._tableaux["Sessions"]._df["Code IRIS"].astype(str)
-        else:
-            self._fe_sessions = fe_sessions
-
-
-        # Pour faire le merge, il faut que les colonnes soient de même type (là "Code session" est de type int64 et "Code IRIS" est de type object (souvent des chaînes de caractères)).
-        # Comme je ne peux être sûr que tous les "Code IRIS" issu des CSV soient bien convertibles en int (c’est-à-dire pas de chaînes vides, NaN, ou autres caractères non numériques), alors je passe par des strings
-        df_stagiaires["Code session"] = df_stagiaires["Code session"].astype(str)
-        #self._fe_sessions._tableaux["Sessions"]._df["Code IRIS"] = self._fe_sessions._tableaux["Sessions"]._df["Code IRIS"].astype(str)
-        
-        # On récupère uniquement les colonnes souhaitées dans une vue pour faciliter le codage (c'est un alias)
-        df_sessions_filtre = self._fe_sessions._tableaux["Sessions"]._df[self._colonnes_sessions]
-        
-        # On fait la jointure entre df_stagiaires et df_sessions_filtre
-        #timer.debut("Création du DataFrame Stagiaires (jointure)")
-        df_stagiaires = df_stagiaires.merge(
-            df_sessions_filtre,
-            left_on="Code session",
-            right_on="Code IRIS",
-            how="left"
-        )
-
-        # On réorganise les colonnes : d'abord celles de df_sessions puis celles de df_stagiaires
-        colonnes_resultat = (
-            df_sessions_filtre.columns.tolist() +  # colonnes de _df_sessions
-            [col for col in df_stagiaires.columns if col not in df_sessions_filtre.columns]  # le reste (i.e. celles de df_stagiaires)
-        )
-        df_stagiaires = df_stagiaires[colonnes_resultat]
-        #print(_df_stagiaires)
-        
-        # On vire "Code session" qui est redondante avec "Code IRIS"
-        df_stagiaires.drop(columns=["Code session"], inplace=True)
-        
-        # On renomme les colonnes
-        #df_sessions_filtre.rename(columns={"Date début ses.": "Date"}, inplace=True)
-        #df_sessions_filtre.rename(columns={"Année début ses.": "Année"}, inplace=True)
-
-        # On remplace le DataFrame existant par le nouveau
-        if remplace_df:
-            self._fe_stagiaires._tableaux["Stagiaires"].remplace_df(df_stagiaires)
-        
-        # On écrit et on sauve
-        #timer.debut("On écrit le DataFrame, on met à jour les TCD et on sauve")
-        self._fe_stagiaires._tableaux["Stagiaires"].ecrit_dataFrame_dans_tableauStructure(df_stagiaires, supprimeDonneesEtRemplace=True)
-        self._fe_stagiaires.save()
-
-
-        # Màj des TCD
-        self._fe_stagiaires.actualiser_TCD()
-        #timer.fin()
-
-    def demander_code_iris(self):
-        print("TODO : demander_code_iris appelé → Essayer de généraliser avec demander_code")
-        def verifier_entree(*args):
-            val = entry_code.get()
-            bouton_valider.config(state="normal" if val.isdigit() and len(val) == 5 else "disabled")
-            bouton_renommer.config(state="normal" if val.isdigit() and len(val) == 5 else "disabled")
-
-        def valider():
-            nonlocal code_iris
-            self._codeIRIS = int(entry_code.get())
-            fenetre.destroy()
-
-        def valider_et_renommer():
-            nonlocal code_iris
-            self._codeIRIS = int(entry_code.get())
-            nouveau_nom = f"S-{code_iris}-Stagiaires.csv"
-            nouveau_chemin = os.path.join(
-                os.path.dirname(self._chemin_csv_stagiaires),
-                nouveau_nom
-            )
-
-            try:
-                os.rename(self._chemin_csv_stagiaires, nouveau_chemin)
-                self._chemin_csv_stagiaires = nouveau_chemin
-            except Exception as e:
-                tk.messagebox.showerror("Erreur", f"Impossible de renommer le fichier :\n{e}")
-                log_erreur(f"impossible de renommer le fichier :\n{e}")
-                return  # Ne pas fermer la fenêtre si erreur
-
-            fenetre.destroy()
-
-        def annuler():
-            fenetre.destroy()
-            log_erreur("code IRIS non renseignée pour " + self._chemin_csv_stagiaires + " → exit()")
-            exit()
-
-        code_iris = None
-
-        fenetre = tk.Tk()
-        fenetre.title("Code IRIS à renseigner manuellement")
-        fenetre.resizable(False, False)
-        fenetre.geometry("500x180")
-        fenetre.eval('tk::PlaceWindow . center')
-
-        # Fermer avec Échap
-        fenetre.bind("<Escape>", lambda e: annuler())
-        # Entrée = bouton Valider
-        fenetre.bind("<Return>", lambda e: bouton_valider.invoke())
-
-        label_warning = tk.Label(
-            fenetre,
-            text="⚠ Code IRIS non trouvé automatiquement, veuillez le spécifier manuellement",
-            font=("Segoe UI", 10, "bold"),
-            fg="orange"
-        )
-        label_warning.pack(pady=(10, 5))
-
-        label_chemin = tk.Label(
-            fenetre,
-            text=f"Chemin du fichier source :\n  *{self._chemin_csv_stagiaires}*",
-            font=("Segoe UI", 9),
-            justify="left",
-            wraplength=480
-        )
-        label_chemin.pack(pady=(0, 10))
-
-        frame_saisie = tk.Frame(fenetre)
-        frame_saisie.pack()
-
-        entry_code = tk.Entry(frame_saisie, width=10, justify="center", font=("Segoe UI", 12))
-        entry_code.pack()
-        entry_code.focus()
-
-        entry_code_var = tk.StringVar()
-        entry_code["textvariable"] = entry_code_var
-        entry_code_var.trace_add("write", verifier_entree)
-
-        frame_boutons = tk.Frame(fenetre)
-        frame_boutons.pack(pady=10)
-
-        bouton_valider = tk.Button(frame_boutons, text="Valider", state="disabled", width=20, command=valider)
-        bouton_valider.grid(row=0, column=0, padx=5)
-
-        bouton_renommer = tk.Button(frame_boutons, text="Valider et remplacer le nom du CSV", state="disabled", width=30, command=valider_et_renommer)
-        bouton_renommer.grid(row=0, column=1, padx=5)
-
-        bouton_annuler = tk.Button(frame_boutons, text="Annuler", width=10, command=annuler)
-        bouton_annuler.grid(row=0, column=2, padx=5)
-
-        fenetre.mainloop()
-
-        return code_iris
-    
-    def demander_code(self, typeCode) -> int|str:
-        # Initialisation en fonction du type de code
-        match typeCode:
-            case "Code IRIS":
-                print("Cas code IRIS")
-                nbCaracteres = 5
-                chemin_a_tester = self._chemin_csv_stagiaires
-            case "Trigramme formation":
-                print("Cas trigramme formation")
-                nbCaracteres = 3
-                chemin_a_tester = self._chemin_csv_stagiaires
-            case _:
-                log_erreur(f"cas non valide : soit 'IRIS' soit 'Trigramme formation', demandé : {typeCode} → exit()")
-                exit()
-
-            
-        def verifier_entree(*args):
-            val = entry_code.get()
-            bouton_valider.config(state="normal" if val.isdigit() and len(val) == nbCaracteres else "disabled")
-            if typeCode=="Code IRIS":
-                bouton_renommer.config(state="normal" if val.isdigit() and len(val) == nbCaracteres else "disabled")
-
-        def valider():
-            nonlocal code # Adaptation : changer en "code"
-            code = entry_code.get()            
-            fenetre.destroy()
-
-        # Cas IRIS uniquement : ne pas toucher / ne pas afficher si cas Trigramme formation
-        def valider_et_renommer():
-            nonlocal code
-            code = entry_code.get()
-            nouveau_nom = f"S-{code}-Stagiaires.csv"
-            nouveau_chemin = os.path.join(
-                os.path.dirname(self._chemin_csv_stagiaires),
-                nouveau_nom
-            )
-
-            try:
-                os.rename(self._chemin_csv_stagiaires, nouveau_chemin)
-                self._chemin_csv_stagiaires = nouveau_chemin
-            except Exception as e:
-                tk.messagebox.showerror("Erreur", f"Impossible de renommer le fichier :\n{e}")
-                log_erreur("Erreur", f"Impossible de renommer le fichier :\n{e}")
-                return  # Ne pas fermer la fenêtre si erreur
-
-            fenetre.destroy()
-
-        def annuler():
-            fenetre.destroy()
-            log_erreur(f"{typeCode} non renseignée pour {chemin_a_tester} → exit()")
-            exit()
-
-        code = None
-
-        fenetre = tk.Tk()
-        fenetre.title(f"{typeCode} à renseigner manuellement")
-        fenetre.resizable(False, False)
-        fenetre.geometry("500x180")
-        fenetre.eval('tk::PlaceWindow . center')
-
-        # Fermer avec Échap
-        fenetre.bind("<Escape>", lambda e: annuler())
-        # Entrée = bouton Valider
-        fenetre.bind("<Return>", lambda e: bouton_valider.invoke())
-
-        label_warning = tk.Label(
-            fenetre,
-            text=f"⚠ {typeCode} non trouvé automatiquement.\nVeuillez le spécifier manuellement",
-            font=("Segoe UI", 10, "bold"),
-            fg="orange"
-        )
-        label_warning.pack(pady=(10, 5))
-
-        label_chemin = tk.Label(
-            fenetre,
-            text=f"Chemin du fichier source :\n  *{chemin_a_tester}*",
-            font=("Segoe UI", 9),
-            justify="left",
-            wraplength=480
-        )
-        label_chemin.pack(pady=(0, 10))
-
-        frame_saisie = tk.Frame(fenetre)
-        frame_saisie.pack()
-
-        entry_code = tk.Entry(frame_saisie, width=10, justify="center", font=("Segoe UI", 12))
-        entry_code.pack()
-        entry_code.focus()
-
-        entry_code_var = tk.StringVar()
-        entry_code["textvariable"] = entry_code_var
-        entry_code_var.trace_add("write", verifier_entree)
-
-        frame_boutons = tk.Frame(fenetre)
-        frame_boutons.pack(pady=10)
-
-        bouton_valider = tk.Button(frame_boutons, text="Valider", state="disabled", width=20, command=valider)
-        bouton_valider.grid(row=0, column=0, padx=5)
-
-        if typeCode == "Code IRIS":
-            bouton_renommer = tk.Button(frame_boutons, text="Valider et remplacer le nom du CSV", state="disabled", width=30, command=valider_et_renommer)
-            bouton_renommer.grid(row=0, column=1, padx=5)
-
-        bouton_annuler = tk.Button(frame_boutons, text="Annuler", width=10, command=annuler)
-        bouton_annuler.grid(row=0, column=2, padx=5)
-
-        fenetre.mainloop()
-
-        code = int(code) if code.isdigit() else str(code)
-        return code
-
-    def recupere_trig_formation_depuis_chemin(self, chemin:str|None) -> str:
-        """
-        Extrait un trigramme (3 lettres/chiffres) depuis un chemin, ou le demande à l'utilisateur si introuvable.
-        Gère les slashs / et \\ de manière robuste.
-        """
-        # On récupère le trigramme de la formation depuis le chemin du CSV ou alors on demande à l'utilisateur via tkinter
-        trigramme = None
-
-        if chemin:
-            # Normalise les slashs pour s'assurer que le chemin est cohérent
-            chemin_normalise = chemin.replace("\\", "/")
-
-            # Découpe le chemin en parties
-            parties = chemin_normalise.split("/")
-
-            # Recherche un segment de 3 caractères alphanumériques
-            for part in parties:
-                if re.fullmatch(r"[a-zA-Z0-9]{3}", part):
-                    trigramme = part
-                    break
-
-            # Si rien trouvé, on demande à l'utilisateur
-            if not trigramme:
-                trigramme = self.demander_code("Trigramme formation")
-
-        else:
-            trigramme = self.demander_code("Trigramme formation")
-
-        #print(instance._trigrammeFormation)
-
-        return trigramme
-
-    def ouvrir_ou_creer_evaluationsFormation(self, trigramme:str) -> bool:
-        """
-        Ouvre ou crée le fichier Excel d'évaluations globales pour une formation donnée.
-
-        Cette méthode construit le chemin vers le fichier d'évaluations correspondant au 
-        trigramme de la formation. Si ce fichier existe, il est ouvert et les données 
-        des stagiaires sont chargées dans un DataFrame. Sinon, un nouveau fichier est 
-        créé à partir d'un modèle, et les données seront à initialiser.
-
-        Args:
-            trigramme (str): Code trigramme de la formation.
-
-        Returns:
-                - Un booléen indiquant si les anciennes données doivent être supprimées et remplacées 
-                (`True` si nouveau fichier créé, `False` sinon).
-        """ 
-        # On définit le chemin vers les évaluations de la formation (le fichier qui va concaténer toutes les évaluation d'une formation)
-        self._chemin_excel_evaluations_formation = self._chemin_excel_evaluations_defaut.replace("###", trigramme)
-
-        # On vérifie que le répertoire dédié existe sinon on le créée : \\instnt\partage\FORMATIONS_C\###\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations
-        os.makedirs(os.path.dirname(self._chemin_excel_evaluations_formation), exist_ok=True)
-        
-        # On regarde si Evaluation-Stagiaires-Global-XXX.xlsx existe
-        if os.path.isfile(self._chemin_excel_evaluations_formation):
-            # Alors on l'ouvre
-            self.ouvrir_fe_evaluations_formation()
-            
-            # On récupère la liste des sessions déjà intégrées (liste des codes et des chemins) → Ce sera pour écrire dans le tkinter
-            #dico_sessionsDejaTraitees = dict(
-            #df_formation_stagiaires[df_formation_stagiaires["Trigramme formation"] == trigramme]     # 1. filtre sur le trigramme
-            #.drop_duplicates(subset=["Code IRIS", "Chemin fichier CSV"])  # 2. élimine les doublons
-            #[["Code IRIS", "Chemin fichier CSV"]]            # 3. sélection des colonnes
-            #.values                               # 4. valeurs du DF
-            #    )        
-
-            # Il ne faudra pas supprimer les anciennes données de fe_evaluations_formation
-            supprimeDonneesEtRemplace = False  
-        else :
-            # On créée le fichier : on ouvre le modèle (on sauvera avec le bon nom à la fin)
-            fe_evaluations_formation = FichierExcel.depuis_modele(chemin_modele=self._chemin_modeleExcel_stagiaires, chemin_fichier_sauv=self._chemin_excel_evaluations_formation)
-
-            # Il faudra supprimer les anciennes données de fe_evaluations_formation
-            supprimeDonneesEtRemplace = True
-
-            df_formation_stagiaires = None
-            vlog.ajouter_message("Création EvalStat Global formation", fe_evaluations_formation.chemin_fichier, style=["vert"])
-
-        return fe_evaluations_formation, df_formation_stagiaires, supprimeDonneesEtRemplace
-
-    def ouvrir_fe_evaluations_formation(self) -> None:
-        self._fe_evaluations_formation = FichierExcel.depuis_fichier(chemin_fichier=self._chemin_excel_evaluations_formation)
-        self._fe_evaluations_formation._tableaux["CSV_stagiaires"].charge_df()
-        #self._fe_evaluations_formation._tableaux["Stagiaires"]._df['Trigramme formation'] = self._fe_evaluations_formation._tableaux["Stagiaires"]._df['Trigramme formation'].astype(str)
-        self._df_formation_stagiaires = self._fe_evaluations_formation._tableaux["Stagiaires"]._df  # Alias
-
-    def filedialog_csv(self, code_IRIS:int, trigramme:Optional[str] = None) -> str|None:
-        root = tk.Tk()
-        root.withdraw()  # Ne pas afficher la fenêtre principale
-
-        if (trigramme is None) and (self._chemin_excel_evaluations_formation is not None):
-            trigramme = self._chemin_excel_evaluations_formation
-        
-        if trigramme:
-            # On pré-définit le chemin où sont sensés être stockés les CSV d'évaluation des stagiaires
-            chemin_repertoire_csv = optimiseCheminRepertoire(os.path.dirname(self._chemin_excel_evaluations_defaut.replace("###", trigramme)))
-
-        while True:
-            chemin = filedialog.askopenfilename(title=f"Sélectionner le fichier CSV de la session {code_IRIS}", initialdir=chemin_repertoire_csv or os.getcwd, filetypes=[("Fichiers CSV", "*.csv")])
-
-            if chemin:
-                print(f"Fichier sélectionné : {chemin}")
-                return chemin  # ✅ Fichier sélectionné → on retourne
-
-            # ❌ Aucun fichier sélectionné → boîte personnalisée
-            reponse = self.filedialog_csv_pasDeReponse()
-
-            if reponse == "choisir":
-                continue  # 🔁 Re-ouvrir le file dialog
-            elif reponse == "absent":
-                print("Pas de CSV disponible pour cette session.")
-                return None
-            elif reponse == "quitter":
-                print("Traitement interrompu par l'utilisateur.")
-                sys.exit()
-            else:
-                print("Réponse inattendue. Fermeture.")
-                sys.exit()
-    
-    @staticmethod
-    def filedialog_csv_pasDeReponse():
-        choix = {} # Astuce : les dictionnaires sont dispo dans les sous-fonctions sans avoir à les déclarer nonlocal (plutôt qu'un str par ex.)
-
-        def choisir_nouveau():
-            choix["reponse"] = "choisir"
-            fenetre.destroy()
-
-        def pas_disponible():
-            choix["reponse"] = "absent"
-            fenetre.destroy()
-
-        def quitter():
-            choix["reponse"] = "quitter"
-            fenetre.destroy()
-
-        fenetre = tk.Tk()
-        fenetre.title("Aucun fichier sélectionné")
-        fenetre.geometry("400x150")
-        fenetre.resizable(False, False)
-        fenetre.eval('tk::PlaceWindow . center')  # Centrer la fenêtre
-
-        label = tk.Label(fenetre, text="Aucun fichier n'a été sélectionné.\nQue souhaitez-vous faire ?", pady=20)
-        label.pack()
-
-        bouton_frame = tk.Frame(fenetre)
-        bouton_frame.pack()
-
-        tk.Button(bouton_frame, text="Pas de CSV pour cette session", width=35, command=pas_disponible).grid(row=0, column=0, padx=5, pady=5)
-        tk.Button(bouton_frame, text="Choisir CSV à nouveau", width=25, command=choisir_nouveau).grid(row=1, column=0, padx=5, pady=5)
-        tk.Button(bouton_frame, text="Quitter traitement", width=20, command=quitter).grid(row=2, column=0, padx=5, pady=5)
-
-        fenetre.mainloop()
-        return choix.get("reponse")
 
 class BilanSessionV3:
     """
@@ -3224,162 +1980,6 @@ class REE:
                 cc_str = json.dumps(str(cc))
             print(f"    {json.dumps(nom_col)}: {cc_str}{virgule}")
         print("}")
-
-class Traiter_REE_BAK:
-    def __init__(self):
-        # Fichier renseigné par la ressource extérieure
-        self._chemin_ficheAdministrative:str = None
-        self._word_ficheAdministrative:FichierWord = None  
-
-        # Fichier Excel à remplir pour Laetitia Da Mota (RH INSTN qui s'occupe de rentrer les REE dans IRIS)
-        self._chemin_modele_excel_ficheIntervenant:str = r"\\harmonie\INSTN\UEM\_Documents_communs\Formations\Formateurs\P09-Pr01-Qualifier les ressources enseignantes\P09_Pr01_Ta.E_Grille des critères de qualification des compétences_V1.xlsx"
-        self._excel_ficheIntervenant:FichierExcel = None  
-
-        self._mail_rh:Mail = None  # Mail à envoyer à la RH INSTN qui s'occupe de rentrer les REE dans IRIS (Laetitita Da Mota)
-
-        self._repertoire_sauvegarde_fichiersREE:str = r"\\harmonie\INSTN\UEM\_Documents_communs\Formations\Formateurs\1.Intervenants - Documents administratifs" # Lieu où sauvegarder les fichiers de l'intervenant
-
-        # Association colonnes excel avec command control Word
-        # La préparation de ce ditionnaire peut être faite avec : fe = FichierExcel.depuis_fichier(chemin_fichier=r"T:\_Documents_communs\Formations\Formateurs\P09-Pr01-Qualifier les ressources enseignantes\P09_Pr01_Ta.E_Grille des critères de qualification des compétences_V1.xlsx", charger_df=True) ; fe._tableaux["QualificationsREE"].generer_dictionnaire_depuis_excel()
-        self._dict_colExcel_cc:Dict[str, str] = {
-            "NOM": "Nom",
-            "Pr\u00e9nom": "Prenoms",
-            "Dipl\u00f4me ou formation/exp\u00e9rience professionnelle": "Diplome",
-            "Dur\u00e9e exp\u00e9rience professionnelle": "DureeExperiencePro",
-            "Niveau d'expertise permettant une reconnaissance": "NiveauExpertise",
-            "Domaine / Sp\u00e9cialit\u00e9 \nde l'expertise": "DomaineExpertise",
-            "ATTRIBUTION Niveau comp\u00e9tence": None,
-            "Combien de jours anim\u00e9s, en moyenne par an": "formation_nbJoursAnimes",
-            "Combien de jours de formations suivies en p\u00e9dagogie (=animation)": "formation_nbJoursFormationPedagogie",
-            "Profils d'apprenants form\u00e9s": "formation_profilApprenants",
-            "Taux consolid\u00e9 de la satisfaction des apprenants relativement \u00e0 l'enseignant-formateur consid\u00e9r\u00e9": None,
-            "Estimation par le RP de la capacit\u00e9 de l'enseignant-formateur \u00e0 animer \n(fond de salle)": None,
-            "Outils num\u00e9riques utilis\u00e9s durant les animations r\u00e9alis\u00e9es\n(serious game, blended-learning\u2026)": "formation_outilsNumeriques",
-            "Combien de jours pass\u00e9s en conception de s\u00e9quence de formation, en moyenne par an": "IngPedago_nbJoursConception",
-            "Combien de jours de formations suivies en ing\u00e9nierie p\u00e9dagogique (=conception de s\u00e9quences de formation)": "IngPedago_nbJoursFormationIngPedago",
-            "Estimation par le RP de la conception de la s\u00e9quence en fonction des objectifs p\u00e9dagogiques fournis par le RP\n(fond de salle, analyse des supports fournis)": None,
-            "Estimation par le RP de la pertinence de l'\u00e9valuation des acquis r\u00e9alis\u00e9e par l'enseignant-formateur sur sa s\u00e9quence\n(analyse de la progression des apprenants : tests avant/apr\u00e8s)": None,
-            "Estimation par le RP de l'utilisation des m\u00e9thodes actives\n(\u00e9tudes de cas, r\u00e9solution de probl\u00e8mes, classes invers\u00e9es, travaux de groupes\u2026)": None,
-            "Combien d'ann\u00e9es d'exp\u00e9rience en conception de dispositifs de formations\n(=cr\u00e9ation et coordination)": "IngFormation_nbJoursConception",
-            "Combien de jours de formations suivies en ing\u00e9nierie de formation\n(=conception de dispositifs de formation)": "IngFormation_nbJoursFormationIngFormation",
-            "Estimation par le chef de projet ou le CUE de la complexit\u00e9 des pr\u00e9c\u00e9dents dispositifs de formation con\u00e7us": None,
-            "Profil des apprenants des dispositifs de formations prc\u00e9demment con\u00e7us": "IngFormation_profilApprenants",
-            "Estimation par le chef de projet ou le CUE de l'\u00e9valuation des acquis r\u00e9alis\u00e9 dans le dispositif de formation\n(mesure de la progression des apprenants=estimation de la qualit\u00e9 du dispositif de formation)": None,
-            "Combien d'ann\u00e9es d'exp\u00e9rience en tant que tuteur acad\u00e9mique": "IngFormation_nbAnneesTuteur",
-            "Combien de r\u00e9f\u00e9rentiels d'activit\u00e9, de comp\u00e9tence et d'\u00e9valuation r\u00e9alis\u00e9s": "IngFormation_nbAnneesTuteur",
-            "Combien de jours de formations suivies en ing\u00e9nierie de comp\u00e9tences": "IngCompetences_nbReferentiels",
-            "Estimation par la cellule p\u00e9dagogique de DPF de la complexit\u00e9 des pr\u00e9c\u00e9dentes r\u00e9alisations de l'ing\u00e9nieur/consultant en ing\u00e9nierie de comp\u00e9tences \n(complexit\u00e9 du m\u00e9tier et de son environnement : risques, r\u00e9glementation...)": "IngCompetences_nbJoursFormationIngCompetences",
-            "ATTRIBUTION Niveau comp\u00e9tence ": None,
-            "Evaluation CECRL ou \u00e9quivalence TOEIC, TOEFL": "ResultatLangue2",
-            "ATTRIBUTION Niveau comp\u00e9tence  ": None,
-            "Curriculum vitae": None,
-        }
-
-
-
-        # Fichier Excel qui liste les AI des intervenants
-        self._chemin_excel_AI:str = r"\\harmonie\INSTN\UEM\_Documents_communs\Formations\Formateurs\2.AI\Liste AI formateurs.xlsx"
-        self._excel_AI:FichierExcel = None
-        self._onglet_excel_AI:str = "Intervenants" #Ligne ET = 3, 1èreligne = 4
-        self._tableauStructure_AI:str = "ListeIntervenants"
-        nbLignes_avantET_AI:int = 2 # Si tableau structuré, normalement on n'en a pas besoin
-
-        # Fichier Excel qui liste des intervenants qui centralise les coordonnées 
-        self._chemin_excel_listeIntervenants:str = r"\\harmonie\INSTN\UEM\_Echanges\VTE\Planning UEM.xlsm"
-        self._excel_listeIntervenants:FichierExcel = None
-        self._onglet_excel_listeIntervenants:str = "Liste intervenants" #Ligne ET = 4, 1èreligne = 5
-        self._tableauStructure_listeIntervenant:str = "ListeIntervenants"
-        nbLignes_avantET_listeIntervenants:int = 3  # Si tableau structuré, normalement on n'en a pas besoin
-        
-
-
-        # === Début code ===
-
-        # On ouvre le word et on charge tous les command control (filedialog depuis "Download"). On le ferme
-        self._word_ficheAdministrative = FichierWord.depuisFichier()
-        #print(self._word_ficheAdministrative)
-
-        # On crée le répertoire dans le répertoire des REE s'il n'existe pas (ou assimilé) (NOM Prénom (Société - AAAA))
-        self._repertoire_sauvegarde_fichiersREE += f"\\{self._word_ficheAdministrative.cc['Nom'].upper()} {self._word_ficheAdministrative.cc['Prenoms'].title()} ({self._word_ficheAdministrative.cc['RaisonSociale'] if self._word_ficheAdministrative.cc['RaisonSociale'] != 'Raison sociale employeur principal' else 'CEA'} - {datetime.now().year})"
-        #print(self._repertoire_sauvegarde_fichiersREE)
-        #os.makedirs(self._repertoire_sauvegarde_fichiersREE, exist_ok=True)
-
-        # On sélectionne tous les fichiers de la REE et on les déplace dans le répertoire idoine
-        #self.deplacer_fichiers(self._repertoire_sauvegarde_fichiersREE)
-
-        # On ouvre le fichier Excel à remplir pour Laetitia Da Mota (c'est un modèle, on le collera avec le bon nom dans le répertoire idoine)
-        fichier_sauvegarde_fichiersREE = os.path.join(self._repertoire_sauvegarde_fichiersREE, os.path.basename(self._chemin_modele_excel_ficheIntervenant))
-        self._excel_ficheIntervenant = FichierExcel.depuis_modele(self._chemin_modele_excel_ficheIntervenant, fichier_sauvegarde_fichiersREE, charger_df=True)
-        #print(self._excel_ficheIntervenant._tableaux["QualificationsREE"]._df)
-
-        # On écrit le dataframe du tableau QualificationsREE avec les données de l'intervenant provenant du word
-        df_REE = self._excel_ficheIntervenant._tableaux["QualificationsREE"]._df  # Alias
-        nouvelle_ligne = {}
-        for col_df, cc_key in self._dict_colExcel_cc.items():
-            if cc_key is None:
-                # Pas de clé correspondante => valeur vide dans la DataFrame
-                nouvelle_ligne[col_df] = None
-            else:
-                # Récupérer la valeur dans le dictionnaire Word, ou None si la clé absente
-                valeur = self._word_ficheAdministrative._cc.get(cc_key, None)
-                nouvelle_ligne[col_df] = convertir_si_possible(valeur)
-                #print(valeur, type(convertir_si_possible(valeur)))
-
-        # Ajouter la nouvelle ligne au DataFrame
-        # TODO : non pas sûr
-        df_REE = pd.concat([df_REE, pd.DataFrame([nouvelle_ligne])], ignore_index=True)
-
-        # On pré-rempli le fichier Excel fiche intervenant grâce aux CC et au dictionnaire
-        self._excel_ficheIntervenant._tableaux["QualificationsREE"].ecrit_dataFrame_dans_tableauStructure(df_REE, remplace_df_par_nouveau=True)
-
-        # On sauve la fiche intervenant
-        #self._excel_ficheIntervenant.save()
-        #self._excel_ficheIntervenant.close()
-
-        # On ouvre l'Excel et le Word pour comparaison et adaptations manuelles
-
-        # Dès que l'Excel est fermé, on prépare le mail pour Laetitia
-
-        # On met à jour le fichier Excel Liste AI formateurs.xlsx : onglet intervenant, on cherche et remplace la date de validité de l'attestation employeur sinon nouvelle ligne (recopier formule + format)
-        # On met à jour le fichier Excel  avec la liste des intervenants :  on cherche et remplace les données mail, tel, Ville, la date de validité de l'attestation employeur... sinon nouvelle ligne (recopier formule + format)
-
-        
-    def deplacer_fichiers(self, destination: str = None) -> None:
-        """
-        Ouvre un dialogue pour sélectionner des fichiers, puis les déplace vers un dossier choisi.
-
-        Args:
-            destination (str, optional): Chemin du dossier de destination.
-                                        Si None, un dialogue s'ouvrira pour le choisir.
-        """
-
-        # Fenêtre Tkinter cachée
-        root = tk.Tk()
-        root.withdraw()
-
-        # Sélection des fichiers à déplacer
-        fichiers = filedialog.askopenfilenames(title="Sélectionner les fichiers à déplacer")
-        if not fichiers:
-            print("Aucun fichier sélectionné.")
-            return
-
-        # Sélection du dossier de destination
-        if destination is None:
-            destination = filedialog.askdirectory(title="Choisir le dossier de destination")
-            if not destination:
-                print("Aucun dossier de destination sélectionné.")
-                return
-
-        # Déplacement de chaque fichier
-        for fichier in fichiers:
-            nom_fichier = os.path.basename(fichier)
-            chemin_destination = os.path.join(destination, nom_fichier)
-
-            try:
-                shutil.move(fichier, chemin_destination)
-                print(f"✅ Déplacé : {nom_fichier}")
-            except Exception as e:
-                print(f"❌ Erreur avec {nom_fichier} : {e}")
 
 class Traiter_contactsApprentis:
     """
@@ -4205,3 +2805,1240 @@ chemin_word_bilan_output = r'C:\Users\vt238770\Documents\_CEA\Prog\Modèles\Bila
 # Specs pédagogiques
 #chemin_specsPedagogiques = r'\\instnt\partage\FORMATIONS_C\948\P05-P06-dossier-conception-referentiel\specifications-pedagogiques-et-referentiel\P06-Pr01-F01_Specifications-pedagogiques - 948 - 2025.04.pdf'
 
+
+
+
+
+class TravauxFichiersIRIS_BAK:
+    "C'est la classe qui contient l'environnement pour bosser sur des fichiers Exports IRIS"
+    def __init__(self, prop:PropExportIRIS, chemins_fichiersInput:str|tuple[str, ...]=None):
+        
+        # Type d'export
+        self._nom_typeExport = prop._nom_typeExport
+        self._codeExport = prop._codeExport
+
+        # Informations génériques sur les exports, modèles et output (dépend du type d'export)
+        self._input = prop._input  # Informations input données
+        self._modele = prop._modele  # Informations sur le modèle Excel à employer pour remplir l'output
+        self._output = prop._output  # Informations output
+
+        self._df_tableau = None
+        self._df_chemins = None
+
+        # S'il n'y a pas de chemin_fichiersInput de donné, c'est qu'il faut les sélectionner manuellement
+        if not chemins_fichiersInput:
+            self.choisirFichiers_filedialog()
+        else:
+            self._chemins_fichiersInput = chemins_fichiersInput
+
+        # self._chemins_fichiersInput doit être un tuple de strings. Si c'est un string c'est qu'un seul fichier a été donné. Alors on convertit en tuple
+        if isinstance(self._chemins_fichiersInput, str):
+            self._chemins_fichiersInput = (chemins_fichiersInput,)
+
+    @classmethod
+    def avecLecture(cls, propExportIRIS:PropExportIRIS, chemins_fichiersInput:str|tuple[str, ...]=None):
+        """On lit le/les extract IRIS et on stocke dans self._df_tableau"""
+        instance = cls(prop=propExportIRIS, chemins_fichiersInput=chemins_fichiersInput)
+        instance.lire_extractIRIS()
+        return instance
+
+    @classmethod
+    def avecEcritureOutputDefaut(cls, propExportIRIS:PropExportIRIS, chemins_fichiersInput:str|tuple[str, ...]=None):
+        
+        instance = cls.avecLecture(propExportIRIS, chemins_fichiersInput)
+
+        # Création des paramètres pour l'ouverture du modèle
+        chemin_fichier = instance._modele.chemin_fichier
+        #nom_onglet = instance._output.nom_onglet
+
+        # Création des paramètres pour l'output
+        chemin_fichier_output = os.path.join(instance._output.repertoire, instance._output.nom_fichier[:-5] + "-" + date.today().strftime("%Y.%m.%d") + ".xlsx") #ou f"{datetime.now():%Y.%m.%d}")
+
+        # On ouvre le modèle et tous ses tableaux structurés
+        #fe_modele = FichierExcel.depuis_fichier(chemin_fichier=chemin_fichier)
+        fe_modele = FichierExcel.depuis_modele(chemin_modele=chemin_fichier, chemin_fichier_sauv=chemin_fichier_output)
+
+        # On copie le DataFrame avec les nouvelles données dans le modèle
+        fe_modele._tableaux[instance._nom_typeExport].ecrit_dataFrame_dans_tableauStructure(instance._df_tableau, supprimeDonneesEtRemplace=True)
+        
+        # On écrit les références des fichiers copiés dans le tableau structuré "Imports"
+        instance._df_chemins = pd.DataFrame(instance._chemins_fichiersInput, columns=['Chemin fichier'])
+        fe_modele._tableaux["Imports"].ecrit_dataFrame_dans_tableauStructure(df=instance._df_chemins, supprimeDonneesEtRemplace=True)
+        
+        #On enregistre et on ferme (par précaution car copieformat xlwings sauvegarde)
+        fe_modele.save()    
+        fe_modele.close()
+
+        return instance
+ 
+     # === Méthodes ===
+    def choisirFichiers_filedialog(self):
+        # Lister/sélectionner les documents à concaténer
+        cheminsExcel = filedialog.askopenfilenames(title="Sélectionner les fichiers " + self._nom_typeExport + " (" + self._codeExport + ") Excel à concaténer", filetype=[("Fichiers Excel", "*.xlsx")], initialdir=self._input.repertoire)
+        
+        # Gestion du cas où il y a non-sélection de fichiers
+        if not cheminsExcel:
+            log_erreur("click sur cancel du filedialog → Pas de chemins de fichier")
+        self._chemins_fichiersInput = cheminsExcel
+    
+    def lire_extractIRIS(self):
+        """
+        Crée le DataFrame pour l'export IRIS. On le stocke dans self.__df_tableau
+        On selectionne la bonne methode en fonction du type d'export
+
+        :Example:
+        >>> self.lire_extractIRIS()
+
+
+        .. seealso:: Rien du tout.
+        .. warning:: Rien du tout.
+        .. note:: Rien du tout.
+        .. todo:: Rien du tout.
+        """
+
+        # Initialisation : on crée un DataFrame vide pour recevoir (peut-être) des infos que l'on traitera et qui nécessitera d'adjoindre des colonnes à self.__df_tableau
+        df_colonnes_sup = None
+
+        # On parcourt le tuple des fichiers à lire
+        df_list = [] # Liste des DataFrame qui contiendra chaque fichier Excel séparément
+        taille_totale = sum(os.path.getsize(fichier) for fichier in self._chemins_fichiersInput) # Calcul taille totale pour barre de progression
+
+        with tqdm(total=taille_totale, unit='o', unit_scale=True, desc=Fore.CYAN+"Lecture des fichiers Excel" + Style.RESET_ALL) as pbar:
+            #for i, ifichier in enumerate((os.path.basename(chemin) for chemin in self._chemins_fichiersInput), 1):
+            for i, chemin in enumerate(self._chemins_fichiersInput, 1):
+                # Données pour tqdm
+                fichier = os.path.basename(chemin)
+                taille = os.path.getsize(chemin)  
+                pbar.set_postfix(file=fichier, progress=f"{i}/{len(self._chemins_fichiersInput)}")  # Affichage dynamique dans la barre
+                
+                df = pd.read_excel(chemin, skiprows=self._input.nbLignes_avantET)
+                df_list.append(df)  # On ajoute le DataFrame à notre liste de DataFrame
+                
+                # Mise à jour de la barre avec la taille du fichier
+                pbar.update(taille)
+
+        # Concaténation finale (note : toute la fin de la méthode se fait quasi-instantanément)
+        self._df_tableau = pd.concat(df_list, ignore_index=True) 
+
+        # Selon le type d'export à traiter, on va faire des traitements spécifiques (extraction d'info des colonnes référence formation ou n° Iris)
+        match self._codeExport:
+            # Cas Sessions ou Inscriptions ou Ventes (sensiblement comme 'Inscription R04500' mais groupé par Client (pas de détail de chaque stagiaire))
+            case "R04110" | "R04500" | "R04301":
+                # On extrait / retravaille les informations de la colonne 'N° Session'
+                df_colonnes_sup = self._df_tableau['N° Session'].apply(self.extraire_infos_numSessionIRIS)
+                # A cause de certains éléments None ou NaN, Pandas type la colonne en float. Je la retype en Int64 qui permet de stocker des NaN avec des entiers, contrairement au type int standard.
+                df_colonnes_sup['Année'] = df_colonnes_sup['Année'].astype('Int64')
+                #print(df_colonnes_sup)
+
+            # Cas Formations
+            case "R0304":
+                # On extrait / retravaille les informations de la colonne 'Référence'
+                df_colonnes_sup = self._df_tableau['Référence'].apply(self.extraire_infos_referenceFormationIRIS)
+                # A cause de certains éléments None ou NaN, Pandas type la colonne en float. Je la retype en Int64 qui permet de stocker des NaN avec des entiers, contrairement au type int standard.
+                df_colonnes_sup['Année'] = df_colonnes_sup['Année'].astype('Int64')
+                #print(df_colonnes_sup)
+
+        # Ajouter les colonnes supplémentaires au DataFrame principal ssi le DataFrame df_colonnes_sup exite
+        if df_colonnes_sup is not None:
+            self._df_tableau = pd.concat([self._df_tableau, df_colonnes_sup], axis=1)
+    
+    def extraire_infos_numSessionIRIS(self, reference:str):
+        """
+        Fonction pour extraire les colonnes à partir de la colonne 'Référence'. Je dois faire une fonction interne car j'emploie Split qui ne s'applique que sur des string. Je dois donc faire appel à cette fonction ligne par ligne et donc créer une fonction que j'appelle par DataFrame[colonne].apply().
+
+        Exemples de cas à traiter  :
+        #S-04934-FI1516-1512-GI_VBE_GBO
+        #S-05251-FI1516-1510-AMS-LCH-CLE
+        #S-05246-F1516-1510-OPE-HGR-NNO
+        #S-04178-FC15-604-SES-CCO
+
+        ANCIENNE METHODE DE TRAITEMENT
+        self.__df_tableau['Numéro IRIS'] = self.__df_tableau['N° Session'].astype(str).str[2:7]
+        self.__df_tableau['Type formation'] = self.__df_tableau['N° Session'].astype(str).str[8:10]
+        self.__df_tableau['Trigramme AF'] = self.__df_tableau['N° Session'].astype(str).str[-3:] #tout sauf 3 derniers caract
+        self.__df_tableau['Trigramme RP'] = self.__df_tableau['N° Session'].astype(str).str[-7:-4] #De -7 à -4
+        self.__df_tableau['Trigramme formation'] = self.__df_tableau['N° Session'].astype(str).str[-11:-8]        
+        """
+        # Vérifier que la référence est une chaîne de caractères
+        if not isinstance(reference, str):
+            #print("Problème : la référence n'est pas une instance : ")
+            #print(reference)
+            return pd.Series({
+                'Trigramme formation': None,
+                'Code IRIS': None,
+                'Type de formation': None,
+                'Année': None,
+                'Trigramme RP': None,
+                'Trigramme AF': None,
+                '3ème élément de la référence': None
+            })
+
+        blocs = reference.split('-')
+
+        # Sécurité : vérifier qu'on n'a pas plus de 8 blocs
+        if len(blocs) > 8:
+            print("Problème : il y a plus de 8 blocs : ")
+            print(reference)
+            return pd.Series({
+                'Trigramme formation': None,
+                'Code IRIS': None,
+                'Type de formation': None,
+                'Année': None,
+                'Trigramme RP': None,
+                'Trigramme AF': None,
+                '3ème élément de la référence': None
+            })
+
+        # Traitement commun aux cas 6, 7 et 8 blocs
+        # le blocs[0] c'est "S" ça sert à rien
+        code_IRIS = blocs[1] if len(blocs) >= 2 else None
+        #print(reference)
+        if len(blocs) > 2:
+            type_formation = blocs[2][:2]
+            annee_match = re.search(r'\d+', blocs[2][2:])
+            annee = int(annee_match.group()) if annee_match else None
+        else :
+            type_formation = None
+            annee = None
+
+        if len(blocs) > 5:
+            trigramme_AF = blocs[-1].rstrip('_')
+            trigramme_RP = blocs[-2].rstrip('_')
+            trigramme = blocs[-3].rstrip('_')
+        else:
+            trigramme_RP = None
+            trigramme_AF = None
+            trigramme = None
+
+        # 3e élément uniquement si on a 7 ou 8 blocs
+        troisieme_bloc = '-'.join(blocs[3:-3]) if len(blocs) in [7, 8] else None
+        
+        return pd.Series({
+            'Trigramme formation': trigramme,
+            'Code IRIS': code_IRIS,
+            'Type de formation': type_formation,
+            'Année': annee,
+            'Trigramme RP': trigramme_RP,
+            'Trigramme AF': trigramme_AF,
+            '3ème élément de la référence': troisieme_bloc
+        })
+
+    def extraire_infos_referenceFormationIRIS(self, reference):
+        """
+        Fonction pour extraire les colonnes à partir de la colonne 'Référence'. Je dois faire une fonction interne car j'emploie Split qui ne s'applique que sur des string. Je dois donc faire appel à cette fonction ligne par ligne et donc créer une fonction que j'appelle par DataFrame[colonne].apply().
+        """
+        
+        # Vérifier que la référence est une chaîne de caractères
+        if not isinstance(reference, str):
+            #print("Problème : la référence n'est pas une instance : ")
+            #print(reference)
+            return pd.Series({
+                'Trigramme formation': None,
+                'Type de formation': None,
+                'Année': None,
+                'Unité de formation': None,
+                '3ème élément de la référence': None
+            })
+
+        blocs = reference.split('-')
+
+        # Sécurité : vérifier qu'on a au moins 4 blocs
+        if len(blocs) < 3:
+            print("Problème : il y a moins de 3 blocs : ")
+            print(reference)
+            return pd.Series({
+                'Trigramme formation': None,
+                'Type de formation': None,
+                'Année': None,
+                'Unité de formation': None,
+                '3ème élément de la référence': None
+            })
+
+        # Traitement commun aux cas 3 et 4+ blocs
+        type_formation = blocs[0][:2]
+        annee_match = re.search(r'\d+', blocs[0][2:])
+        annee = int(annee_match.group()) if annee_match else None
+
+        trigramme = blocs[1].rstrip('_')
+        unite_formation = blocs[-1].rstrip('_')
+
+        # 3e élément uniquement si on a 4 blocs ou plus
+        troisieme_bloc = '-'.join(blocs[2:-1]) if len(blocs) > 3 else None
+        
+        return pd.Series({
+            'Trigramme formation': trigramme,
+            'Type de formation': type_formation,
+            'Année': annee,
+            'Unité de formation': unite_formation,
+            '3ème élément de la référence': troisieme_bloc
+        })
+   
+   
+    # === Affichage ===
+    def __str__(self):
+        if self._chemins_fichiersInput:
+            # Pour aff_repertoire et chemin 
+            aff_cheminsFichiers = ""
+            for cfichier in self._chemins_fichiersInput:
+                aff_cheminsFichiers = aff_cheminsFichiers + "\n    " + cfichier
+        else:
+            aff_cheminsFichiers = "Aucun fichier spécifié"
+
+        # Pour aff_df
+        from io import StringIO
+        buffer = StringIO()
+        if self._df_tableau is not None:
+            print(self._df_tableau, file=buffer)
+            aff_df = buffer.getvalue()
+        else:
+            aff_df = "Non défini"
+
+        return (
+            f"TravauxFichiersIRIS\n"
+            f"  Chemins fichiers à exploiter : {aff_cheminsFichiers}\n"
+            f"  df_tableau :\n{aff_df}"
+            )
+
+class Traiter_evalStat_OLD:
+    # Obtenir :
+    #   - Taux de recommandation en 2025 :	100%
+    #   - Satisfaction sur l’année 2025 :	4,75 sur 5
+    #   - Taux de retour (facultatif)
+
+    # Enlever ligne total avant traitement
+    # Remise ligne total après fin traitement
+
+    # Aller chercher CSV (sélectionner le fichier à partir du chemin standard)
+    # chemin standard vers CSV = "\\Instnt\partage\FORMATIONS_C\"&codeFormation&"\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\CSV\"
+
+    # Importer le CSV dans le modèle Excel (onglet "CSV")
+    # Ecrire nb d'inscrits (vient de sessions) + code formation et code IRIS + changer chemin CSV → Voir si je ne peux pas urtiliser des plages nommées
+    # coller infos dans tableau travaillé
+    #   - depuis colonne H jusqu'à la fin (AG) on copie et on va transposer
+    #   - pour toutes les 2 colonnes ça fait critère puis commentaire
+    #   - sauf pour "Recommanderiez-vous cette formation ?" (AD) + "Commentaires, remarques, suggestions " (AH)
+    #   - transformer valeurs de Recommanderiez-vous cette formation ? et Avez-vous d'autres besoins de formation ? en oui = 5 et non = 0
+    # Actualiser les TCD
+    # Sauvegarder au bon endroit
+    # TODO : pour l'instant à cause de pandas, je casse les segments
+
+    # Possibilité d'importer plusieurs CSV pour une même année
+    # Attention : impact sur nombre total de stagiaire (sommer dans sessions)
+    
+    def __init__(self) -> None:
+        
+        self._chemin_csv_stagiaires:str|None = None  # Fichier csv EvalStat stagiaire individuel
+        self._chemin_excel_stagiaires_output:str|None = None  # Fichier xlsx EvalStat stagiaire individuel qu'on va créer à partir du CSV
+        self._fe_stagiaires:FichierExcel|None = None  # Objet contenant les données EvalStat stagiaire individuel
+
+        self._chemin_modeleExcel_stagiaires:str|None = None  # Modèle Excel dans lequel importer le CSV
+        
+        self._chemin_excel_sessions:str|None = None  # Chemin du fichier Excel qui contient les extracts IRIS Sessions (ou a minima celles de la période en cours) dans lequel on a les informations des sessions (permet de compélter les CSV)
+        self._fe_sessions:FichierExcel|None = None  # Fichier Excel qui contient les extracts IRIS Sessions (ou a minima celles de la période en cours)
+
+        self._trigrammeFormation:str|None = None
+        self._codeIRIS:int|None = None
+
+        self._chemin_excel_evaluations_formation:Optional[str] = None  # Chemin du fichier Excel qui contient tous les CSV d'évaluation d'une formation
+        self._fe_evaluations_formation:Optional[FichierExcel] = None # Fichier Excel qui contient tous les CSV d'évaluation d'une formation
+        self._df_formation_stagiaires:Optional[pd.DataFrame] = None # DataFrame de self._fe_evaluations_formation (Alias)
+
+        self._chemins_csv_traites:List[str] = []
+        self._chemins_csv_exclus:List[str] = []
+
+        # Valeurs actuellement écrites en dur
+        self._chemin_excel_evaluations_defaut = r'\\instnt\partage\FORMATIONS_C\###\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\Evaluation-Stagiaires-Global-###.xlsx'
+        self._chemin_modeleExcel_stagiaires = r"C:\Users\vt238770\Documents\_CEA\Prog\Modèles\Evaluation-Stagiaires-Modèle.xlsx"
+        self._chemin_excel_sessions = r"C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Extracts complets\R04110_Sessions-COMPLET-2025.08.24.xlsx" 
+        #instance._chemin_excel_stagiaires_output = r"C:\Users\vt238770\Documents\_CEA\Prog\Modèles\Evaluation-Stagiaires-testOut.xlsx"
+
+        # === Colonnes du CSV selon traitement à avoir ===
+        # Colonnes descriptives à recopier
+        self._colonnes_csv_fixes = [
+            "Chemin fichier CSV", "Prénom", "Nom", "Entreprise", "Code session"]
+
+        # Colonnes avec note/commentaire en binôme
+        self._colonnes_csv_avec_commentaires = [
+            "Accueil, organisation et qualité des informations délivrées",
+            "Conseils et orientation avant l'inscription",
+            "Informations après l'inscription",
+            "Accueil à l'arrivée sur site",
+            "Prise en compte de vos besoins et attentes",
+            "Qualité des animations",
+            "Logique d'enchainement des interventions",
+            "Qualité des supports de cours utilisés",
+            "Qualité des moyens pédagogique",
+            "Accès aux outils digitaux",
+            "Satisfaction globale",
+            "Avez-vous d'autres besoins de formation ?"]
+
+        # Colonnes à valeur texte seule
+        self._colonnes_csv_commentaires_seuls = [
+            "Comment avez-vous connu cette formation ?",
+            "Commentaires, remarques, suggestions"]
+
+        # Colonnes note seule (il se trouve que je vais aussi devoir convertir le booléen)
+        self._colonnes_csv_bool = [
+            "Recommanderiez-vous cette formation ?"]
+        
+        
+        # === Colonnes de l'extract IRIS Sessions à récupérer ===
+        self._colonnes_sessions = [
+            "N° Session",
+            "Formation",
+            "Trigramme formation",
+            "Code IRIS",
+            "Date début ses.",
+            "Année début ses.",
+            "Type de formation",
+            "Trigramme RP",
+            "Trigramme AF",
+            "Nb. Présents"]
+
+     
+    @classmethod
+    def depuis_fe_evaluations_formation(cls, trigramme:str) -> Traiter_evalStat:
+        """
+        A partir d'un trigramme de foramtion, on ouvre et on charge le fichier excel qui concatène tous les CSV d'une formation 
+        """
+        # On crée l'instance et on complète les infos avec les valeurs facultatives
+        instance = Traiter_evalStat()
+        # On définit le chemin vers les évaluations de la formation (le fichier qui va concaténer toutes les évaluation d'une formation)
+        instance._chemin_excel_evaluations_formation = instance._chemin_excel_evaluations_defaut.replace("###", trigramme)
+
+        instance.ouvrir_fe_evaluations_formation()
+
+        return instance
+        
+    @classmethod
+    def depuis_chemin_csv_stagiaires(cls, chemin_csv_stagiaires:str, fe_sessions:FichierExcel=None, ouvrirDossier:bool=False, remplace_df:bool=False) -> Traiter_evalStat:
+        timer.debut(f"Traitement du CSV {os.path.basename(chemin_csv_stagiaires)}")
+        # On créée l'instance
+        instance = Traiter_evalStat()
+        instance._chemin_csv_stagiaires = chemin_csv_stagiaires
+        if fe_sessions is not None:
+            instance._fe_sessions = fe_sessions
+            # Quand je ferai la jointure plus tard sur "Code IRIS", il faudra que ce soit avec des strings
+            instance._fe_sessions._tableaux["Sessions"]._df["Code IRIS"] = instance._fe_sessions._tableaux["Sessions"]._df["Code IRIS"].astype(str)
+
+        # On récupère le trigramme de la formation depuis le chemin du CSV
+        instance._trigrammeFormation = instance.recupere_trig_formation_depuis_chemin(chemin_csv_stagiaires)
+        
+        # Pour le nom de l'Excel output : on reprend le nom du csv et on remplace par xlsx
+        instance._chemin_excel_stagiaires_output = os.path.join(os.path.dirname(instance._chemin_csv_stagiaires), os.path.basename(instance._chemin_csv_stagiaires).replace(".csv", ".xlsx"))
+
+        # On génère le fichier Excel du CSV à partir du modèle
+        instance._construit_FichierExcel_depuis_CSV(fe_sessions = fe_sessions, remplace_df=remplace_df)
+
+        # Ouverture du dossier à la fin
+        if ouvrirDossier:
+            ouvrir_dossier(os.path.dirname(instance._chemin_excel_stagiaires_output))
+
+        # On ajoute le chemin au tuple des éléments traités
+        instance._chemins_csv_traites.append(chemin_csv_stagiaires)
+        
+        timer.fin()
+        return instance        
+
+    @classmethod
+    def depuis_tuple_csv_stagiaires(cls, tuple_csv_stagiaires:Tuple(str), chemin_excel_evaluations_defaut:str=None, chemin_modeleExcel_stagiaires:str=None, chemin_excel_sessions:str=None, fe_sessions:FichierExcel=None, ouvrirDossier:bool=False) -> Traiter_evalStat:
+        """
+        A partir d'un tuple de chemins de CSV stagiaire (il peut il y avoir plusieurs trigrammes de formations différents)
+        Permet de générer :
+           - le fichier excel stagiaires de chaque session (via le CSV)
+           - le fichier excel stagiaires de chaque formation (celui qui concatène tous les CSV d'une session) [Il est créé ou on l'append avec les nouvelles valeurs]
+        
+        On exclue du traitement les chemin_csv_session qui sont déjà dans le FE formation (on considère que le CSV a déjà été traité)
+
+        """
+
+        
+        # On crée l'instance et on complète les infos avec les valeurs facultatives
+        instance = Traiter_evalStat()
+
+        if chemin_excel_evaluations_defaut is not None:
+            instance._chemin_excel_evaluations_defaut = chemin_excel_evaluations_defaut
+        if chemin_modeleExcel_stagiaires is not None:
+            instance._chemin_modeleExcel_stagiaires = chemin_modeleExcel_stagiaires
+        if chemin_excel_sessions is not None:
+            instance._chemin_excel_sessions = chemin_excel_sessions
+        if fe_sessions is not None:
+            instance._fe_sessions = fe_sessions
+        
+        df_formation_csv = None
+        df_formation_stagiaires = None
+        #dico_sessionsDejaTraitees = None
+        #timer = Timer()
+
+        # On récupère les données de Sessions (on en aura besoin plus tard)
+        if instance._fe_sessions is None:
+            timer.debut("Lecture fichier session")
+            instance._fe_sessions = FichierExcel.depuis_fichier(instance._chemin_excel_sessions)
+            timer.fin()
+        
+
+        # On convertit le tuple de strings en dictionnaire avec les trigrammes formation en clef
+        dico_chemins_csv_session = defaultdict(list)  #Dictionnaire spécial : lorsqu’on accède à une clé qui n’existe pas encore, il va automatiquement créer une nouvelle entrée avec une valeur par défaut, ici une liste vide (list())
+        for chemin in tuple_csv_stagiaires:
+            trigramme = instance.recupere_trig_formation_depuis_chemin(chemin)
+            dico_chemins_csv_session[trigramme].append(chemin)
+        dico_chemins_csv_session = dict(dico_chemins_csv_session)  # Optionnel : conversion en dict normal
+
+
+        # Pour chaque trigramme on va traiter chaque session et soit créer soit append le fichier excel global de la formation
+        for trigramme, chemins_csv_session in dico_chemins_csv_session.items(): #chemins est la liste des chemins des évaluations pour chaque sessions de ce trigramme formation
+            print(f"\n\n{Style.BRIGHT}{Fore.RED}Gestion des formations {trigramme}")
+
+            # On ouvre ou on créée (si inexistant) le fichier Excel qui concatène toutes les sessions d'une formation
+            supprimeDonneesEtRemplace_evaluations_formation = instance.ouvrir_ou_creer_evaluationsFormation(trigramme)
+
+            # Pour chaque chemin de session, on crée le fe_stagiaire dédié de la session et on ajoute les lignes de son dataframe au dataframe de fe_evaluations_formation
+            for chemin_csv_session in chemins_csv_session:
+                print(f"\n{Style.BRIGHT}{Fore.YELLOW}Gestion de la session {chemin_csv_session}")
+                traiterCSV = True  # Par défaut, on traite le CSV
+
+                # On vérifie que chemin_csv_session n'est pas déjà dans le fichier session pour savoir si on l'exclue du traitement
+                if df_formation_stagiaires is not None:
+                    if chemin_csv_session in df_formation_stagiaires["Chemin fichier CSV"].drop_duplicates().tolist():  
+                        traiterCSV = False
+                        instance._chemins_csv_exclus.append(chemin_csv_session)
+                        print(f"Exclusion car csv déjà dans le fichier global : {chemin_csv_session}")
+                        vlog.ajouter_message("Exclusion car csv déjà dans le fichier global", chemin_csv_session, style=["orange"])
+
+                # Traitement du CSV
+                if traiterCSV:  
+                    #timer.debut("Traiter_evalStat.depuis_chemin_csv_stagiaires")
+                    traite_csv_session = Traiter_evalStat.depuis_chemin_csv_stagiaires(chemin_csv_session, fe_sessions=instance._fe_sessions, ouvrirDossier=ouvrirDossier, remplace_df=True)
+
+                    #timer.debut("Copie des Dataframe csv et stagiaires")
+                    # #Si df_formation_csv est vide, il faut l'initialiser avec le premier df sinon on concatène
+                    if df_formation_csv is None:
+                        df_formation_csv = traite_csv_session._fe_stagiaires._tableaux["CSV_stagiaires"]._df.copy()
+                        df_formation_stagiaires = traite_csv_session._fe_stagiaires._tableaux["Stagiaires"]._df.copy()
+                    else:
+                        df_formation_csv = pd.concat([df_formation_csv, traite_csv_session._fe_stagiaires._tableaux["CSV_stagiaires"]._df], ignore_index=True)
+                        df_formation_stagiaires = pd.concat([df_formation_stagiaires, traite_csv_session._fe_stagiaires._tableaux["Stagiaires"]._df], ignore_index=True)
+                    
+                    # On ajoute le chemin au tuple des éléments traités
+                    instance._chemins_csv_traites.append(chemin_csv_session)
+                    vlog.ajouter_message("Fichiers traités", chemin_csv_session, style=["vert"])
+
+            # On concatène, on sauve et on ferme le fe de tous les CSV de la formation
+            if instance._chemins_csv_traites :
+                print(f"\n\n{Style.BRIGHT}{Fore.RED}Écriture du fichier global des évaluations de la formation {trigramme}")
+                timer.debut("Écriture, sauvegarde et fermeture")
+                instance._fe_evaluations_formation._tableaux["CSV_stagiaires"].ecrit_dataFrame_dans_tableauStructure(df_formation_csv, supprimeDonneesEtRemplace = supprimeDonneesEtRemplace_evaluations_formation)
+                instance._fe_evaluations_formation._tableaux["Stagiaires"].ecrit_dataFrame_dans_tableauStructure(df_formation_stagiaires, supprimeDonneesEtRemplace = supprimeDonneesEtRemplace_evaluations_formation)
+
+                instance._fe_evaluations_formation.save()
+                instance._fe_evaluations_formation.close()
+                timer.fin()
+            
+                # Actualisation des TCD
+                instance._fe_evaluations_formation.actualiser_TCD()
+
+        return instance
+
+    # ===  (getter / setter) ===
+    @property
+    def chemins_csv_traites(self):
+        return self._chemins_csv_traites
+
+
+    ######
+    #  === Méthodes internes ===
+    ######
+
+    def _construit_FichierExcel_depuis_CSV(self, fe_sessions:FichierExcel=None, remplace_df:bool=False):
+        ######
+        # === Import et traitement du CSV d'evalStat ===
+        ######
+        # On récupère l'encodage et on importe le CSV dans un DataFrame
+        #timer = Timer()
+        codage_csv = trouve_encodage_csv(self._chemin_csv_stagiaires)
+        #print(f"\nConstruction de l'Excel pour {os.path.basename(self._chemin_csv_stagiaires)} ; codage : {codage_csv}")
+        #timer.debut("Import du CSV et traitement du DataFrame")
+        df_csv_stagiaires = pd.read_csv(self._chemin_csv_stagiaires, sep=';', encoding=codage_csv)  # Ouverture du CSV et mise dans un DataFrame
+        
+        # Prise en compte qu'on a plusieurs formats de CSV : on doit traiter des colonnes en + ou - en conséquences
+        if "Date de fin" in df_csv_stagiaires.columns:
+            # Cas 1 (nouveau format de csv) : supprimer "Date de fin" → Test : r"P:\FORMATIONS_C\54C\P07-bilan-sessions-et-bilan-formation\rapports-sessions-evaluations\2023-06-S14317 UEM\S-14317-FC23-54C-VTE-LRA-Stagiaires.csv"
+            df_csv_stagiaires = df_csv_stagiaires.drop(columns=["Date de fin"])
+        else:
+            # Cas 2 (ancien format de csv) : supprimer la 2e et 3e colonne (indices 1 et 2) → Test : r"P:\FORMATIONS_C\22B\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-17606 - 22B - 06-2025\S-17606-FC25-22B-VTE-CAR-Stagiaires.csv"
+            df_csv_stagiaires = df_csv_stagiaires.drop(df_csv_stagiaires.columns[[1, 2]], axis=1)
+        
+        # On rajoute le chemin du CSV en première colonne
+        df_csv_stagiaires.insert(0, "Chemin fichier CSV", self._chemin_csv_stagiaires)
+
+        # Définition self._codeIRIS. Sinon Non existant, on récupère le numéro IRIS depuis le CSV (c'est la plus sur)
+        if self._codeIRIS is None:
+            match = re.search(r"\b\d{5}\b", self._chemin_csv_stagiaires)
+            if match:
+                self._codeIRIS = match.group(0)
+            else:
+                self.demander_code_iris()
+
+        # Met à jour ou crée la colonne "Code session" avec self._codeIRIS
+        df_csv_stagiaires["Code session"] = self._codeIRIS
+
+        # Mise au format jj/mm/aaaa de la colonne "Date" (si elle existe)
+        if "Date" in df_csv_stagiaires.columns:
+            try:
+                df_csv_stagiaires["Date"] = pd.to_datetime(df_csv_stagiaires["Date"], dayfirst=True, errors="coerce").dt.strftime("%d/%m/%Y")  # dayfirst=True indique que le premier nombre correspond au jour (format jj/mm/aaaa)
+            except Exception as e:
+                print(f"Erreur de conversion de la colonne Date : {e}")
+
+        # A cause des espaces à la con qui trainent dans les noms des colonnes des CSV, je vais reload le dataframe depuis l'excel que je viens de créer car les colonnes du modèle sont bien nommées
+        # Ainsi on sauve ici plutôt qu'à la fin et on reload le DataFrame
+        self._fe_stagiaires = FichierExcel.depuis_modele(chemin_modele=self._chemin_modeleExcel_stagiaires, chemin_fichier_sauv=self._chemin_excel_stagiaires_output)
+        if remplace_df:
+            self._fe_stagiaires._tableaux["CSV_stagiaires"].remplace_df(df_csv_stagiaires)
+        self._fe_stagiaires._tableaux["CSV_stagiaires"].ecrit_dataFrame_dans_tableauStructure(df_csv_stagiaires, supprimeDonneesEtRemplace=True)
+        self._fe_stagiaires.save(self._chemin_excel_stagiaires_output)
+        self._fe_stagiaires.close()
+        self._fe_stagiaires = FichierExcel.depuis_fichier(self._chemin_excel_stagiaires_output)
+        self._fe_stagiaires._tableaux["CSV_stagiaires"].charge_df()
+        df_csv_stagiaires = self._fe_stagiaires._tableaux["CSV_stagiaires"]._df
+        
+        ######
+        # === On crée la seconde partie du DataFrame qui sera dans l'onglet "Stagiaire" ===
+        # On va découper le dataframe du CSV selon les différents critères et mettre dans un dataframe qu'on pourra exploiter par un TCD
+        ######
+        # Nouveau DataFrame à remplir
+        df_long = []
+
+        # Parcours des lignes
+        for _, row in df_csv_stagiaires.iterrows():
+            #print("Ligne en cours : ")
+            #print(row)
+            base = {col: row[col] for col in self._colonnes_csv_fixes}  # Création des colonnes qui seront répétées à chaque fois
+            base["NOM Prénom"] = f"{str(row['Nom']).upper()} {row['Prénom']}".strip()  # Création du champ "NOM Prénom"
+
+            # Cas 1 : colonnes avec note + commentaire associé
+            for critere in self._colonnes_csv_avec_commentaires:
+                if critere in row:
+                    #print(f"'{critere}'")
+                    if(critere == "Avez-vous d'autres besoins de formation ?"):  # Il faut changer le booléen en 0 ou 5
+                        val = str(row[critere]).strip().lower()
+                        row[critere] = 5 if val == "oui" else (0 if val == "non" else None)
+                    commentaire_col = row.index[row.index.get_loc(critere) + 1]
+                    if(pd.notna(row[critere]) or pd.notna(row.get(commentaire_col, None))) :
+                        df_long.append({
+                            **base,
+                            "Critère": critere,
+                            "Note": row[critere],
+                            "Commentaires": row.get(commentaire_col, None)
+                        })
+
+            # Cas 2 : colonnes texte seules
+            for critere in self._colonnes_csv_commentaires_seuls:
+                if critere in row:
+                    if(pd.notna(row[critere])) :
+                        df_long.append({
+                            **base,
+                            "Critère": critere,
+                            "Note": None,
+                            "Commentaires": row[critere]
+                        })
+
+            # Cas 3 : Note seule + booléens convertis
+            for critere in self._colonnes_csv_bool:
+                if critere in row:
+                    if(pd.notna(row[critere])) :
+                        val = str(row[critere]).strip().lower()
+                        note = 5 if val == "oui" else (0 if val == "non" else None)
+                        df_long.append({
+                            **base,
+                            "Critère": critere,
+                            "Note": note,
+                            "Commentaires": None
+                        })
+
+        # Construction du DataFrame final
+        df_stagiaires = pd.DataFrame(df_long)
+
+        # Réorganise les colonnes pour placer "NOM Prénom" juste après "Nom"
+        colonnes = list(df_stagiaires.columns)
+        if "NOM Prénom" in colonnes and "Nom" in colonnes:
+            colonnes.remove("NOM Prénom")
+            index_nom = colonnes.index("Nom")
+            colonnes.insert(index_nom + 1, "NOM Prénom")
+            df_stagiaires = df_stagiaires[colonnes]
+
+        # Supprime les colonnes "Prénom" et "Nom" devenues inutiles
+        df_stagiaires.drop(columns=["Prénom", "Nom"], inplace=True)
+
+
+        ######
+        # === On fait le left join entre df_stagiaires et les données qui proviennent de l'extract IRIS Sessions ===
+        ######
+        # On récupère les données de Sessions
+        if fe_sessions is None:
+            timer.debut("Lecture fichier session")
+            self._fe_sessions = FichierExcel.depuis_fichier(self._chemin_excel_sessions)
+            self._fe_sessions._tableaux["Sessions"]._df["Code IRIS"] = self._fe_sessions._tableaux["Sessions"]._df["Code IRIS"].astype(str)
+        else:
+            self._fe_sessions = fe_sessions
+
+
+        # Pour faire le merge, il faut que les colonnes soient de même type (là "Code session" est de type int64 et "Code IRIS" est de type object (souvent des chaînes de caractères)).
+        # Comme je ne peux être sûr que tous les "Code IRIS" issu des CSV soient bien convertibles en int (c’est-à-dire pas de chaînes vides, NaN, ou autres caractères non numériques), alors je passe par des strings
+        df_stagiaires["Code session"] = df_stagiaires["Code session"].astype(str)
+        #self._fe_sessions._tableaux["Sessions"]._df["Code IRIS"] = self._fe_sessions._tableaux["Sessions"]._df["Code IRIS"].astype(str)
+        
+        # On récupère uniquement les colonnes souhaitées dans une vue pour faciliter le codage (c'est un alias)
+        df_sessions_filtre = self._fe_sessions._tableaux["Sessions"]._df[self._colonnes_sessions]
+        
+        # On fait la jointure entre df_stagiaires et df_sessions_filtre
+        #timer.debut("Création du DataFrame Stagiaires (jointure)")
+        df_stagiaires = df_stagiaires.merge(
+            df_sessions_filtre,
+            left_on="Code session",
+            right_on="Code IRIS",
+            how="left"
+        )
+
+        # On réorganise les colonnes : d'abord celles de df_sessions puis celles de df_stagiaires
+        colonnes_resultat = (
+            df_sessions_filtre.columns.tolist() +  # colonnes de _df_sessions
+            [col for col in df_stagiaires.columns if col not in df_sessions_filtre.columns]  # le reste (i.e. celles de df_stagiaires)
+        )
+        df_stagiaires = df_stagiaires[colonnes_resultat]
+        #print(_df_stagiaires)
+        
+        # On vire "Code session" qui est redondante avec "Code IRIS"
+        df_stagiaires.drop(columns=["Code session"], inplace=True)
+        
+        # On renomme les colonnes
+        #df_sessions_filtre.rename(columns={"Date début ses.": "Date"}, inplace=True)
+        #df_sessions_filtre.rename(columns={"Année début ses.": "Année"}, inplace=True)
+
+        # On remplace le DataFrame existant par le nouveau
+        if remplace_df:
+            self._fe_stagiaires._tableaux["Stagiaires"].remplace_df(df_stagiaires)
+        
+        # On écrit et on sauve
+        #timer.debut("On écrit le DataFrame, on met à jour les TCD et on sauve")
+        self._fe_stagiaires._tableaux["Stagiaires"].ecrit_dataFrame_dans_tableauStructure(df_stagiaires, supprimeDonneesEtRemplace=True)
+        self._fe_stagiaires.save()
+
+
+        # Màj des TCD
+        self._fe_stagiaires.actualiser_TCD()
+        #timer.fin()
+
+    def demander_code_iris(self):
+        print("TODO : demander_code_iris appelé → Essayer de généraliser avec demander_code")
+        def verifier_entree(*args):
+            val = entry_code.get()
+            bouton_valider.config(state="normal" if val.isdigit() and len(val) == 5 else "disabled")
+            bouton_renommer.config(state="normal" if val.isdigit() and len(val) == 5 else "disabled")
+
+        def valider():
+            nonlocal code_iris
+            self._codeIRIS = int(entry_code.get())
+            fenetre.destroy()
+
+        def valider_et_renommer():
+            nonlocal code_iris
+            self._codeIRIS = int(entry_code.get())
+            nouveau_nom = f"S-{code_iris}-Stagiaires.csv"
+            nouveau_chemin = os.path.join(
+                os.path.dirname(self._chemin_csv_stagiaires),
+                nouveau_nom
+            )
+
+            try:
+                os.rename(self._chemin_csv_stagiaires, nouveau_chemin)
+                self._chemin_csv_stagiaires = nouveau_chemin
+            except Exception as e:
+                tk.messagebox.showerror("Erreur", f"Impossible de renommer le fichier :\n{e}")
+                log_erreur(f"impossible de renommer le fichier :\n{e}")
+                return  # Ne pas fermer la fenêtre si erreur
+
+            fenetre.destroy()
+
+        def annuler():
+            fenetre.destroy()
+            log_erreur("code IRIS non renseignée pour " + self._chemin_csv_stagiaires + " → exit()")
+            exit()
+
+        code_iris = None
+
+        fenetre = tk.Tk()
+        fenetre.title("Code IRIS à renseigner manuellement")
+        fenetre.resizable(False, False)
+        fenetre.geometry("500x180")
+        fenetre.eval('tk::PlaceWindow . center')
+
+        # Fermer avec Échap
+        fenetre.bind("<Escape>", lambda e: annuler())
+        # Entrée = bouton Valider
+        fenetre.bind("<Return>", lambda e: bouton_valider.invoke())
+
+        label_warning = tk.Label(
+            fenetre,
+            text="⚠ Code IRIS non trouvé automatiquement, veuillez le spécifier manuellement",
+            font=("Segoe UI", 10, "bold"),
+            fg="orange"
+        )
+        label_warning.pack(pady=(10, 5))
+
+        label_chemin = tk.Label(
+            fenetre,
+            text=f"Chemin du fichier source :\n  *{self._chemin_csv_stagiaires}*",
+            font=("Segoe UI", 9),
+            justify="left",
+            wraplength=480
+        )
+        label_chemin.pack(pady=(0, 10))
+
+        frame_saisie = tk.Frame(fenetre)
+        frame_saisie.pack()
+
+        entry_code = tk.Entry(frame_saisie, width=10, justify="center", font=("Segoe UI", 12))
+        entry_code.pack()
+        entry_code.focus()
+
+        entry_code_var = tk.StringVar()
+        entry_code["textvariable"] = entry_code_var
+        entry_code_var.trace_add("write", verifier_entree)
+
+        frame_boutons = tk.Frame(fenetre)
+        frame_boutons.pack(pady=10)
+
+        bouton_valider = tk.Button(frame_boutons, text="Valider", state="disabled", width=20, command=valider)
+        bouton_valider.grid(row=0, column=0, padx=5)
+
+        bouton_renommer = tk.Button(frame_boutons, text="Valider et remplacer le nom du CSV", state="disabled", width=30, command=valider_et_renommer)
+        bouton_renommer.grid(row=0, column=1, padx=5)
+
+        bouton_annuler = tk.Button(frame_boutons, text="Annuler", width=10, command=annuler)
+        bouton_annuler.grid(row=0, column=2, padx=5)
+
+        fenetre.mainloop()
+
+        return code_iris
+    
+    def demander_code(self, typeCode) -> int|str:
+        # Initialisation en fonction du type de code
+        match typeCode:
+            case "Code IRIS":
+                print("Cas code IRIS")
+                nbCaracteres = 5
+                chemin_a_tester = self._chemin_csv_stagiaires
+            case "Trigramme formation":
+                print("Cas trigramme formation")
+                nbCaracteres = 3
+                chemin_a_tester = self._chemin_csv_stagiaires
+            case _:
+                log_erreur(f"cas non valide : soit 'IRIS' soit 'Trigramme formation', demandé : {typeCode} → exit()")
+                exit()
+
+            
+        def verifier_entree(*args):
+            val = entry_code.get()
+            bouton_valider.config(state="normal" if val.isdigit() and len(val) == nbCaracteres else "disabled")
+            if typeCode=="Code IRIS":
+                bouton_renommer.config(state="normal" if val.isdigit() and len(val) == nbCaracteres else "disabled")
+
+        def valider():
+            nonlocal code # Adaptation : changer en "code"
+            code = entry_code.get()            
+            fenetre.destroy()
+
+        # Cas IRIS uniquement : ne pas toucher / ne pas afficher si cas Trigramme formation
+        def valider_et_renommer():
+            nonlocal code
+            code = entry_code.get()
+            nouveau_nom = f"S-{code}-Stagiaires.csv"
+            nouveau_chemin = os.path.join(
+                os.path.dirname(self._chemin_csv_stagiaires),
+                nouveau_nom
+            )
+
+            try:
+                os.rename(self._chemin_csv_stagiaires, nouveau_chemin)
+                self._chemin_csv_stagiaires = nouveau_chemin
+            except Exception as e:
+                tk.messagebox.showerror("Erreur", f"Impossible de renommer le fichier :\n{e}")
+                log_erreur("Erreur", f"Impossible de renommer le fichier :\n{e}")
+                return  # Ne pas fermer la fenêtre si erreur
+
+            fenetre.destroy()
+
+        def annuler():
+            fenetre.destroy()
+            log_erreur(f"{typeCode} non renseignée pour {chemin_a_tester} → exit()")
+            exit()
+
+        code = None
+
+        fenetre = tk.Tk()
+        fenetre.title(f"{typeCode} à renseigner manuellement")
+        fenetre.resizable(False, False)
+        fenetre.geometry("500x180")
+        fenetre.eval('tk::PlaceWindow . center')
+
+        # Fermer avec Échap
+        fenetre.bind("<Escape>", lambda e: annuler())
+        # Entrée = bouton Valider
+        fenetre.bind("<Return>", lambda e: bouton_valider.invoke())
+
+        label_warning = tk.Label(
+            fenetre,
+            text=f"⚠ {typeCode} non trouvé automatiquement.\nVeuillez le spécifier manuellement",
+            font=("Segoe UI", 10, "bold"),
+            fg="orange"
+        )
+        label_warning.pack(pady=(10, 5))
+
+        label_chemin = tk.Label(
+            fenetre,
+            text=f"Chemin du fichier source :\n  *{chemin_a_tester}*",
+            font=("Segoe UI", 9),
+            justify="left",
+            wraplength=480
+        )
+        label_chemin.pack(pady=(0, 10))
+
+        frame_saisie = tk.Frame(fenetre)
+        frame_saisie.pack()
+
+        entry_code = tk.Entry(frame_saisie, width=10, justify="center", font=("Segoe UI", 12))
+        entry_code.pack()
+        entry_code.focus()
+
+        entry_code_var = tk.StringVar()
+        entry_code["textvariable"] = entry_code_var
+        entry_code_var.trace_add("write", verifier_entree)
+
+        frame_boutons = tk.Frame(fenetre)
+        frame_boutons.pack(pady=10)
+
+        bouton_valider = tk.Button(frame_boutons, text="Valider", state="disabled", width=20, command=valider)
+        bouton_valider.grid(row=0, column=0, padx=5)
+
+        if typeCode == "Code IRIS":
+            bouton_renommer = tk.Button(frame_boutons, text="Valider et remplacer le nom du CSV", state="disabled", width=30, command=valider_et_renommer)
+            bouton_renommer.grid(row=0, column=1, padx=5)
+
+        bouton_annuler = tk.Button(frame_boutons, text="Annuler", width=10, command=annuler)
+        bouton_annuler.grid(row=0, column=2, padx=5)
+
+        fenetre.mainloop()
+
+        code = int(code) if code.isdigit() else str(code)
+        return code
+
+    def recupere_trig_formation_depuis_chemin(self, chemin:str|None) -> str:
+        """
+        Extrait un trigramme (3 lettres/chiffres) depuis un chemin, ou le demande à l'utilisateur si introuvable.
+        Gère les slashs / et \\ de manière robuste.
+        """
+        # On récupère le trigramme de la formation depuis le chemin du CSV ou alors on demande à l'utilisateur via tkinter
+        trigramme = None
+
+        if chemin:
+            # Normalise les slashs pour s'assurer que le chemin est cohérent
+            chemin_normalise = chemin.replace("\\", "/")
+
+            # Découpe le chemin en parties
+            parties = chemin_normalise.split("/")
+
+            # Recherche un segment de 3 caractères alphanumériques
+            for part in parties:
+                if re.fullmatch(r"[a-zA-Z0-9]{3}", part):
+                    trigramme = part
+                    break
+
+            # Si rien trouvé, on demande à l'utilisateur
+            if not trigramme:
+                trigramme = self.demander_code("Trigramme formation")
+
+        else:
+            trigramme = self.demander_code("Trigramme formation")
+
+        #print(instance._trigrammeFormation)
+
+        return trigramme
+
+    def ouvrir_ou_creer_evaluationsFormation(self, trigramme:str) -> bool:
+        """
+        Ouvre ou crée le fichier Excel d'évaluations globales pour une formation donnée.
+
+        Cette méthode construit le chemin vers le fichier d'évaluations correspondant au 
+        trigramme de la formation. Si ce fichier existe, il est ouvert et les données 
+        des stagiaires sont chargées dans un DataFrame. Sinon, un nouveau fichier est 
+        créé à partir d'un modèle, et les données seront à initialiser.
+
+        Args:
+            trigramme (str): Code trigramme de la formation.
+
+        Returns:
+                - Un booléen indiquant si les anciennes données doivent être supprimées et remplacées 
+                (`True` si nouveau fichier créé, `False` sinon).
+        """ 
+        # On définit le chemin vers les évaluations de la formation (le fichier qui va concaténer toutes les évaluation d'une formation)
+        self._chemin_excel_evaluations_formation = self._chemin_excel_evaluations_defaut.replace("###", trigramme)
+
+        # On vérifie que le répertoire dédié existe sinon on le créée : \\instnt\partage\FORMATIONS_C\###\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations
+        os.makedirs(os.path.dirname(self._chemin_excel_evaluations_formation), exist_ok=True)
+        
+        # On regarde si Evaluation-Stagiaires-Global-XXX.xlsx existe
+        if os.path.isfile(self._chemin_excel_evaluations_formation):
+            # Alors on l'ouvre
+            self.ouvrir_fe_evaluations_formation()
+            
+            # On récupère la liste des sessions déjà intégrées (liste des codes et des chemins) → Ce sera pour écrire dans le tkinter
+            #dico_sessionsDejaTraitees = dict(
+            #df_formation_stagiaires[df_formation_stagiaires["Trigramme formation"] == trigramme]     # 1. filtre sur le trigramme
+            #.drop_duplicates(subset=["Code IRIS", "Chemin fichier CSV"])  # 2. élimine les doublons
+            #[["Code IRIS", "Chemin fichier CSV"]]            # 3. sélection des colonnes
+            #.values                               # 4. valeurs du DF
+            #    )        
+
+            # Il ne faudra pas supprimer les anciennes données de fe_evaluations_formation
+            supprimeDonneesEtRemplace = False  
+        else :
+            # On créée le fichier : on ouvre le modèle (on sauvera avec le bon nom à la fin)
+            fe_evaluations_formation = FichierExcel.depuis_modele(chemin_modele=self._chemin_modeleExcel_stagiaires, chemin_fichier_sauv=self._chemin_excel_evaluations_formation)
+
+            # Il faudra supprimer les anciennes données de fe_evaluations_formation
+            supprimeDonneesEtRemplace = True
+
+            df_formation_stagiaires = None
+            vlog.ajouter_message("Création EvalStat Global formation", fe_evaluations_formation.chemin_fichier, style=["vert"])
+
+        return fe_evaluations_formation, df_formation_stagiaires, supprimeDonneesEtRemplace
+
+    def ouvrir_fe_evaluations_formation(self) -> None:
+        self._fe_evaluations_formation = FichierExcel.depuis_fichier(chemin_fichier=self._chemin_excel_evaluations_formation)
+        self._fe_evaluations_formation._tableaux["CSV_stagiaires"].charge_df()
+        #self._fe_evaluations_formation._tableaux["Stagiaires"]._df['Trigramme formation'] = self._fe_evaluations_formation._tableaux["Stagiaires"]._df['Trigramme formation'].astype(str)
+        self._df_formation_stagiaires = self._fe_evaluations_formation._tableaux["Stagiaires"]._df  # Alias
+
+    def filedialog_csv(self, code_IRIS:int, trigramme:Optional[str] = None) -> str|None:
+        root = tk.Tk()
+        root.withdraw()  # Ne pas afficher la fenêtre principale
+
+        if (trigramme is None) and (self._chemin_excel_evaluations_formation is not None):
+            trigramme = self._chemin_excel_evaluations_formation
+        
+        if trigramme:
+            # On pré-définit le chemin où sont sensés être stockés les CSV d'évaluation des stagiaires
+            chemin_repertoire_csv = optimiseCheminRepertoire(os.path.dirname(self._chemin_excel_evaluations_defaut.replace("###", trigramme)))
+
+        while True:
+            chemin = filedialog.askopenfilename(title=f"Sélectionner le fichier CSV de la session {code_IRIS}", initialdir=chemin_repertoire_csv or os.getcwd, filetypes=[("Fichiers CSV", "*.csv")])
+
+            if chemin:
+                print(f"Fichier sélectionné : {chemin}")
+                return chemin  # ✅ Fichier sélectionné → on retourne
+
+            # ❌ Aucun fichier sélectionné → boîte personnalisée
+            reponse = self.filedialog_csv_pasDeReponse()
+
+            if reponse == "choisir":
+                continue  # 🔁 Re-ouvrir le file dialog
+            elif reponse == "absent":
+                print("Pas de CSV disponible pour cette session.")
+                return None
+            elif reponse == "quitter":
+                print("Traitement interrompu par l'utilisateur.")
+                sys.exit()
+            else:
+                print("Réponse inattendue. Fermeture.")
+                sys.exit()
+    
+    @staticmethod
+    def filedialog_csv_pasDeReponse():
+        choix = {} # Astuce : les dictionnaires sont dispo dans les sous-fonctions sans avoir à les déclarer nonlocal (plutôt qu'un str par ex.)
+
+        def choisir_nouveau():
+            choix["reponse"] = "choisir"
+            fenetre.destroy()
+
+        def pas_disponible():
+            choix["reponse"] = "absent"
+            fenetre.destroy()
+
+        def quitter():
+            choix["reponse"] = "quitter"
+            fenetre.destroy()
+
+        fenetre = tk.Tk()
+        fenetre.title("Aucun fichier sélectionné")
+        fenetre.geometry("400x150")
+        fenetre.resizable(False, False)
+        fenetre.eval('tk::PlaceWindow . center')  # Centrer la fenêtre
+
+        label = tk.Label(fenetre, text="Aucun fichier n'a été sélectionné.\nQue souhaitez-vous faire ?", pady=20)
+        label.pack()
+
+        bouton_frame = tk.Frame(fenetre)
+        bouton_frame.pack()
+
+        tk.Button(bouton_frame, text="Pas de CSV pour cette session", width=35, command=pas_disponible).grid(row=0, column=0, padx=5, pady=5)
+        tk.Button(bouton_frame, text="Choisir CSV à nouveau", width=25, command=choisir_nouveau).grid(row=1, column=0, padx=5, pady=5)
+        tk.Button(bouton_frame, text="Quitter traitement", width=20, command=quitter).grid(row=2, column=0, padx=5, pady=5)
+
+        fenetre.mainloop()
+        return choix.get("reponse")
+
+class Traiter_REE_BAK:
+    def __init__(self):
+        # Fichier renseigné par la ressource extérieure
+        self._chemin_ficheAdministrative:str = None
+        self._word_ficheAdministrative:FichierWord = None  
+
+        # Fichier Excel à remplir pour Laetitia Da Mota (RH INSTN qui s'occupe de rentrer les REE dans IRIS)
+        self._chemin_modele_excel_ficheIntervenant:str = r"\\harmonie\INSTN\UEM\_Documents_communs\Formations\Formateurs\P09-Pr01-Qualifier les ressources enseignantes\P09_Pr01_Ta.E_Grille des critères de qualification des compétences_V1.xlsx"
+        self._excel_ficheIntervenant:FichierExcel = None  
+
+        self._mail_rh:Mail = None  # Mail à envoyer à la RH INSTN qui s'occupe de rentrer les REE dans IRIS (Laetitita Da Mota)
+
+        self._repertoire_sauvegarde_fichiersREE:str = r"\\harmonie\INSTN\UEM\_Documents_communs\Formations\Formateurs\1.Intervenants - Documents administratifs" # Lieu où sauvegarder les fichiers de l'intervenant
+
+        # Association colonnes excel avec command control Word
+        # La préparation de ce ditionnaire peut être faite avec : fe = FichierExcel.depuis_fichier(chemin_fichier=r"T:\_Documents_communs\Formations\Formateurs\P09-Pr01-Qualifier les ressources enseignantes\P09_Pr01_Ta.E_Grille des critères de qualification des compétences_V1.xlsx", charger_df=True) ; fe._tableaux["QualificationsREE"].generer_dictionnaire_depuis_excel()
+        self._dict_colExcel_cc:Dict[str, str] = {
+            "NOM": "Nom",
+            "Pr\u00e9nom": "Prenoms",
+            "Dipl\u00f4me ou formation/exp\u00e9rience professionnelle": "Diplome",
+            "Dur\u00e9e exp\u00e9rience professionnelle": "DureeExperiencePro",
+            "Niveau d'expertise permettant une reconnaissance": "NiveauExpertise",
+            "Domaine / Sp\u00e9cialit\u00e9 \nde l'expertise": "DomaineExpertise",
+            "ATTRIBUTION Niveau comp\u00e9tence": None,
+            "Combien de jours anim\u00e9s, en moyenne par an": "formation_nbJoursAnimes",
+            "Combien de jours de formations suivies en p\u00e9dagogie (=animation)": "formation_nbJoursFormationPedagogie",
+            "Profils d'apprenants form\u00e9s": "formation_profilApprenants",
+            "Taux consolid\u00e9 de la satisfaction des apprenants relativement \u00e0 l'enseignant-formateur consid\u00e9r\u00e9": None,
+            "Estimation par le RP de la capacit\u00e9 de l'enseignant-formateur \u00e0 animer \n(fond de salle)": None,
+            "Outils num\u00e9riques utilis\u00e9s durant les animations r\u00e9alis\u00e9es\n(serious game, blended-learning\u2026)": "formation_outilsNumeriques",
+            "Combien de jours pass\u00e9s en conception de s\u00e9quence de formation, en moyenne par an": "IngPedago_nbJoursConception",
+            "Combien de jours de formations suivies en ing\u00e9nierie p\u00e9dagogique (=conception de s\u00e9quences de formation)": "IngPedago_nbJoursFormationIngPedago",
+            "Estimation par le RP de la conception de la s\u00e9quence en fonction des objectifs p\u00e9dagogiques fournis par le RP\n(fond de salle, analyse des supports fournis)": None,
+            "Estimation par le RP de la pertinence de l'\u00e9valuation des acquis r\u00e9alis\u00e9e par l'enseignant-formateur sur sa s\u00e9quence\n(analyse de la progression des apprenants : tests avant/apr\u00e8s)": None,
+            "Estimation par le RP de l'utilisation des m\u00e9thodes actives\n(\u00e9tudes de cas, r\u00e9solution de probl\u00e8mes, classes invers\u00e9es, travaux de groupes\u2026)": None,
+            "Combien d'ann\u00e9es d'exp\u00e9rience en conception de dispositifs de formations\n(=cr\u00e9ation et coordination)": "IngFormation_nbJoursConception",
+            "Combien de jours de formations suivies en ing\u00e9nierie de formation\n(=conception de dispositifs de formation)": "IngFormation_nbJoursFormationIngFormation",
+            "Estimation par le chef de projet ou le CUE de la complexit\u00e9 des pr\u00e9c\u00e9dents dispositifs de formation con\u00e7us": None,
+            "Profil des apprenants des dispositifs de formations prc\u00e9demment con\u00e7us": "IngFormation_profilApprenants",
+            "Estimation par le chef de projet ou le CUE de l'\u00e9valuation des acquis r\u00e9alis\u00e9 dans le dispositif de formation\n(mesure de la progression des apprenants=estimation de la qualit\u00e9 du dispositif de formation)": None,
+            "Combien d'ann\u00e9es d'exp\u00e9rience en tant que tuteur acad\u00e9mique": "IngFormation_nbAnneesTuteur",
+            "Combien de r\u00e9f\u00e9rentiels d'activit\u00e9, de comp\u00e9tence et d'\u00e9valuation r\u00e9alis\u00e9s": "IngFormation_nbAnneesTuteur",
+            "Combien de jours de formations suivies en ing\u00e9nierie de comp\u00e9tences": "IngCompetences_nbReferentiels",
+            "Estimation par la cellule p\u00e9dagogique de DPF de la complexit\u00e9 des pr\u00e9c\u00e9dentes r\u00e9alisations de l'ing\u00e9nieur/consultant en ing\u00e9nierie de comp\u00e9tences \n(complexit\u00e9 du m\u00e9tier et de son environnement : risques, r\u00e9glementation...)": "IngCompetences_nbJoursFormationIngCompetences",
+            "ATTRIBUTION Niveau comp\u00e9tence ": None,
+            "Evaluation CECRL ou \u00e9quivalence TOEIC, TOEFL": "ResultatLangue2",
+            "ATTRIBUTION Niveau comp\u00e9tence  ": None,
+            "Curriculum vitae": None,
+        }
+
+
+
+        # Fichier Excel qui liste les AI des intervenants
+        self._chemin_excel_AI:str = r"\\harmonie\INSTN\UEM\_Documents_communs\Formations\Formateurs\2.AI\Liste AI formateurs.xlsx"
+        self._excel_AI:FichierExcel = None
+        self._onglet_excel_AI:str = "Intervenants" #Ligne ET = 3, 1èreligne = 4
+        self._tableauStructure_AI:str = "ListeIntervenants"
+        nbLignes_avantET_AI:int = 2 # Si tableau structuré, normalement on n'en a pas besoin
+
+        # Fichier Excel qui liste des intervenants qui centralise les coordonnées 
+        self._chemin_excel_listeIntervenants:str = r"\\harmonie\INSTN\UEM\_Echanges\VTE\Planning UEM.xlsm"
+        self._excel_listeIntervenants:FichierExcel = None
+        self._onglet_excel_listeIntervenants:str = "Liste intervenants" #Ligne ET = 4, 1èreligne = 5
+        self._tableauStructure_listeIntervenant:str = "ListeIntervenants"
+        nbLignes_avantET_listeIntervenants:int = 3  # Si tableau structuré, normalement on n'en a pas besoin
+        
+
+
+        # === Début code ===
+
+        # On ouvre le word et on charge tous les command control (filedialog depuis "Download"). On le ferme
+        self._word_ficheAdministrative = FichierWord.depuisFichier()
+        #print(self._word_ficheAdministrative)
+
+        # On crée le répertoire dans le répertoire des REE s'il n'existe pas (ou assimilé) (NOM Prénom (Société - AAAA))
+        self._repertoire_sauvegarde_fichiersREE += f"\\{self._word_ficheAdministrative.cc['Nom'].upper()} {self._word_ficheAdministrative.cc['Prenoms'].title()} ({self._word_ficheAdministrative.cc['RaisonSociale'] if self._word_ficheAdministrative.cc['RaisonSociale'] != 'Raison sociale employeur principal' else 'CEA'} - {datetime.now().year})"
+        #print(self._repertoire_sauvegarde_fichiersREE)
+        #os.makedirs(self._repertoire_sauvegarde_fichiersREE, exist_ok=True)
+
+        # On sélectionne tous les fichiers de la REE et on les déplace dans le répertoire idoine
+        #self.deplacer_fichiers(self._repertoire_sauvegarde_fichiersREE)
+
+        # On ouvre le fichier Excel à remplir pour Laetitia Da Mota (c'est un modèle, on le collera avec le bon nom dans le répertoire idoine)
+        fichier_sauvegarde_fichiersREE = os.path.join(self._repertoire_sauvegarde_fichiersREE, os.path.basename(self._chemin_modele_excel_ficheIntervenant))
+        self._excel_ficheIntervenant = FichierExcel.depuis_modele(self._chemin_modele_excel_ficheIntervenant, fichier_sauvegarde_fichiersREE, charger_df=True)
+        #print(self._excel_ficheIntervenant._tableaux["QualificationsREE"]._df)
+
+        # On écrit le dataframe du tableau QualificationsREE avec les données de l'intervenant provenant du word
+        df_REE = self._excel_ficheIntervenant._tableaux["QualificationsREE"]._df  # Alias
+        nouvelle_ligne = {}
+        for col_df, cc_key in self._dict_colExcel_cc.items():
+            if cc_key is None:
+                # Pas de clé correspondante => valeur vide dans la DataFrame
+                nouvelle_ligne[col_df] = None
+            else:
+                # Récupérer la valeur dans le dictionnaire Word, ou None si la clé absente
+                valeur = self._word_ficheAdministrative._cc.get(cc_key, None)
+                nouvelle_ligne[col_df] = convertir_si_possible(valeur)
+                #print(valeur, type(convertir_si_possible(valeur)))
+
+        # Ajouter la nouvelle ligne au DataFrame
+        # TODO : non pas sûr
+        df_REE = pd.concat([df_REE, pd.DataFrame([nouvelle_ligne])], ignore_index=True)
+
+        # On pré-rempli le fichier Excel fiche intervenant grâce aux CC et au dictionnaire
+        self._excel_ficheIntervenant._tableaux["QualificationsREE"].ecrit_dataFrame_dans_tableauStructure(df_REE, remplace_df_par_nouveau=True)
+
+        # On sauve la fiche intervenant
+        #self._excel_ficheIntervenant.save()
+        #self._excel_ficheIntervenant.close()
+
+        # On ouvre l'Excel et le Word pour comparaison et adaptations manuelles
+
+        # Dès que l'Excel est fermé, on prépare le mail pour Laetitia
+
+        # On met à jour le fichier Excel Liste AI formateurs.xlsx : onglet intervenant, on cherche et remplace la date de validité de l'attestation employeur sinon nouvelle ligne (recopier formule + format)
+        # On met à jour le fichier Excel  avec la liste des intervenants :  on cherche et remplace les données mail, tel, Ville, la date de validité de l'attestation employeur... sinon nouvelle ligne (recopier formule + format)
+
+        
+    def deplacer_fichiers(self, destination: str = None) -> None:
+        """
+        Ouvre un dialogue pour sélectionner des fichiers, puis les déplace vers un dossier choisi.
+
+        Args:
+            destination (str, optional): Chemin du dossier de destination.
+                                        Si None, un dialogue s'ouvrira pour le choisir.
+        """
+
+        # Fenêtre Tkinter cachée
+        root = tk.Tk()
+        root.withdraw()
+
+        # Sélection des fichiers à déplacer
+        fichiers = filedialog.askopenfilenames(title="Sélectionner les fichiers à déplacer")
+        if not fichiers:
+            print("Aucun fichier sélectionné.")
+            return
+
+        # Sélection du dossier de destination
+        if destination is None:
+            destination = filedialog.askdirectory(title="Choisir le dossier de destination")
+            if not destination:
+                print("Aucun dossier de destination sélectionné.")
+                return
+
+        # Déplacement de chaque fichier
+        for fichier in fichiers:
+            nom_fichier = os.path.basename(fichier)
+            chemin_destination = os.path.join(destination, nom_fichier)
+
+            try:
+                shutil.move(fichier, chemin_destination)
+                print(f"✅ Déplacé : {nom_fichier}")
+            except Exception as e:
+                print(f"❌ Erreur avec {nom_fichier} : {e}")

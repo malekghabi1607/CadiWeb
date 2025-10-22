@@ -82,7 +82,7 @@ class Timer:
             self.fin()
 
         self.__description = description
-        self.__debut = time.time()
+        self.__debut = time_module.time()
         self.__timer_en_cours = True
 
         self.__last_message = f"⏳ Traitement de {self.__description}..."
@@ -92,7 +92,7 @@ class Timer:
         if not self.__timer_en_cours:
             return  # Rien à terminer
 
-        self.__fin = time.time()
+        self.__fin = time_module.time()
         self.__duree = self.__fin - self.__debut
         minutes, secondes = divmod(int(self.__duree), 60)
 
