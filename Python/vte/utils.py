@@ -18,6 +18,7 @@ import time as time_module
 import copy
 import ctypes
 from ctypes import wintypes
+from pathlib import Path
 
 import time as time_module
 from datetime import date, datetime, time, timedelta
@@ -85,7 +86,7 @@ class Timer:
         self.__debut = time_module.time()
         self.__timer_en_cours = True
 
-        self.__last_message = f"⏳ Traitement de {self.__description}..."
+        self.__last_message = f"⏳ {self.__description}..."
         print(self.__last_message, end='', flush=True)
 
     def fin(self):
@@ -464,6 +465,41 @@ def lister_fichiers_repertoire(
         fichiers.sort(key=lambda f: os.path.getmtime(f), reverse=True)
 
     return fichiers
+
+def obtenir_fichier_plus_recent_repertoire(repertoire: str, motif: str):
+    """
+    Retourne le fichier le plus récent d'un répertoire correspondant à une expression régulière.
+
+    Args:
+        repertoire (str): Chemin du répertoire à parcourir.
+        motif (str): Expression régulière pour filtrer les fichiers.
+
+    Example:
+        dernier_log = obtenir_fichier_plus_recent("/var/logs", r"^journal_.*")
+
+    Returns:
+        str | None: Chemin complet du fichier le plus récent correspondant, ou None si aucun ne correspond.
+    """
+    chemin_repertoire = Path(repertoire)
+    if not chemin_repertoire.is_dir():
+        raise NotADirectoryError(f"{repertoire} n'est pas un répertoire valide.")
+
+    expression = re.compile(motif)
+
+    # Liste des fichiers qui correspondent au motif
+    fichiers_correspondants = [
+        fichier for fichier in chemin_repertoire.iterdir()
+        if fichier.is_file() and expression.search(fichier.name)
+    ]
+
+    if not fichiers_correspondants:
+        return None
+
+    # Tri par date de création (ou de modification selon le système)
+    fichier_plus_recent = max(fichiers_correspondants, key=lambda f: f.stat().st_ctime)
+
+    return str(fichier_plus_recent)
+
 
 ### --------------------------------------------------------------------
 #  Réseau
