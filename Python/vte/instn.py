@@ -1338,18 +1338,9 @@ class EvalStat:
         
 
 
-class BilanSessionV3:
+class BilanSession:
     """
     C'est la classe qui contient tous les éléments de ma formation pour mon bilan de session V3
-
-    # TODO j'en suis là
-    # Todo Word
-    # Dans le modèle Word : gérer le lien vers la GED 
-    # Exploiter EvalStat
-    # Il y a des trous dans la raquette dans le word de sortie (checkboxes)
-    # coller des images depuis Excel
-    # ? Exploiter export formation plutôt que export sessions pour les valeurs par défaut nmin/max...
-
     """
     # === VARIABLES D'ENVIRONNEMENT
     _repertoire_fichier_session:str = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\IRIS\Extracts complets"
@@ -1393,32 +1384,39 @@ class BilanSessionV3:
     _evalInf3_com:str = ""
     _tauxRetours_val:str = ""
 
-    
-    def __init__(self, codeFormation:str, annee:int, periode:str) -> None:
+    def __init__(self) -> None:
+        pass
 
-        self._codeFormation = codeFormation
-        self._annee = annee
-        self._periode = periode
+    @classmethod   
+    def bilanUnique(cls, codeFormation:str, annee:int, periode:str) -> BilanSession:
+
+        instance = cls()
+    
+        instance._codeFormation = codeFormation
+        instance._annee = annee
+        instance._periode = periode
 
 
         # Ouverture / création du dataframe de l'extract IRIS sessions de la formation
-        df_sessions_filtre = self._creer_df_extractIRIS_sessions_periode()
+        df_sessions_filtre = instance._creer_df_extractIRIS_sessions_periode()
 
         # On met à jour df_sessions_filtre selon les sessions que souhaite garder / exclure l'utilisateur
-        df_sessions_filtre = self._demande_sessions_a_exclure(df_sessions_filtre)
+        df_sessions_filtre = instance._demande_sessions_a_exclure(df_sessions_filtre)
 
         # On met à jour l'Excel evalstat de la formation si des sessions demandées par l'utilisateur ne s'y trouvent pas
-        self._maj_evalstat_formation(df_sessions_filtre)
+        instance._maj_evalstat_formation(df_sessions_filtre)
 
         # On calcule les stats
-        self._calculer_stats_criteres()
-        #pprint(self._stats_stagiaires)
+        instance._calculer_stats_criteres()
+        #pprint(instance._stats_stagiaires)
 
         # On construit le bilan de session (bilan de session V3)
-        self._bilanSessionV3()
+        instance._bilanSessionV3()
 
         # On ouvre le word
-        FichierWord.depuisFichier(chemin_fichier=self._chemin_word_bilan_output, charger_contentControl=False, afficherWord=True)
+        FichierWord.depuisFichier(chemin_fichier=instance._chemin_word_bilan_output, charger_contentControl=False, afficherWord=True)
+
+
 
     @staticmethod
     def _demander_entiers(message="Pour exclure des sessions : entrez un ou plusieurs code IRIS (numéro à 5 chiffres) séparés par des espaces (ou rien pour passer) : ") -> List[str]:
@@ -1448,11 +1446,9 @@ class BilanSessionV3:
 
             except ValueError:
                 print("Erreur : veuillez entrer uniquement des nombres entiers, séparés par des espaces ou des virgules.")
-                BilanSessionV3._demander_entiers()
+                BilanSession._demander_entiers()
 
 
-            
-            return valeurs
             
     def _creer_df_extractIRIS_sessions_periode(self) -> pd.DataFrame:
         """
@@ -1469,22 +1465,24 @@ class BilanSessionV3:
         # Ouverture export session IRIS
         ####
 
-        # Pour l'instant je récupère l'export session de IRIS le plus récent
-        self._chemin_fichier_session = obtenir_fichier_plus_recent_repertoire(self._repertoire_fichier_session, r"^R04110_Sessions.*")
-        vlog.print("OK", f"✅ Récupération du dernier extract IRIS Sessions de {self._repertoire_fichier_session} : {os.path.basename(self._chemin_fichier_session)}")
-        
-        # Je load l'Excel des sessions
-        timer.debut(f"Lecture de {self._chemin_fichier_session}")
-        self._fe_sessions = FichierExcel.depuis_fichier(self._chemin_fichier_session)
-        vlog.ajouter_message("OK", f"✅ Lecture de {self._chemin_fichier_session}")
-        timer.fin()
-        #print(self._fe_session)
+        # J'ouvre et lit l'export sessions IRIS si et seulement si je ne l'ai pas déjà ouvert et lu avant
+        if not self._fe_sessions:
+            # Pour l'instant je récupère l'export session de IRIS le plus récent
+            self._chemin_fichier_session = obtenir_fichier_plus_recent_repertoire(self._repertoire_fichier_session, r"^R04110_Sessions.*")
+            vlog.print("OK", f"✅ Récupération du dernier extract IRIS Sessions de {self._repertoire_fichier_session} : {os.path.basename(self._chemin_fichier_session)}")
+            
+            # Je load l'Excel des sessions
+            timer.debut(f"Lecture de {self._chemin_fichier_session}")
+            self._fe_sessions = FichierExcel.depuis_fichier(self._chemin_fichier_session)
+            vlog.ajouter_message("OK", f"✅ Lecture de {self._chemin_fichier_session}")
+            timer.fin()
+            #print(self._fe_session)
 
-        # Création d'un alias sur le tableau structuré "Sessions"
-        self._df_sessions = self._fe_sessions._tableaux["Sessions"]._df
+            # Création d'un alias sur le tableau structuré "Sessions"
+            self._df_sessions = self._fe_sessions._tableaux["Sessions"]._df
 
-       # Je retype "Trigramme formation"
-        self._df_sessions['Trigramme formation'] = self._df_sessions['Trigramme formation'].astype(str)
+            # Je retype "Trigramme formation"
+            self._df_sessions['Trigramme formation'] = self._df_sessions['Trigramme formation'].astype(str)
 
 
 
@@ -1543,7 +1541,7 @@ class BilanSessionV3:
         ))
         
         # On demande à l'utilisateur les sessions qu'il veut exclure
-        exclusionSessions = BilanSessionV3._demander_entiers()
+        exclusionSessions = BilanSession._demander_entiers()
         if exclusionSessions:  # si la liste n'est pas vide
             df_sessions_filtre = df_sessions_filtre[~df_sessions_filtre['Code IRIS'].isin(exclusionSessions)]
         else:
@@ -1680,112 +1678,114 @@ class BilanSessionV3:
         return self._stats_stagiaires
 
     def _bilanSessionV3(self) -> None:
-        def __construit_champsFusionV3(self) -> None:
-            """
-            Calcule puis définit les str des champs de fusion
-            """
-            #####
-            # On évalue les valeurs requises pour la fin de la méthode
-            #####
-            self._periodeSessionsEvaluees = f"{self._periode} {self._annee}"
-            self._chemin_word_bilan_output = os.path.join(os.path.dirname(self._es._fe_evaluations_formation.chemin_fichier), "Bilan session-"+self._periodeSessionsEvaluees+".docx")
-            nb_stagiaires_retours = self._df_stagiaires_final['NOM Prénom'].nunique()
-            nb_apprenants = self._df_stagiaires_final_1ligne_session['Nb présents'].sum()
-
-            stats_sous_3 = { # Dictionnaire pour les critères dont la moyenne est inférieure à 3 et non exclus (critères dans la liste self._critere_a_enlever)
-                critere: valeurs
-                for critere, valeurs in self._stats_stagiaires.items()
-                if (
-                    critere not in self._critere_a_enlever
-                    and valeurs["Moyenne"] is not None
-                    and valeurs["Moyenne"] < 3
-                )
-            }
-
-
-
-            #####
-            # Affectation des valeurs pour les champs de fusion (ce sont des str)
-            #####
-            self._titreFormation = self._df_stagiaires_final["Formation"].iloc[-1]  # On est sensé travailler sur un même trigramme de formation, donc quelle que soit la ligne on a le bon nom de formation
-            # self._codeFormation = codeFormation  # (donné en argument)
-            # self._periodeSessionsEvaluees = f"{self._periode} {self._annee}"  # Evalué plus haut
-            self._nbSessionsEvaluees = f"{len(self._codes_IRIS_communs)}"
-            self._numerosSessions = ", ".join(self._df_stagiaires_final_1ligne_session["N° Session"].dropna().astype(str).unique())
-            self._nbApprenants = f"{nb_apprenants}"
-            self._rp = ", ".join(self._df_stagiaires_final_1ligne_session["Trigramme RP"].dropna().astype(str).unique())
-            self._af = ", ".join(self._df_stagiaires_final_1ligne_session["Trigramme AF"].dropna().astype(str).unique())
-
-            self._satisfactionGlobale_moy = f'{self._stats_stagiaires["Satisfaction globale"]["Moyenne"]:.1f}'
-            self._satisfactionGlobale_com = self._stats_stagiaires["Satisfaction globale"]["Commentaires"].replace("_x000D_", "\n")
-
-            self._recommandation_moy = f'{self._stats_stagiaires["Recommanderiez-vous cette formation ?"]["Moyenne"]/5*100:.0f}%'  # (on divise par 5 car on a un booléen stcké sous forme de note sur 5 : 0 = False, 5 = True)
-            self._commentairesRemarquesSuggestions_com = self._stats_stagiaires["Commentaires, remarques, suggestions"]["Commentaires"].replace("_x000D_", "\n")
-
-            self._evalInf3_val = f"{len(stats_sous_3)}"
-            self._evalInf3_com = "\n".join(f"• {clef} ({valeurs['Moyenne']:.1f}) :{valeurs['Commentaires'].replace('•', '\n   -').replace('\n\n', '\n')}"
-                for clef, valeurs in stats_sous_3.items()
-            )
-            #self._evalInf3_com = "\n".join(
-            #    valeurs["Commentaires"]
-            #    for valeurs in stats_sous_3.values()
-            #    if valeurs["Commentaires"]
-            #).replace("_x000D_", "\n")
-
-            self._tauxRetours_val = f"{(nb_stagiaires_retours/nb_apprenants)*100:.0f}%"
-
-        def __mergeBilanV3(self) -> None:
-            """
-            A partir d'un chemin de fichier word avec des champs de fusion, on crée le bilan de formation final en incluant les données à l'intérieur.
-            Le fichier output est défini par l'utilisateur
-
-            :param s_word_bilan_input: Chemin du fichier Word contenant les champs de fusion et a employer
-            :type s_word_bilan_input: string
-            :param s_word_bilan_output: Chemin du fichier Word apres fusion des donnees
-            :type s_word_bilan_output: string
-            :return: pas de donnee en retour
-            :rtype: none
-
-            :Example:
-
-            >>> self.mergeBilan("C:\\Users\\wordIn.docx", "C:\\Users\\wordOut.docx")
-
-
-            .. seealso:: Rien du tout.
-            .. warning:: Rien du tout.
-            .. note:: Rien du tout.
-            .. todo:: Rien du tout.
-            """
-
-            #print(f"BilanFormation lancé avec : trigramme={self._codeFormation}, année={self._annee}")
-            document = MailMerge(self._chemin_word_bilan_input)
-            #print(document.get_merge_fields())
-
-            document.merge(
-                titreFormation = self._titreFormation,
-                codeFormation = self._codeFormation,
-                periodeSessionsEvaluees = self._periodeSessionsEvaluees,
-                nbSessionsEvaluees = self._nbSessionsEvaluees,
-                numerosSessions = self._numerosSessions,
-                nbApprenants = self._nbApprenants,
-                rp = self._rp,
-                af = self._af,
-                satisfactionGlobale_moy = self._satisfactionGlobale_moy,
-                satisfactionGlobale_com = self._satisfactionGlobale_com,
-                recommandation_moy = self._recommandation_moy,
-                commentairesRemarquesSuggestions_com = self._commentairesRemarquesSuggestions_com,
-                evalInf3_val = self._evalInf3_val,
-                evalInf3_com = self._evalInf3_com,
-                tauxRetours_val = self._tauxRetours_val
-                )
-            
-            document.write(self._chemin_word_bilan_output)
-
         # On construit champs de fusion
-        __construit_champsFusionV3()
+        self.__construit_champsFusionV3()
 
         # On merge les champs de fusion
-        __mergeBilanV3()
+        self.__mergeBilanV3()
+
+    def __construit_champsFusionV3(self) -> None:
+        """
+        Calcule puis définit les str des champs de fusion
+        """
+        #####
+        # On évalue les valeurs requises pour la fin de la méthode
+        #####
+        self._periodeSessionsEvaluees = f"{self._periode} {self._annee}"
+        self._chemin_word_bilan_output = os.path.join(os.path.dirname(self._es._fe_evaluations_formation.chemin_fichier), "Bilan session-"+self._periodeSessionsEvaluees+".docx")
+        nb_stagiaires_retours = self._df_stagiaires_final['NOM Prénom'].nunique()
+        nb_apprenants = self._df_stagiaires_final_1ligne_session['Nb présents'].sum()
+
+        stats_sous_3 = { # Dictionnaire pour les critères dont la moyenne est inférieure à 3 et non exclus (critères dans la liste self._critere_a_enlever)
+            critere: valeurs
+            for critere, valeurs in self._stats_stagiaires.items()
+            if (
+                critere not in self._critere_a_enlever
+                and valeurs["Moyenne"] is not None
+                and valeurs["Moyenne"] < 3
+            )
+        }
+
+
+
+        #####
+        # Affectation des valeurs pour les champs de fusion (ce sont des str)
+        #####
+        self._titreFormation = self._df_stagiaires_final["Formation"].iloc[-1]  # On est sensé travailler sur un même trigramme de formation, donc quelle que soit la ligne on a le bon nom de formation
+        # self._codeFormation = codeFormation  # (donné en argument)
+        # self._periodeSessionsEvaluees = f"{self._periode} {self._annee}"  # Evalué plus haut
+        self._nbSessionsEvaluees = f"{len(self._codes_IRIS_communs)}"
+        self._numerosSessions = ", ".join(self._df_stagiaires_final_1ligne_session["N° Session"].dropna().astype(str).unique())
+        self._nbApprenants = f"{nb_apprenants}"
+        self._rp = ", ".join(self._df_stagiaires_final_1ligne_session["Trigramme RP"].dropna().astype(str).unique())
+        self._af = ", ".join(self._df_stagiaires_final_1ligne_session["Trigramme AF"].dropna().astype(str).unique())
+
+        self._satisfactionGlobale_moy = f'{self._stats_stagiaires["Satisfaction globale"]["Moyenne"]:.1f}'
+        self._satisfactionGlobale_com = self._stats_stagiaires["Satisfaction globale"]["Commentaires"].replace("_x000D_", "\n")
+
+        self._recommandation_moy = f'{self._stats_stagiaires["Recommanderiez-vous cette formation ?"]["Moyenne"]/5*100:.0f}%'  # (on divise par 5 car on a un booléen stcké sous forme de note sur 5 : 0 = False, 5 = True)
+        self._commentairesRemarquesSuggestions_com = self._stats_stagiaires["Commentaires, remarques, suggestions"]["Commentaires"].replace("_x000D_", "\n")
+
+        self._evalInf3_val = f"{len(stats_sous_3)}"
+        self._evalInf3_com = "\n".join(f"• {clef} ({valeurs['Moyenne']:.1f}) :{valeurs['Commentaires'].replace('•', '\n   -').replace('\n\n', '\n')}"
+            for clef, valeurs in stats_sous_3.items()
+        )
+        #self._evalInf3_com = "\n".join(
+        #    valeurs["Commentaires"]
+        #    for valeurs in stats_sous_3.values()
+        #    if valeurs["Commentaires"]
+        #).replace("_x000D_", "\n")
+
+        self._tauxRetours_val = f"{(nb_stagiaires_retours/nb_apprenants)*100:.0f}%"
+
+    def __mergeBilanV3(self) -> None:
+        """
+        A partir d'un chemin de fichier word avec des champs de fusion, on crée le bilan de formation final en incluant les données à l'intérieur.
+        Le fichier output est défini par l'utilisateur
+
+        :param s_word_bilan_input: Chemin du fichier Word contenant les champs de fusion et a employer
+        :type s_word_bilan_input: string
+        :param s_word_bilan_output: Chemin du fichier Word apres fusion des donnees
+        :type s_word_bilan_output: string
+        :return: pas de donnee en retour
+        :rtype: none
+
+        :Example:
+
+        >>> self.mergeBilan("C:\\Users\\wordIn.docx", "C:\\Users\\wordOut.docx")
+
+
+        .. seealso:: Rien du tout.
+        .. warning:: Rien du tout.
+        .. note:: Rien du tout.
+        .. todo:: Rien du tout.
+        """
+
+        #print(f"BilanFormation lancé avec : trigramme={self._codeFormation}, année={self._annee}")
+        document = MailMerge(self._chemin_word_bilan_input)
+        #print(document.get_merge_fields())
+
+        document.merge(
+            titreFormation = self._titreFormation,
+            codeFormation = self._codeFormation,
+            periodeSessionsEvaluees = self._periodeSessionsEvaluees,
+            nbSessionsEvaluees = self._nbSessionsEvaluees,
+            numerosSessions = self._numerosSessions,
+            nbApprenants = self._nbApprenants,
+            rp = self._rp,
+            af = self._af,
+            satisfactionGlobale_moy = self._satisfactionGlobale_moy,
+            satisfactionGlobale_com = self._satisfactionGlobale_com,
+            recommandation_moy = self._recommandation_moy,
+            commentairesRemarquesSuggestions_com = self._commentairesRemarquesSuggestions_com,
+            evalInf3_val = self._evalInf3_val,
+            evalInf3_com = self._evalInf3_com,
+            tauxRetours_val = self._tauxRetours_val
+            )
+        
+        document.write(self._chemin_word_bilan_output)
+
+
 
 class BilanFormation:
     """
