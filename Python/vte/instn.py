@@ -1235,11 +1235,19 @@ class EvalStat:
         On pointe au mieux sur le répertoire des CSV de cette formation pour la boîte de dialogue.
         """
 
+        import tkinter as tk
+        from tkinter import filedialog
+        import os, sys
+
+        def _centrer_fenetre(fenetre, largeur=400, hauteur=250):
+            """Centre la fenêtre sur l'écran."""
+            fenetre.update_idletasks()
+            x = (fenetre.winfo_screenwidth() // 2) - (largeur // 2)
+            y = (fenetre.winfo_screenheight() // 2) - (hauteur // 2)
+            fenetre.geometry(f"{largeur}x{hauteur}+{x}+{y}")
+
         def _filedialog_csv_pasDeReponse():
-            """
-            Si l'utilisateur a cliqué sur 'Annuler' à la boîte de _filedialog_csv,
-            alors on demande à l'utilisateur s'il veut choisir à nouveau, sauter cette étape ou quitter.
-            """
+            """Boîte modale si aucun fichier n’a été sélectionné."""
             choix = {}
 
             def choisir_nouveau():
@@ -1257,20 +1265,15 @@ class EvalStat:
                 fenetre.quit()
                 fenetre.destroy()
 
-            fenetre = tk.Toplevel()  # ✅ sous-fenêtre modale
+            fenetre = tk.Toplevel()
             fenetre.title("Aucun fichier sélectionné")
-            fenetre.geometry("400x250")
+            _centrer_fenetre(fenetre, 400, 250)
             fenetre.resizable(False, False)
-            fenetre.eval('tk::PlaceWindow . center')
-            fenetre.attributes('-topmost', True)  # ✅ reste au-dessus
-            fenetre.grab_set()  # ✅ bloque l’interaction avec le reste
+            fenetre.attributes('-topmost', True)
+            fenetre.grab_set()
             fenetre.focus_force()
 
-            label = tk.Label(
-                fenetre,
-                text="Aucun fichier n'a été sélectionné.\nQue souhaitez-vous faire ?",
-                pady=20
-            )
+            label = tk.Label(fenetre, text="Aucun fichier n'a été sélectionné.\nQue souhaitez-vous faire ?", pady=20)
             label.pack()
 
             bouton_frame = tk.Frame(fenetre)
@@ -1280,16 +1283,12 @@ class EvalStat:
             tk.Button(bouton_frame, text="Choisir CSV à nouveau", width=25, command=choisir_nouveau).grid(row=1, column=0, padx=5, pady=5)
             tk.Button(bouton_frame, text="Quitter traitement", width=20, command=quitter).grid(row=2, column=0, padx=5, pady=5)
 
-            fenetre.wait_window()  # ✅ attend la fermeture avant de continuer
+            fenetre.wait_window()
             return choix.get("reponse")
 
-        # --- Fenêtre principale invisible servant de parent ---
+        # --- Fenêtre principale invisible ---
         root = tk.Tk()
-        root.withdraw()  # cache la fenêtre principale
-        root.lift()  # met au-dessus
-        root.attributes('-topmost', True)  # force le focus
-        root.after_idle(root.attributes, '-topmost', False)  # évite qu’elle reste bloquée au-dessus
-        root.focus_force()
+        root.withdraw()
 
         # Prépare le chemin initial
         if (trigramme is None) and (self._chemin_excel_evaluations_formation is not None):
@@ -1304,25 +1303,29 @@ class EvalStat:
         else:
             chemin_repertoire_csv = os.getcwd()
 
-        # --- Boucle de sélection ---
+        # --- Boucle principale ---
         while True:
+            # Force la boîte de dialogue à passer au premier plan juste avant l’ouverture
+            root.attributes('-topmost', True)
+            root.update()
             chemin = filedialog.askopenfilename(
-                parent=root,  # ✅ rattache au root
+                parent=root,
                 title=f"Sélectionner le fichier CSV de la session {code_IRIS}",
                 initialdir=chemin_repertoire_csv,
                 filetypes=[("Fichiers CSV", "*.csv")]
             )
+            root.attributes('-topmost', False)
 
             if chemin:
                 print(f"✅ Fichier sélectionné : {chemin}")
                 root.destroy()
-                return chemin  # fichier choisi → on sort
+                return chemin
 
-            # ❌ Aucun fichier sélectionné → fenêtre de choix personnalisée
+            # Aucun fichier sélectionné → boîte modale personnalisée
             reponse = _filedialog_csv_pasDeReponse()
 
             if reponse == "choisir":
-                continue  # 🔁 réouvrir le filedialog
+                continue
             elif reponse == "absent":
                 print(f"⚠️ Pas de CSV disponible pour cette session {code_IRIS}, session exclue.")
                 root.destroy()
