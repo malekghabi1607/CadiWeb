@@ -1341,30 +1341,29 @@ class BilanSessionV3:
     _critere_a_enlever = [
         "Comment avez-vous connu cette formation ?", "Avez-vous d'autres besoins de formation ?", "Commentaires, remarques, suggestions", "Recommanderiez-vous cette formation ?"]
 
-    # Liste des champs de fusion du Word
-    _titreFormation:Optional[str] = None # OK
-    #_codeFormation:str  # OK # Déjà déclaré pour fonctionnement de la classe
-    _periodeSessionsEvaluees:Optional[str] = None # OK
-    _nbSessionsEvaluees:Optional[int] = None # OK
-    _numerosSessions:Optional[str] = None # OK
-    _nbApprenants:Optional[int] = None # OK
-    _rp:Optional[str] = None # OK
-    _af:Optional[str] = None # OK
-    _satisfactionGlobale_moy:Optional[float] = None
-    _satisfactionGlobale_com:Optional[str] = None
-    _recommandation_moy:Optional[float] = None
-    _commentairesRemarquesSuggestions_com:Optional[str] = None
-    _evalInf3_val:Optional[int] = None
-    _evalInf3_com:Optional[str] = None
-    _tauxRetours_val:Optional[float] = None
+    # Liste des champs de fusion du Word (pour la fonction .mergefields, il faut des str)
+    _titreFormation:str = ""
+    #_codeFormation:str = ""  # Déjà déclaré pour fonctionnement de la classe
+    _periodeSessionsEvaluees:str = ""
+    _nbSessionsEvaluees:str = ""
+    _numerosSessions:str = ""
+    _nbApprenants:str = ""
+    _rp:str = ""
+    _af:str = ""
+    _satisfactionGlobale_moy:str = ""
+    _satisfactionGlobale_com:str = ""
+    _recommandation_moy:str = ""
+    _commentairesRemarquesSuggestions_com:str = ""
+    _evalInf3_val:str = ""
+    _evalInf3_com:str = ""
+    _tauxRetours_val:str = ""
 
     
     def __init__(self, codeFormation:str, annee:int, periode:str) -> None:
 
-        self._codeFormation:str = codeFormation
-        self._annee:int = annee
-        self._periode:str = periode
-        self._periodeSessionsEvaluees:str = f"{self._periode} {self._annee}"
+        self._codeFormation = codeFormation
+        self._annee = annee
+        self._periode = periode
 
         #####
         # Exploitation de l'extract IRIS sessions
@@ -1524,7 +1523,7 @@ class BilanSessionV3:
 
         # On calcule les stats
         self.calculer_stats_criteres()
-        pprint(self._stats_stagiaires)
+        #pprint(self._stats_stagiaires)
 
         # On crée le dictionnaire pour les critères dont la moyenne est inférieure à 3 et non exclus (critères dans la liste self._critere_a_enlever)
         stats_sous_3 = {
@@ -1541,56 +1540,84 @@ class BilanSessionV3:
         
         
         # Dernière vérif qu'on a bien tout importé les CSV dans l'excel global
-        df_stagiaires_filtre = self._df_stagiaires[self._df_stagiaires['Code IRIS'] in codes_communs]
+        df_stagiaires_filtre = self._df_stagiaires[self._df_stagiaires['Code IRIS'].isin(codes_communs)]
+        print(df_stagiaires_filtre)
+        df_stagiaires_filtre_1ligne_session = df_stagiaires_filtre.drop_duplicates(subset=['Code IRIS'])  # Ne garde qu'une ligne par Code IRIS (la première rencontrée)
+        print(df_stagiaires_filtre_1ligne_session)
+
         code_session_absents_fin = list(set(df_sessions_filtre['Code IRIS']) - set(df_stagiaires_filtre['Code IRIS']))
         if not code_session_absents_fin:
             print(code_session_absents_fin)
             vlog.ajouter_message("Erreur", "Erreur il reste encore des disparités avec des CSV non importés qui sont sensés être dans le bilan après traitement", )
 
         # On évalue le nombre de stagiaires ayant fait des retours
-        nb_stagiaires_retours = set(df_stagiaires_filtre['NOM Prénom'])
+        nb_stagiaires_retours = df_stagiaires_filtre['NOM Prénom'].nunique()
+        nb_apprenants = df_stagiaires_filtre_1ligne_session['Nb. Nommés'].sum()
 
         # Application du pré-filtre avec les 3 critères trigramme, statut session et période
-        df_sessions_filtre = self._df_sessions[
-            (self._df_sessions['Code IRIS'] == str(self._codeFormation))]
+        #df_sessions_filtre = self._df_sessions[
+        #    (self._df_sessions['Trigramme formation'] == str(self._codeFormation)) &
+        #    (self._df_sessions['Année début ses.'] == self._annee) &
+        #    (self._df_sessions['Statut Session'] != "Annulée")
+        #]
+        
+        #df_sessions_filtre = self._df_sessions[
+        #    (self._df_sessions['Code IRIS'].isin(codes_communs))]
+        #print(df_sessions_filtre)
+
+
+
+
+
+        #####
+        # Affectation des valeurs pour les champs de fusion
+        #####
 
         # On définit les mergeField de Word issus de l'exrtract IRIS sessions
-        self._titreFormation = df_sessions_filtre[["Session"]].iloc[-1]
-        self._nbSessionsEvaluees = len(codes_communs)
-        self._numerosSessions = ", ".join(df_sessions_filtre["N° Session"].astype(str))
-        self._nbApprenants = df_sessions_filtre["Nb. Nommés"].sum()
-        self._rp = ", ".join(df_sessions_filtre["Trigramme RP"].astype(str))
-        self._af = ", ".join(df_sessions_filtre["Trigramme AF"].astype(str))
+        #self._titreFormation = df_sessions_filtre["Session"].iloc[-1]
+        self._titreFormation = df_stagiaires_filtre["Formation"].iloc[-1]  # On est sensé travailler sur un même trigramme de formation, donc quelle que soit la ligne on a le bon nom de formation
+        # self._codeFormation = codeFormation  # (donné en argument)
+        self._periodeSessionsEvaluees = f"{self._periode} {self._annee}"
+        self._nbSessionsEvaluees = f"{len(codes_communs)}"
+        self._numerosSessions = ", ".join(df_stagiaires_filtre_1ligne_session["N° Session"].nunique.astype(str))
+        #self._nbApprenants = df_sessions_filtre["Nb. Nommés"].sum()
+        self._nbApprenants = f"{df_stagiaires_filtre_1ligne_session['Nb. Nommés'].sum()}"
+        self._rp = ", ".join(df_stagiaires_filtre_1ligne_session["Trigramme RP"].nunique.astype(str))
+        self._af = ", ".join(df_stagiaires_filtre_1ligne_session["Trigramme AF"].nunique.astype(str))
 
 
         # On ouvre le fichier Excel EvalStat et on le filtre sur les sessions qui nous intéressent
         #df_stagiaires_satisfaction = self._df_stagiaires[self._df_stagiaires['Critère'] == "Satisfaction globale"]
         #self._satisfactionGlobale_moy:Optional[float] = df_stagiaires_satisfaction['Note'].mean()
         #self._satisfactionGlobale_com:Optional[str] = "\n".join("•" + df_stagiaires_satisfaction['Commentaires'].dropna().astype(str))
-        self._satisfactionGlobale_moy:Optional[float] = round(self._stats_stagiaires["Satisfaction globale"]["Moyenne"],1)
-        print(f"self._satisfactionGlobale_moy = {self._satisfactionGlobale_moy}")
-        self._satisfactionGlobale_com:Optional[str] = self._stats_stagiaires["Satisfaction globale"]["Commentaires"]
-        print(f"self._satisfactionGlobale_com = {self._satisfactionGlobale_com}")
+        self._satisfactionGlobale_moy = f'{self._stats_stagiaires["Satisfaction globale"]["Moyenne"]:.1f}'
+        #print(f"self._satisfactionGlobale_moy = {self._satisfactionGlobale_moy}")
+        self._satisfactionGlobale_com = self._stats_stagiaires["Satisfaction globale"]["Commentaires"].replace("_x000D_", "\n")
+        #print(f"self._satisfactionGlobale_com = {self._satisfactionGlobale_com}")
 
         #df_stagiaires_recommandation = self._df_stagiaires[self._df_stagiaires['Critère'] == "Recommanderiez-vous cette formation ?"]
         #self._recommandation_moy:Optional[float] = df_stagiaires_recommandation['Note'].mean()
-        self._recommandation_moy:Optional[float] = round(self._stats_stagiaires["Recommanderiez-vous cette formation ?"]["Moyenne"]*100,0)
-        print(f"self._recommandation_moy = {self._recommandation_moy}")
+        self._recommandation_moy = f'{self._stats_stagiaires["Recommanderiez-vous cette formation ?"]["Moyenne"]*100:.0f}%'
+        #print(f"self._recommandation_moy = {self._recommandation_moy}")
 
         
         #df_stagiaires_commentaires = self._df_stagiaires[self._df_stagiaires['Critère'] == "Commentaires, remarques, suggestions"]
         #self._commentairesRemarquesSuggestions_com:Optional[str] = "\n".join("•" + df_stagiaires_commentaires['Commentaires'].dropna().astype(str))
-        self._commentairesRemarquesSuggestions_com:Optional[str] = self._stats_stagiaires["Commentaires, remarques, suggestions"]["Commentaires"]
-        print(f"self._commentairesRemarquesSuggestions_com = {self._commentairesRemarquesSuggestions_com}")
+        self._commentairesRemarquesSuggestions_com = self._stats_stagiaires["Commentaires, remarques, suggestions"]["Commentaires"].replace("_x000D_", "\n")
+        #print(f"self._commentairesRemarquesSuggestions_com = {self._commentairesRemarquesSuggestions_com}")
 
-        self._evalInf3_val:Optional[int] = len(stats_sous_3)
-        self._evalInf3_com:Optional[str] = "\n".join(
-            valeurs["Commentaires"]
-            for valeurs in stats_sous_3.values()
+        self._evalInf3_val = f"{len(stats_sous_3)}"
+        self._evalInf3_com = "\n".join(f"• {clef} ({valeurs['Moyenne']:.1f})"
+            for clef, valeurs in stats_sous_3.items()
             if valeurs["Commentaires"]
         )
+        #self._evalInf3_com = "\n".join(
+        #    valeurs["Commentaires"]
+        #    for valeurs in stats_sous_3.values()
+        #    if valeurs["Commentaires"]
+        #).replace("_x000D_", "\n")
 
-        self._tauxRetours_val:Optional[float] = round((nb_stagiaires_retours/self._nbApprenants)*100,0)
+        self._tauxRetours_val = f"{(nb_stagiaires_retours/nb_apprenants)*100:.0f}%"
 
         self._mergeBilanV3(os.path.join(os.path.dirname(es._fe_evaluations_formation.chemin_fichier), "Bilan session-"+self._periodeSessionsEvaluees+".docx"))
 
@@ -1629,15 +1656,15 @@ class BilanSessionV3:
             nbSessionsEvaluees = self._nbSessionsEvaluees,
             numerosSessions = self._numerosSessions,
             nbApprenants = self._nbApprenants,
-            re = self._rp,
+            rp = self._rp,
             af = self._af,
-            satisfactionGlobale_moy = f"{self._satisfactionGlobale_moy:.1f}",
+            satisfactionGlobale_moy = self._satisfactionGlobale_moy,
             satisfactionGlobale_com = self._satisfactionGlobale_com,
-            recommandation_moy = f"{self._recommandation_moy:.1f}%",
+            recommandation_moy = self._recommandation_moy,
             commentairesRemarquesSuggestions_com = self._commentairesRemarquesSuggestions_com,
-            evalInf3_val = f"{self._evalInf3_val:.0f}%",
+            evalInf3_val = self._evalInf3_val,
             evalInf3_com = self._evalInf3_com,
-            tauxRetours_val = f"{self._tauxRetours_val:.0f}%"
+            tauxRetours_val = self._tauxRetours_val
             )
         
         document.write(chemin_word_bilan_output)
