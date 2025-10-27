@@ -1229,16 +1229,18 @@ class EvalStat:
 
 
     # === Popup ===
-    def _filedialog_csv(self, code_IRIS:int, trigramme:Optional[str] = None) -> str|None:
+    def _filedialog_csv(self, code_IRIS: int, trigramme: Optional[str] = None) -> str | None:
         """
-        Ouvre un filediahog pour demander à l'utilisateur de sélectionner un CSV
-        On pointe au mieux sur le répertoire des CSV de cette formation pour la boite de dialogue
+        Ouvre un filedialog pour demander à l'utilisateur de sélectionner un CSV.
+        On pointe au mieux sur le répertoire des CSV de cette formation pour la boîte de dialogue.
         """
+
         def _filedialog_csv_pasDeReponse():
             """
-            Si l'utilisateur a cliqué sur annulé à la boite de _filedialog_csv, alors on demande à l'utilisateur s'il veut choisir à nouveau, sauter cette étape (pas de CSV pour cette session) ou quitter l'appli
+            Si l'utilisateur a cliqué sur 'Annuler' à la boîte de _filedialog_csv,
+            alors on demande à l'utilisateur s'il veut choisir à nouveau, sauter cette étape ou quitter.
             """
-            choix = {} # Astuce : les dictionnaires sont dispo dans les sous-fonctions sans avoir à les déclarer nonlocal (plutôt qu'un str par ex.)
+            choix = {}
 
             def choisir_nouveau():
                 choix["reponse"] = "choisir"
@@ -1255,13 +1257,20 @@ class EvalStat:
                 fenetre.quit()
                 fenetre.destroy()
 
-            fenetre = tk.Tk()
+            fenetre = tk.Toplevel()  # ✅ sous-fenêtre modale
             fenetre.title("Aucun fichier sélectionné")
             fenetre.geometry("400x250")
             fenetre.resizable(False, False)
-            fenetre.eval('tk::PlaceWindow . center')  # Centrer la fenêtre
+            fenetre.eval('tk::PlaceWindow . center')
+            fenetre.attributes('-topmost', True)  # ✅ reste au-dessus
+            fenetre.grab_set()  # ✅ bloque l’interaction avec le reste
+            fenetre.focus_force()
 
-            label = tk.Label(fenetre, text="Aucun fichier n'a été sélectionné.\nQue souhaitez-vous faire ?", pady=20)
+            label = tk.Label(
+                fenetre,
+                text="Aucun fichier n'a été sélectionné.\nQue souhaitez-vous faire ?",
+                pady=20
+            )
             label.pack()
 
             bouton_frame = tk.Frame(fenetre)
@@ -1271,41 +1280,62 @@ class EvalStat:
             tk.Button(bouton_frame, text="Choisir CSV à nouveau", width=25, command=choisir_nouveau).grid(row=1, column=0, padx=5, pady=5)
             tk.Button(bouton_frame, text="Quitter traitement", width=20, command=quitter).grid(row=2, column=0, padx=5, pady=5)
 
-            fenetre.mainloop()
+            fenetre.wait_window()  # ✅ attend la fermeture avant de continuer
             return choix.get("reponse")
 
+        # --- Fenêtre principale invisible servant de parent ---
         root = tk.Tk()
-        root.withdraw()  # Ne pas afficher la fenêtre principale
+        root.withdraw()  # cache la fenêtre principale
+        root.lift()  # met au-dessus
+        root.attributes('-topmost', True)  # force le focus
+        root.after_idle(root.attributes, '-topmost', False)  # évite qu’elle reste bloquée au-dessus
+        root.focus_force()
 
+        # Prépare le chemin initial
         if (trigramme is None) and (self._chemin_excel_evaluations_formation is not None):
             trigramme = self._chemin_excel_evaluations_formation
-        
-        if trigramme:
-            # On pré-définit le chemin où sont sensés être stockés les CSV d'évaluation des stagiaires
-            chemin_repertoire_csv = optimiseCheminRepertoire(os.path.dirname(self._chemin_excel_evaluations_defaut.replace("###", trigramme)))
 
+        if trigramme:
+            chemin_repertoire_csv = optimiseCheminRepertoire(
+                os.path.dirname(
+                    self._chemin_excel_evaluations_defaut.replace("###", trigramme)
+                )
+            )
+        else:
+            chemin_repertoire_csv = os.getcwd()
+
+        # --- Boucle de sélection ---
         while True:
-            chemin = filedialog.askopenfilename(title=f"Sélectionner le fichier CSV de la session {code_IRIS}", initialdir=chemin_repertoire_csv or os.getcwd, filetypes=[("Fichiers CSV", "*.csv")])
+            chemin = filedialog.askopenfilename(
+                parent=root,  # ✅ rattache au root
+                title=f"Sélectionner le fichier CSV de la session {code_IRIS}",
+                initialdir=chemin_repertoire_csv,
+                filetypes=[("Fichiers CSV", "*.csv")]
+            )
 
             if chemin:
-                print(f"Fichier sélectionné : {chemin}")
-                return chemin  # ✅ Fichier sélectionné → on retourne
+                print(f"✅ Fichier sélectionné : {chemin}")
+                root.destroy()
+                return chemin  # fichier choisi → on sort
 
-            # ❌ Aucun fichier sélectionné → boîte personnalisée
+            # ❌ Aucun fichier sélectionné → fenêtre de choix personnalisée
             reponse = _filedialog_csv_pasDeReponse()
 
             if reponse == "choisir":
-                continue  # 🔁 Re-ouvrir le file dialog
+                continue  # 🔁 réouvrir le filedialog
             elif reponse == "absent":
                 print(f"⚠️ Pas de CSV disponible pour cette session {code_IRIS}, session exclue.")
+                root.destroy()
                 return None
             elif reponse == "quitter":
                 print("❌ Traitement interrompu par l'utilisateur.")
+                root.destroy()
                 sys.exit()
             else:
                 print("Réponse inattendue. Fermeture.")
+                root.destroy()
                 sys.exit()
-    
+        
 
 
 class BilanSessionV3:
