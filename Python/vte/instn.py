@@ -1324,7 +1324,7 @@ class EvalStat:
             if reponse == "choisir":
                 continue
             elif reponse == "absent":
-                print(f"⚠️ Pas de CSV disponible pour cette session {code_IRIS}, session exclue.")
+                #print(f"⚠️  Pas de CSV disponible pour cette session {code_IRIS}, session exclue.")
                 root.destroy()
                 return None
             elif reponse == "quitter":
@@ -1361,6 +1361,10 @@ class BilanSessionV3:
     _periode:str
     _lieuPrincipal:str = "INSTN Marcoule"
     _stats_stagiaires:dict = None # Dictionnaire des stats des CSV
+    _es:EvalStat  # Fichier Excel global des évaluations stagiaires de la formation
+    
+    _codes_IRIS_communs:list[str]  # Codes IRIS en commun entre le fichier Excel des sessions et le fichier Excel global des évaluations stagiaires de la formation
+    _codes_IRIS_absents_fin:list[str]  # Disparités restantes après traitement des CSV manquants entre le fichier Excel des sessions et le fichier Excel global des évaluations stagiaires de la formation
 
     #_sessions_nom_typeExport = sessions._nom_typeExport #  Provient de la valeur globale sessions
     #_sessions_codeExport = sessions._codeExport #  Provient de la valeur globale sessions
@@ -1396,50 +1400,98 @@ class BilanSessionV3:
         self._annee = annee
         self._periode = periode
 
-        #####
-        # Exploitation de l'extract IRIS sessions
-        #####
 
-        # J'ouvre un export session de IRIS et load tous ses tableaux structurés dans des DataFrame (inclus dans un FichierExcel)
-        #self._chemin_fichier_session = filedialog.askopenfilename(title="Sélectionner l'export " + self._sessions_nom_typeExport + " (" + self._sessions_codeExport + ") Excel à employer", filetype=[("Fichiers Excel", "*.xlsx")], initialdir=self._sessions_repertoire)
-        #if not self._chemin_fichier_session:
-        #    vlog.log_erreur("click sur cancel du filedialog → Pas de chemin de fichier session")
+        # Ouverture / création du dataframe de l'extract IRIS sessions de la formation
+        df_sessions_filtre = self._creer_df_extractIRIS_sessions_periode()
 
-        # Pour l'instant je récupère le plus récent
+        # On met à jour df_sessions_filtre selon les sessions que souhaite garder / exclure l'utilisateur
+        df_sessions_filtre = self._demande_sessions_a_exclure(df_sessions_filtre)
+
+        # On met à jour l'Excel evalstat de la formation si des sessions demandées par l'utilisateur ne s'y trouvent pas
+        self._maj_evalstat_formation(df_sessions_filtre)
+
+        # On calcule les stats
+        self._calculer_stats_criteres()
+        #pprint(self._stats_stagiaires)
+
+        # On construit le bilan de session (bilan de session V3)
+        self._bilanSessionV3()
+
+        # On ouvre le word
+        FichierWord.depuisFichier(chemin_fichier=self._chemin_word_bilan_output, charger_contentControl=False, afficherWord=True)
+
+    @staticmethod
+    def _demander_entiers(message="Pour exclure des sessions : entrez un ou plusieurs code IRIS (numéro à 5 chiffres) séparés par des espaces (ou rien pour passer) : ") -> List[str]:
+        while True:
+            entree = input(message).strip()
+            if not entree:
+                # Pas de saisie => retourner liste vide
+                return []
+
+            # On met mes codes IRIS dans une liste de str
+            #valeurs = [v.strip() for v in entree.replace(',', ' ').split()]
+
+            # Vérifier que toutes les valeurs sont des entiers
+            #try:
+            #    entiers = [int(v) for v in valeurs]
+            #    return entiers
+            #except ValueError:
+            #    print("Erreur : veuillez entrer uniquement des nombres entiers, séparés par des espaces ou des virgules.")
+
+            # On met mes codes IRIS dans une liste de str en vrifiant que toutes les valeurs sont des entiers
+            try:
+                # On teste le typage en int
+                l_entiers = [int(v.strip()) for v in entree.replace(',', ' ').split()]
+                # On reconvertit en str avant sortie méthode
+                l_str = [str(v) for v in l_entiers]
+                return l_str
+
+            except ValueError:
+                print("Erreur : veuillez entrer uniquement des nombres entiers, séparés par des espaces ou des virgules.")
+                BilanSessionV3._demander_entiers()
+
+
+            
+            return valeurs
+            
+    def _creer_df_extractIRIS_sessions_periode(self) -> pd.DataFrame:
+        """
+        Méthode pour créer df_sessions_filtre
+        C'est le dataframe issu de l'extract IRIS session. Il est filtré sur :
+           - le trigramme de la formation en cours ;
+           - l'année de la session ;
+           - Statut Session != "Annulée" ;
+           - la période souhaitée pour le bilan (1er semestre, 2nd semestre ou toute l'année)
+
+        On se base sur l'export session de IRIS le plus récent
+        """
+        ####
+        # Ouverture export session IRIS
+        ####
+
+        # Pour l'instant je récupère l'export session de IRIS le plus récent
         self._chemin_fichier_session = obtenir_fichier_plus_recent_repertoire(self._repertoire_fichier_session, r"^R04110_Sessions.*")
-        print(f"✅ Récupération du dernier extract IRIS Sessions de {self._repertoire_fichier_session} : {os.path.basename(self._chemin_fichier_session)}")
+        vlog.print("OK", f"✅ Récupération du dernier extract IRIS Sessions de {self._repertoire_fichier_session} : {os.path.basename(self._chemin_fichier_session)}")
         
         # Je load l'Excel des sessions
         timer.debut(f"Lecture de {self._chemin_fichier_session}")
         self._fe_sessions = FichierExcel.depuis_fichier(self._chemin_fichier_session)
+        vlog.ajouter_message("OK", f"✅ Lecture de {self._chemin_fichier_session}")
         timer.fin()
         #print(self._fe_session)
 
-        # Je charge le DataFrame sur le tableau structuré "Sessions"
-        self._df_sessions = self._fe_sessions._tableaux["Sessions"]._df  # Création d'un alias
+        # Création d'un alias sur le tableau structuré "Sessions"
+        self._df_sessions = self._fe_sessions._tableaux["Sessions"]._df
 
        # Je retype "Trigramme formation"
         self._df_sessions['Trigramme formation'] = self._df_sessions['Trigramme formation'].astype(str)
-        #print(self._df_sessions.columns.to_list())
-        #print(self._df_sessions)
-        #for col in self._df_sessions.columns:
-        #    print(repr(col))
-        #print(self._df_sessions['Trigramme formation'].dtype)
-        
-        # Pour initialiser les valeurs communes, déjà on filtre le Dataframe principal avec le code formation
-        if self._periode == "1er semestre":
-            date_debut = pd.Timestamp(f'{annee}-01-01')
-            date_fin = pd.Timestamp(f'{annee}-06-30')
-        elif self._periode == "2nd semestre":
-            date_debut = pd.Timestamp(f'{annee}-07-01')
-            date_fin = pd.Timestamp(f'{annee}-12-31')
-        elif self._periode == "Année":
-            date_debut = pd.Timestamp(f'{annee}-01-01')
-            date_fin = pd.Timestamp(f'{annee}-12-31')
-        else:
-            # Cas par défaut : on ne filtre pas sur la date
-            date_debut = None
-            date_fin = None
+
+
+
+
+        ####
+        # Filtration du dataframe
+        ####
 
         # Application du pré-filtre avec les 3 critères trigramme, statut session et période
         df_sessions_filtre = self._df_sessions[
@@ -1448,6 +1500,25 @@ class BilanSessionV3:
             (self._df_sessions['Statut Session'] != "Annulée")
         ]
         #print(df_sessions_filtre)
+
+
+        # Définition date de début et de fin de la période choisie par l'utilisateur
+        if self._periode == "1er semestre":
+            date_debut = pd.Timestamp(f'{self._annee}-01-01')
+            date_fin = pd.Timestamp(f'{self._annee}-06-30')
+        elif self._periode == "2nd semestre":
+            date_debut = pd.Timestamp(f'{self._annee}-07-01')
+            date_fin = pd.Timestamp(f'{self._annee}-12-31')
+        elif self._periode == "Année":
+            date_debut = pd.Timestamp(f'{self._annee}-01-01')
+            date_fin = pd.Timestamp(f'{self._annee}-12-31')
+        else:
+            # Cas par défaut : on ne filtre pas sur la date
+            date_debut = None
+            date_fin = None
+
+
+        # Application second filtre sur la période
         if date_debut is not None and date_fin is not None:
             df_sessions_filtre = df_sessions_filtre[
                 (df_sessions_filtre['Date début ses.'] >= date_debut) &
@@ -1455,9 +1526,14 @@ class BilanSessionV3:
             ]   
         #print(df_sessions_filtre)
 
+        return df_sessions_filtre
 
-        # Afficher les sessions et dates et statuts 
-        #print(df_sessions_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Statut \nSession', 'N° Session']].to_string(index=False))
+    def _demande_sessions_a_exclure(self, df_sessions_filtre:pd.DataFrame) -> pd.DataFrame:
+        """
+        Demande à l'utilisateur les sessions qu'il souhaite exclure de la période choisie
+        On retourne un dataframe df_sessions_filtre à jour
+        """
+        # On affiche à l'utilisateur les sessions et dates et statuts 
         print(f"\nListe des sessions {self._codeFormation} dans {os.path.basename(self._chemin_fichier_session)} - {self._periode} {self._annee}")
         print(tabulate(
             df_sessions_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Statut Session', 'N° Session']], 
@@ -1466,14 +1542,15 @@ class BilanSessionV3:
             showindex=False
         ))
         
-        #On demande à l'utilisateur les sessions qu'il veut exclure
-        exclusionSessions = self.demander_entiers()
+        # On demande à l'utilisateur les sessions qu'il veut exclure
+        exclusionSessions = BilanSessionV3._demander_entiers()
         if exclusionSessions:  # si la liste n'est pas vide
             df_sessions_filtre = df_sessions_filtre[~df_sessions_filtre['Code IRIS'].isin(exclusionSessions)]
         else:
             # la liste est vide, on ne filtre rien, on garde tout
             pass
- 
+
+        # On affiche à l'utilisateur les sessions finalement retenues
         print("\nSessions retenues :")
         print(tabulate(
             df_sessions_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Statut Session', 'N° Session']], 
@@ -1482,255 +1559,87 @@ class BilanSessionV3:
             showindex=False
         ))
 
+        return df_sessions_filtre
 
+    def _maj_evalstat_formation(self, df_sessions_filtre:pd.DataFrame):
+        """
+        Met à jour l'Excel evalstat de la formation si des sessions demandées par l'utilisateur ne s'y trouvent pas
+        (on regarde les CSV qui ne sont pas dans le fichier Excel global à partir de la liste df_sessions_filtre['Code IRIS'])
 
-
-
-
-
-
-        #####
-        # Exploitation des EvalStat
-        #####
-
-        # A partir de la liste df_sessions_filtre['Code IRIS'], on regarde les CSV qui ne sont pas dans le fichier Excel global
-        # On ouvre le fichier Excel global des évaluation de la formation
+        """
+        # On ouvre le fichier Excel global des évaluations de la formation
         timer.debut("Lecture du fichier Excel global des évaluations des stagiaires")
-        es = EvalStat.depuis_fe_evaluations_formation(self._codeFormation)
-        self._df_stagiaires = es._fe_evaluations_formation._tableaux["Stagiaires"]._df  # Création d'un alias pour faciliter le code
+        self._es = EvalStat.depuis_fe_evaluations_formation(self._codeFormation)
+        self._df_stagiaires = self._es._fe_evaluations_formation._tableaux["Stagiaires"]._df  # Création d'un alias pour faciliter le code
+        vlog.ajouter_message("OK", f"✅ Lecture du fichier Excel global des évaluations des stagiaires {self._es._fe_evaluations_formation.chemin_fichier}")
         timer.fin()
 
 
 
         # --- Gestion des CSV manquants
         # On isole depuis ce fichier les CSV manquants (df_sessions_filtre = sessions demandées par l'utilisateur ; es._df_formation_stagiaires = existant dans l'excel global)
-        code_session_absents = list(set(df_sessions_filtre['Code IRIS']) - set(self._df_stagiaires['Code IRIS']))
-        if code_session_absents:
-            print(f"🔎 Des codes session sont absents : {code_session_absents}")
+        self._code_session_absents = list(set(df_sessions_filtre['Code IRIS']) - set(self._df_stagiaires['Code IRIS']))
+        if self._code_session_absents:
+            vlog.print("Info", f"🔎 Des codes session sont absents de l'Excel global des évaluations des stagiaires : {self._code_session_absents}")
 
             # Pour les CSV manquants, on demande à l'utilisateur de sélectionner les CSV à la main
             chemins_csv_a_traiter = {}
             chemins_csv_manquants = {}
-            for code_IRIS in code_session_absents:
+            for code_IRIS in self._code_session_absents:
                 # L'utilisateur sélectionne le CSV de code_IRIS
-                chemin_csv_supp = es._filedialog_csv(code_IRIS=code_IRIS, trigramme=self._codeFormation)
+                chemin_csv_supp = self._es._filedialog_csv(code_IRIS=code_IRIS, trigramme=self._codeFormation)
                 
                 if chemin_csv_supp is not None: # CSV sélectionné 
                     chemins_csv_a_traiter[code_IRIS] = chemin_vers_unc(chemin_csv_supp)
-                    print(f"✅ Tous les CSV sont bien importés dans {os.path.basename(es._fe_evaluations_formation.chemin_fichier)}")
+                    vlog.print("OK", f"✅ CSV {code_IRIS} : {chemin_csv_supp}")
                 else: #CSV manquant
-                    chemins_csv_manquants[code_IRIS] = f"Pas de CSV disponible pour cette session {code_IRIS}, session exclue."
+                    chemins_csv_manquants[code_IRIS] = f"❌ Pas de CSV disponible pour cette session {code_IRIS}, session exclue."
+                    vlog.print("CSV non disponible", f"❌ CSV {code_IRIS} : pas de CSV disponible pour cette session, session exclue.")
             #print(chemins_csv_manquants)
 
-            # Les codes à traiter sont chemins_csv_a_traiter (déjà des chemins vers CSV) + les chemins CSV des codes restants dans es._df_formation_stagiaires['Code IRIS']
-            # les chemins des codes restants dans es._df_formation_stagiaires['Code IRIS'] sont les disctinct CSV - les 
 
             # On traite les CSV sélectionnés par l'utilisateur
             tuple_csv_stagiaires = tuple(val for val in chemins_csv_a_traiter.values())
             if tuple_csv_stagiaires:
-                print(f"⏳ Traitement des CSV non déjà présents dans {os.path.basename(es._fe_evaluations_formation.chemin_fichier)} : {tuple_csv_stagiaires}...")
-                es = EvalStat.depuis_tuple_csv_stagiaires(tuple_csv_stagiaires=tuple_csv_stagiaires, fe_sessions=self._fe_sessions)
-            if (es._chemins_csv_traites or es._chemins_csv_probleme or es._chemins_csv_exclus):
-                print("Bilan traitement des CSV :")
-            if es._chemins_csv_traites:
-                print(f"✅ chemins traités :")
-                print(es._chemins_csv_traites)
-            if es._chemins_csv_probleme:
-                print(f"❌ chemins ayant eu des problèmes (exclus) :")
-                print(es._chemins_csv_probleme)
-            if es._chemins_csv_exclus:
-                print(f"❌ chemins exclus lors du traitement :")
-                print(es._chemins_csv_exclus)
+                vlog.print("Info", f"⏳ Traitement des CSV non déjà présents dans {os.path.basename(es._fe_evaluations_formation.chemin_fichier)} : {tuple_csv_stagiaires}...")
+                self._es = EvalStat.depuis_tuple_csv_stagiaires(tuple_csv_stagiaires=tuple_csv_stagiaires, fe_sessions=self._fe_sessions)
+
+            # Affichage selon retours traitement EvalStat
+            if (self._es._chemins_csv_traites or self._es._chemins_csv_probleme or self._es._chemins_csv_exclus):
+                vlog.print("Info", "Bilan traitement des CSV :")
+            if self._es._chemins_csv_traites:
+                vlog.print("OK", f"✅ Chemins traités : {self._es._chemins_csv_traites}")
+            if self._es._chemins_csv_probleme:
+                vlog.print("Problème traitement CSV", f"❌ Chemins ayant eu des problèmes (exclus) : {self._es._chemins_csv_probleme}")
+            if self._es._chemins_csv_exclus:
+                vlog.print("Problème traitement CSV", f"❌ Chemins exclus lors du traitement : {self._es._chemins_csv_exclus}")
                 
         else:
-            print(f"✅ Tous les CSV sont bien déjà importés dans {os.path.basename(es._fe_evaluations_formation.chemin_fichier)}")
+            vlog.print("OK", f"✅ Tous les CSV sont bien déjà importés dans {os.path.basename(self._es._fe_evaluations_formation.chemin_fichier)}")
 
 
-        codes_communs = list(set(df_sessions_filtre['Code IRIS']) & set(self._df_stagiaires['Code IRIS']))
-        code_session_absents = list(set(df_sessions_filtre['Code IRIS']) - set(self._df_stagiaires['Code IRIS']))
-        print(f"\nIn fine, voici la liste des éléments qui seront :")
-        print(f"\t• inclus dans le bilan : {codes_communs}")
-        print(f"\t• exclus du bilan : {code_session_absents}")
+        self._codes_IRIS_communs = list(set(df_sessions_filtre['Code IRIS']) & set(self._df_stagiaires['Code IRIS']))
+        codes_IRIS_absents = list(set(df_sessions_filtre['Code IRIS']) - set(self._df_stagiaires['Code IRIS']))
+        vlog.print("Info", f"\nIn fine, voici la liste des éléments qui seront :")
+        vlog.print("Info", f"\t• inclus dans le bilan : {self._codes_IRIS_communs}")
+        vlog.print("Info", f"\t• exclus du bilan : {codes_IRIS_absents}")
 
 
  
         
         # On remet à jour les alias avec les nouvelles données (après traitement CSV)
-        self._df_stagiaires_final = self._df_stagiaires[self._df_stagiaires['Code IRIS'].isin(codes_communs)]
-        print(self._df_stagiaires_final)
+        self._df_stagiaires_final = self._df_stagiaires[self._df_stagiaires['Code IRIS'].isin(self._codes_IRIS_communs)]
+        #vlog.print("Info", self._df_stagiaires_final)
         self._df_stagiaires_final_1ligne_session = self._df_stagiaires_final.drop_duplicates(subset=['Code IRIS'])  # Ne garde qu'une ligne par Code IRIS (la première rencontrée)
-        print(self._df_stagiaires_final_1ligne_session)
+        #vlog.print("Info", self._df_stagiaires_final_1ligne_session)
 
         # Dernière vérif qu'on a bien tout importé les CSV dans l'excel global
-        code_session_absents_fin = list(set(df_sessions_filtre['Code IRIS']) - set(self._df_stagiaires_final['Code IRIS']))
-        if not code_session_absents_fin:
-            print(code_session_absents_fin)
-            vlog.ajouter_message("Erreur", "Erreur il reste encore des disparités avec des CSV non importés qui sont sensés être dans le bilan après traitement", )
+        self._codes_IRIS_absents_fin = list(set(df_sessions_filtre['Code IRIS']) - set(self._df_stagiaires_final['Code IRIS']))
+        if not self._codes_IRIS_absents_fin:
+            #print(self._code_session_absents_fin)
+            vlog.print("Erreur", f"Erreur il reste encore des disparités avec des CSV non importés qui sont sensés être dans le bilan après traitement : {self._codes_IRIS_absents_fin}", )
 
-
-
-        # On calcule les stats
-        self.calculer_stats_criteres()
-        #pprint(self._stats_stagiaires)
-
-        # On crée le dictionnaire pour les critères dont la moyenne est inférieure à 3 et non exclus (critères dans la liste self._critere_a_enlever)
-        stats_sous_3 = {
-            critere: valeurs
-            for critere, valeurs in self._stats_stagiaires.items()
-            if (
-                critere not in self._critere_a_enlever
-                and valeurs["Moyenne"] is not None
-                and valeurs["Moyenne"] < 3
-            )
-        }
-
-        
-       
-        # On évalue les valeurs requises pour la fin de la méthode
-        self._periodeSessionsEvaluees = f"{self._periode} {self._annee}"
-        self._chemin_word_bilan_output = os.path.join(os.path.dirname(es._fe_evaluations_formation.chemin_fichier), "Bilan session-"+self._periodeSessionsEvaluees+".docx")
-        nb_stagiaires_retours = self._df_stagiaires_final['NOM Prénom'].nunique()
-        nb_apprenants = self._df_stagiaires_final_1ligne_session['Nb présents'].sum()
-
-        # Application du pré-filtre avec les 3 critères trigramme, statut session et période
-        #df_sessions_filtre = self._df_sessions[
-        #    (self._df_sessions['Trigramme formation'] == str(self._codeFormation)) &
-        #    (self._df_sessions['Année début ses.'] == self._annee) &
-        #    (self._df_sessions['Statut Session'] != "Annulée")
-        #]
-        
-        #df_sessions_filtre = self._df_sessions[
-        #    (self._df_sessions['Code IRIS'].isin(codes_communs))]
-        #print(df_sessions_filtre)
-
-
-
-
-
-        #####
-        # Affectation des valeurs pour les champs de fusion
-        #####
-
-        # On définit les mergeField de Word issus de l'exrtract IRIS sessions
-        #self._titreFormation = df_sessions_filtre["Session"].iloc[-1]
-        self._titreFormation = self._df_stagiaires_final["Formation"].iloc[-1]  # On est sensé travailler sur un même trigramme de formation, donc quelle que soit la ligne on a le bon nom de formation
-        # self._codeFormation = codeFormation  # (donné en argument)
-        # self._periodeSessionsEvaluees = f"{self._periode} {self._annee}"  # Evalué plus haut
-        self._nbSessionsEvaluees = f"{len(codes_communs)}"
-        self._numerosSessions = ", ".join(self._df_stagiaires_final_1ligne_session["N° Session"].dropna().astype(str).unique())
-        #self._nbApprenants = df_sessions_filtre["Nb. Nommés"].sum()
-        self._nbApprenants = f"{nb_apprenants}"
-        self._rp = ", ".join(self._df_stagiaires_final_1ligne_session["Trigramme RP"].dropna().astype(str).unique())
-        self._af = ", ".join(self._df_stagiaires_final_1ligne_session["Trigramme AF"].dropna().astype(str).unique())
-
-
-        # On ouvre le fichier Excel EvalStat et on le filtre sur les sessions qui nous intéressent
-        #df_stagiaires_satisfaction = self._df_stagiaires[self._df_stagiaires['Critère'] == "Satisfaction globale"]
-        #self._satisfactionGlobale_moy:Optional[float] = df_stagiaires_satisfaction['Note'].mean()
-        #self._satisfactionGlobale_com:Optional[str] = "\n".join("•" + df_stagiaires_satisfaction['Commentaires'].dropna().astype(str))
-        self._satisfactionGlobale_moy = f'{self._stats_stagiaires["Satisfaction globale"]["Moyenne"]:.1f}'
-        #print(f"self._satisfactionGlobale_moy = {self._satisfactionGlobale_moy}")
-        self._satisfactionGlobale_com = self._stats_stagiaires["Satisfaction globale"]["Commentaires"].replace("_x000D_", "\n")
-        #print(f"self._satisfactionGlobale_com = {self._satisfactionGlobale_com}")
-
-        #df_stagiaires_recommandation = self._df_stagiaires[self._df_stagiaires['Critère'] == "Recommanderiez-vous cette formation ?"]
-        #self._recommandation_moy:Optional[float] = df_stagiaires_recommandation['Note'].mean()
-        self._recommandation_moy = f'{self._stats_stagiaires["Recommanderiez-vous cette formation ?"]["Moyenne"]/5*100:.0f}%'  # (on divise par 5 car on a un booléen stcké sous forme de note sur 5 : 0 = False, 5 = True)
-        #print(f"self._recommandation_moy = {self._recommandation_moy}")
-
-        
-        #df_stagiaires_commentaires = self._df_stagiaires[self._df_stagiaires['Critère'] == "Commentaires, remarques, suggestions"]
-        #self._commentairesRemarquesSuggestions_com:Optional[str] = "\n".join("•" + df_stagiaires_commentaires['Commentaires'].dropna().astype(str))
-        self._commentairesRemarquesSuggestions_com = self._stats_stagiaires["Commentaires, remarques, suggestions"]["Commentaires"].replace("_x000D_", "\n")
-        #print(f"self._commentairesRemarquesSuggestions_com = {self._commentairesRemarquesSuggestions_com}")
-
-        self._evalInf3_val = f"{len(stats_sous_3)}"
-        self._evalInf3_com = "\n".join(f"• {clef} ({valeurs['Moyenne']:.1f}) :{valeurs['Commentaires'].replace('•', '\n   -').replace('\n\n', '\n')}"
-            for clef, valeurs in stats_sous_3.items()
-        )
-        #self._evalInf3_com = "\n".join(
-        #    valeurs["Commentaires"]
-        #    for valeurs in stats_sous_3.values()
-        #    if valeurs["Commentaires"]
-        #).replace("_x000D_", "\n")
-
-        self._tauxRetours_val = f"{(nb_stagiaires_retours/nb_apprenants)*100:.0f}%"
-
-        # On merge les champs de fusion
-        #_chemin_word_bilan_output
-        self._mergeBilanV3()
-
-        # On ouvre le word
-        wd = FichierWord.depuisFichier(chemin_fichier=self._chemin_word_bilan_output, charger_contentControl=False, afficherWord=True)
-
-    def _mergeBilanV3(self):
-        """
-        A partir d'un chemin de fichier word avec des champs de fusion, on crée le bilan de formation final en incluant les données à l'intérieur.
-        Le fichier output est défini par l'utilisateur
-
-        :param s_word_bilan_input: Chemin du fichier Word contenant les champs de fusion et a employer
-        :type s_word_bilan_input: string
-        :param s_word_bilan_output: Chemin du fichier Word apres fusion des donnees
-        :type s_word_bilan_output: string
-        :return: pas de donnee en retour
-        :rtype: none
-
-        :Example:
-
-        >>> self.mergeBilan("C:\\Users\\wordIn.docx", "C:\\Users\\wordOut.docx")
-
-
-        .. seealso:: Rien du tout.
-        .. warning:: Rien du tout.
-        .. note:: Rien du tout.
-        .. todo:: Rien du tout.
-        """
-
-        #print(f"BilanFormation lancé avec : trigramme={self._codeFormation}, année={self._annee}")
-        document = MailMerge(self._chemin_word_bilan_input)
-        #print(document.get_merge_fields())
-
-        document.merge(
-            titreFormation = self._titreFormation,
-            codeFormation = self._codeFormation,
-            periodeSessionsEvaluees = self._periodeSessionsEvaluees,
-            nbSessionsEvaluees = self._nbSessionsEvaluees,
-            numerosSessions = self._numerosSessions,
-            nbApprenants = self._nbApprenants,
-            rp = self._rp,
-            af = self._af,
-            satisfactionGlobale_moy = self._satisfactionGlobale_moy,
-            satisfactionGlobale_com = self._satisfactionGlobale_com,
-            recommandation_moy = self._recommandation_moy,
-            commentairesRemarquesSuggestions_com = self._commentairesRemarquesSuggestions_com,
-            evalInf3_val = self._evalInf3_val,
-            evalInf3_com = self._evalInf3_com,
-            tauxRetours_val = self._tauxRetours_val
-            )
-        
-        document.write(self._chemin_word_bilan_output)
-
-    @staticmethod
-    def demander_entiers(message="Pour exclure des sessions : entrez un ou plusieurs code IRIS (numéro à 5 chiffres) séparés par des espaces (ou rien pour passer) : ") -> List[str]:
-        while True:
-            entree = input(message).strip()
-            if not entree:
-                # Pas de saisie => retourner liste vide
-                return []
-            
-            # Séparer les valeurs (espaces ou virgules)
-            valeurs = [v.strip() for v in entree.replace(',', ' ').split()]
-            return valeurs
-            
-            # Vérifier que toutes les valeurs sont des entiers
-            #try:
-            #    entiers = [int(v) for v in valeurs]
-            #    return entiers
-            #except ValueError:
-            #    print("Erreur : veuillez entrer uniquement des nombres entiers, séparés par des espaces ou des virgules.")
-
-
-    def calculer_stats_criteres(self) -> dict:
+    def _calculer_stats_criteres(self) -> dict:
         """
         Retourne un dictionnaire de la forme :
         {
@@ -1770,6 +1679,113 @@ class BilanSessionV3:
 
         return self._stats_stagiaires
 
+    def _bilanSessionV3(self) -> None:
+        def __construit_champsFusionV3(self) -> None:
+            """
+            Calcule puis définit les str des champs de fusion
+            """
+            #####
+            # On évalue les valeurs requises pour la fin de la méthode
+            #####
+            self._periodeSessionsEvaluees = f"{self._periode} {self._annee}"
+            self._chemin_word_bilan_output = os.path.join(os.path.dirname(self._es._fe_evaluations_formation.chemin_fichier), "Bilan session-"+self._periodeSessionsEvaluees+".docx")
+            nb_stagiaires_retours = self._df_stagiaires_final['NOM Prénom'].nunique()
+            nb_apprenants = self._df_stagiaires_final_1ligne_session['Nb présents'].sum()
+
+            stats_sous_3 = { # Dictionnaire pour les critères dont la moyenne est inférieure à 3 et non exclus (critères dans la liste self._critere_a_enlever)
+                critere: valeurs
+                for critere, valeurs in self._stats_stagiaires.items()
+                if (
+                    critere not in self._critere_a_enlever
+                    and valeurs["Moyenne"] is not None
+                    and valeurs["Moyenne"] < 3
+                )
+            }
+
+
+
+            #####
+            # Affectation des valeurs pour les champs de fusion (ce sont des str)
+            #####
+            self._titreFormation = self._df_stagiaires_final["Formation"].iloc[-1]  # On est sensé travailler sur un même trigramme de formation, donc quelle que soit la ligne on a le bon nom de formation
+            # self._codeFormation = codeFormation  # (donné en argument)
+            # self._periodeSessionsEvaluees = f"{self._periode} {self._annee}"  # Evalué plus haut
+            self._nbSessionsEvaluees = f"{len(self._codes_IRIS_communs)}"
+            self._numerosSessions = ", ".join(self._df_stagiaires_final_1ligne_session["N° Session"].dropna().astype(str).unique())
+            self._nbApprenants = f"{nb_apprenants}"
+            self._rp = ", ".join(self._df_stagiaires_final_1ligne_session["Trigramme RP"].dropna().astype(str).unique())
+            self._af = ", ".join(self._df_stagiaires_final_1ligne_session["Trigramme AF"].dropna().astype(str).unique())
+
+            self._satisfactionGlobale_moy = f'{self._stats_stagiaires["Satisfaction globale"]["Moyenne"]:.1f}'
+            self._satisfactionGlobale_com = self._stats_stagiaires["Satisfaction globale"]["Commentaires"].replace("_x000D_", "\n")
+
+            self._recommandation_moy = f'{self._stats_stagiaires["Recommanderiez-vous cette formation ?"]["Moyenne"]/5*100:.0f}%'  # (on divise par 5 car on a un booléen stcké sous forme de note sur 5 : 0 = False, 5 = True)
+            self._commentairesRemarquesSuggestions_com = self._stats_stagiaires["Commentaires, remarques, suggestions"]["Commentaires"].replace("_x000D_", "\n")
+
+            self._evalInf3_val = f"{len(stats_sous_3)}"
+            self._evalInf3_com = "\n".join(f"• {clef} ({valeurs['Moyenne']:.1f}) :{valeurs['Commentaires'].replace('•', '\n   -').replace('\n\n', '\n')}"
+                for clef, valeurs in stats_sous_3.items()
+            )
+            #self._evalInf3_com = "\n".join(
+            #    valeurs["Commentaires"]
+            #    for valeurs in stats_sous_3.values()
+            #    if valeurs["Commentaires"]
+            #).replace("_x000D_", "\n")
+
+            self._tauxRetours_val = f"{(nb_stagiaires_retours/nb_apprenants)*100:.0f}%"
+
+        def __mergeBilanV3(self) -> None:
+            """
+            A partir d'un chemin de fichier word avec des champs de fusion, on crée le bilan de formation final en incluant les données à l'intérieur.
+            Le fichier output est défini par l'utilisateur
+
+            :param s_word_bilan_input: Chemin du fichier Word contenant les champs de fusion et a employer
+            :type s_word_bilan_input: string
+            :param s_word_bilan_output: Chemin du fichier Word apres fusion des donnees
+            :type s_word_bilan_output: string
+            :return: pas de donnee en retour
+            :rtype: none
+
+            :Example:
+
+            >>> self.mergeBilan("C:\\Users\\wordIn.docx", "C:\\Users\\wordOut.docx")
+
+
+            .. seealso:: Rien du tout.
+            .. warning:: Rien du tout.
+            .. note:: Rien du tout.
+            .. todo:: Rien du tout.
+            """
+
+            #print(f"BilanFormation lancé avec : trigramme={self._codeFormation}, année={self._annee}")
+            document = MailMerge(self._chemin_word_bilan_input)
+            #print(document.get_merge_fields())
+
+            document.merge(
+                titreFormation = self._titreFormation,
+                codeFormation = self._codeFormation,
+                periodeSessionsEvaluees = self._periodeSessionsEvaluees,
+                nbSessionsEvaluees = self._nbSessionsEvaluees,
+                numerosSessions = self._numerosSessions,
+                nbApprenants = self._nbApprenants,
+                rp = self._rp,
+                af = self._af,
+                satisfactionGlobale_moy = self._satisfactionGlobale_moy,
+                satisfactionGlobale_com = self._satisfactionGlobale_com,
+                recommandation_moy = self._recommandation_moy,
+                commentairesRemarquesSuggestions_com = self._commentairesRemarquesSuggestions_com,
+                evalInf3_val = self._evalInf3_val,
+                evalInf3_com = self._evalInf3_com,
+                tauxRetours_val = self._tauxRetours_val
+                )
+            
+            document.write(self._chemin_word_bilan_output)
+
+        # On construit champs de fusion
+        __construit_champsFusionV3()
+
+        # On merge les champs de fusion
+        __mergeBilanV3()
 
 class BilanFormation:
     """

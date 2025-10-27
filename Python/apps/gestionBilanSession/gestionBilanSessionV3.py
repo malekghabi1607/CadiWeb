@@ -11,6 +11,7 @@ def main():
 
 def test():
     # === 
+    # periode = ["1er semestre", "2nd semestre", "Année"]
     bs = BilanSessionV3("948", 2024, "Année")
     print("")
 

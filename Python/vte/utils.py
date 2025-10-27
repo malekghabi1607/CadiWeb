@@ -163,6 +163,10 @@ class Vlog:
             self._dict_messages[categorie] = []
         self._dict_messages[categorie].append((texte, style))
 
+    def print(self, categorie: str, texte: str, style: Union[str, List[str]] = "normal") -> None:
+        self.ajouter_message(categorie=categorie, texte=texte, style=style)
+        print(texte)
+
     def reinitialiser_messages(self) -> None:
         """
         Vide complètement les messages enregistrés.
