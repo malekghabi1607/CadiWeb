@@ -1713,10 +1713,10 @@ class BilanSession:
 
         # Dernière vérif qu'on a bien tout importé les CSV dans l'excel global
         self._codes_IRIS_absents_fin = list(set(self._df_sessions_filtre['Code IRIS']) - set(self._df_stagiaires_final['Code IRIS']))
-        if not self._codes_IRIS_absents_fin:
+        #if not self._codes_IRIS_absents_fin:
             #print(self._code_session_absents_fin)
-            vlog.print("Erreur", f"Erreur il reste encore des disparités avec des CSV non importés qui sont sensés être dans le bilan après traitement : {self._codes_IRIS_absents_fin}")
-            exit()
+            #vlog.print("Erreur", f"Erreur il reste encore des disparités avec des CSV non importés qui sont sensés être dans le bilan après traitement : {self._codes_IRIS_absents_fin}")
+            #exit()
 
         # On définit la liste finale des N° session traités
         codesIRIS_avec_CSV = list(set(self._df_sessions_filtre['Code IRIS']) & set(self._df_stagiaires_final['Code IRIS']))
@@ -1843,26 +1843,45 @@ class BilanSession:
                 self._rp += " (" + ", ".join(self._df_stagiaires_final_1ligne_session["Trigramme RP"].dropna().astype(str).unique()) + ")"  # Valeur si on ne prend que les données CSV
                 self._af += " (" + ", ".join(self._df_stagiaires_final_1ligne_session["Trigramme AF"].dropna().astype(str).unique()) + ")"  # Valeur si on ne prend que les données CSV
 
-            self._commentairesBilan = "Les valeurs entre parenthèses dans les statistiques générales sont les données des sessions pour lesquelles nous avons des CSV exploitables.\n" + self._commentairesBilan
+                self._commentairesBilan = "Les valeurs entre parenthèses dans les statistiques générales sont les données des sessions pour lesquelles nous avons des CSV exploitables.\n" + self._commentairesBilan
             
-            self._satisfactionGlobale_moy = f'{self._stats_stagiaires["Satisfaction globale"]["Moyenne"]:.1f}'
-            self._satisfactionGlobale_com = self._stats_stagiaires["Satisfaction globale"]["Commentaires"].replace("_x000D_", "\n")
+            # Si des champs ne sont pas dans le CSV, alors on garde "" qui est déjà définit dans le constructeur
+            try:
+                self._satisfactionGlobale_moy = f'{self._stats_stagiaires["Satisfaction globale"]["Moyenne"]:.1f}'
+            except:
+                pass
+            try:
+                self._satisfactionGlobale_com = self._stats_stagiaires["Satisfaction globale"]["Commentaires"].replace("_x000D_", "\n")
+            except:
+                pass
+            try:
+                self._recommandation_moy = f'{self._stats_stagiaires["Recommanderiez-vous cette formation ?"]["Moyenne"]/5*100:.0f}%'  # (on divise par 5 car on a un booléen stcké sous forme de note sur 5 : 0 = False, 5 = True)
+            except:
+                pass
+            try:
+                self._commentairesRemarquesSuggestions_com = self._stats_stagiaires["Commentaires, remarques, suggestions"]["Commentaires"].replace("_x000D_", "\n")
+            except:
+                pass
+            try:
+                self._evalInf3_val = f"{len(stats_sous_3)}"
+            except:
+                pass
+            try:
+                self._evalInf3_com = "\n".join(f"• {clef} ({valeurs['Moyenne']:.1f}) :{valeurs['Commentaires'].replace('•', '\n   -').replace('\n\n', '\n')}"
+                    for clef, valeurs in stats_sous_3.items()
+                )
 
-            self._recommandation_moy = f'{self._stats_stagiaires["Recommanderiez-vous cette formation ?"]["Moyenne"]/5*100:.0f}%'  # (on divise par 5 car on a un booléen stcké sous forme de note sur 5 : 0 = False, 5 = True)
-            self._commentairesRemarquesSuggestions_com = self._stats_stagiaires["Commentaires, remarques, suggestions"]["Commentaires"].replace("_x000D_", "\n")
-
-            self._evalInf3_val = f"{len(stats_sous_3)}"
-            self._evalInf3_com = "\n".join(f"• {clef} ({valeurs['Moyenne']:.1f}) :{valeurs['Commentaires'].replace('•', '\n   -').replace('\n\n', '\n')}"
-                for clef, valeurs in stats_sous_3.items()
-            )
-            #self._evalInf3_com = "\n".join(
-            #    valeurs["Commentaires"]
-            #    for valeurs in stats_sous_3.values()
-            #    if valeurs["Commentaires"]
-            #).replace("_x000D_", "\n")
-
-            self._tauxRetours_val = f"{(nb_stagiaires_retours/nb_apprenants)*100:.0f}%"
-
+                #self._evalInf3_com = "\n".join(
+                #    valeurs["Commentaires"]
+                #    for valeurs in stats_sous_3.values()
+                #    if valeurs["Commentaires"]
+                #).replace("_x000D_", "\n")
+            except:
+                pass
+            try:
+                self._tauxRetours_val = f"{(nb_stagiaires_retours/nb_apprenants)*100:.0f}%"
+            except:
+                pass
 
         # On finit d'écrire la partie commentaires → Déjà écrit dans _maj_evalstat_formation
         #self._commentairesBilan += "\nListe des sessions :"
