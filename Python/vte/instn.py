@@ -839,6 +839,10 @@ class EvalStat:
                 timer.debut("Écriture, sauvegarde et fermeture")
                 instance._fe_evaluations_formation._tableaux["CSV_stagiaires"].ecrit_dataFrame_dans_tableauStructure(df_formation_csv, supprimeDonneesEtRemplace = supprimeDonneesEtRemplace_evaluations_formation)
                 instance._fe_evaluations_formation._tableaux["Stagiaires"].ecrit_dataFrame_dans_tableauStructure(df_formation_stagiaires, supprimeDonneesEtRemplace = supprimeDonneesEtRemplace_evaluations_formation)
+                instance._fe_evaluations_formation._tableaux["CSV_stagiaires"].charge_df()
+                instance._fe_evaluations_formation._tableaux["Stagiaires"].charge_df()
+
+                instance._df_formation_stagiaires = instance._fe_evaluations_formation._tableaux["Stagiaires"]._df  # Alias
 
                 instance._fe_evaluations_formation.save()
                 instance._fe_evaluations_formation.close()
@@ -1348,7 +1352,7 @@ class BilanSession:
     # === VARIABLES D'ENVIRONNEMENT (constantes ou communes)
     _REPERTOIRE_FICHIER_SESSION:str = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\IRIS\Extracts complets"
     _CHEMIN_WORD_BILAN_INPUT:str = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\Modèles\P07-Pr05-F05-Bilan-session-V3.docx"
-    _REPERTOIRE_WORD_BILAN_OUTPUT:str = r"\\instnt\partage\FORMATIONS_C\###\P07-bilan-sessions-et-bilan-formation\"
+    _REPERTOIRE_WORD_BILAN_OUTPUT:str = r"\\instnt\partage\FORMATIONS_C\###\P07-bilan-sessions-et-bilan-formation"
 
     _CRITERES_A_ENLEVER = [  # Critères à ne pas retenir pour le calcul des moyennes < 3
         "Comment avez-vous connu cette formation ?", "Avez-vous d'autres besoins de formation ?", "Commentaires, remarques, suggestions", "Recommanderiez-vous cette formation ?"]
@@ -1379,11 +1383,11 @@ class BilanSession:
         self._codes_IRIS_absents_fin: list[str] = []  # Disparités restantes après traitement des CSV manquants entre le fichier Excel des sessions et le fichier Excel global des évaluations stagiaires de la formation
 
         self._exploitationBilan:dict[list] = {
-            "Exploités pour les stats générales" : [],  # Exploités pour stats initiales
-            "Exploités pour les évaluations (CSV présents)" : [],
-            "Exclus des évaluations (CSV manquants)" : [],   # Exclus des évaluations car CSV stagiaires manquants
-            "Exclus des évaluations (problème traitement CSV)" : [],   # Exclus des évaluations car problème au traitement des CSV
-            "Exclus entièrement du bilan" : [],  # Exclus entièrement du bilan car sessions non réalisées ou mauvais RP (exclus par l'utilisateur)
+            "Exploités pour les stats générales" : [],  # Exploités pour stats initiales → Dans _demande_sessions_a_exclure
+            "Exploités pour les évaluations (CSV présents)" : [],  # Exploités pour les stats stagiaires → Dans _maj_evalstat_formation
+            "Exclus des évaluations (CSV manquants)" : [],   # Exclus des évaluations car CSV stagiaires manquants → Dans _maj_evalstat_formation
+            "Exclus des évaluations (problème traitement CSV)" : [],   # Exclus des évaluations car problème au traitement des CSV → Dans _maj_evalstat_formation
+            "Exclus entièrement du bilan" : [],  # Exclus entièrement du bilan car sessions non réalisées ou mauvais RP (exclus par l'utilisateur) → Dans _demande_sessions_a_exclure
         }
 
         # Liste des champs de fusion du Word (pour la fonction .mergefields, il faut des str)
@@ -1608,6 +1612,14 @@ class BilanSession:
         timer.debut("Lecture du fichier Excel global des évaluations des stagiaires")
         self._es = EvalStat.depuis_fe_evaluations_formation(self._codeFormation)
         self._df_stagiaires = self._es._fe_evaluations_formation._tableaux["Stagiaires"]._df  # Création d'un alias pour faciliter le code
+        # Retype "Trigramme formation" et "Code IRIS"
+        self._df_stagiaires["Trigramme formation"] = self._df_stagiaires["Trigramme formation"].astype(str)
+        self._df_stagiaires["Code IRIS"] = (
+            pd.to_numeric(self._df_stagiaires["Code IRIS"], errors="coerce")  # "13414" ou 13414.0 → 13414
+            .astype("Int64")                               # reste un entier (NaN compatible)
+            .astype(str)                                   # enfin en texte propre
+        )
+        
 
         print(f"\nÉtat de Excel évaluations filtré sur période et trigramme ({self._es._chemin_excel_evaluations_formation}) :")
         pprint(self._df_stagiaires)
@@ -1620,6 +1632,8 @@ class BilanSession:
         # --- Gestion des CSV manquants
         # On isole depuis ce fichier les CSV manquants (df_sessions_filtre = sessions demandées par l'utilisateur ; es._df_formation_stagiaires = existant dans l'excel global)
         self._code_session_absents = list(set(self._df_sessions_filtre['Code IRIS']) - set(self._df_stagiaires['Code IRIS']))
+        print(set(self._df_sessions_filtre['Code IRIS']))
+        print(set(self._df_stagiaires['Code IRIS']))
         if self._code_session_absents:
             vlog.print("Info", f"🔎 Des codes session sont absents de l'Excel global des évaluations des stagiaires : {self._code_session_absents}")
 
@@ -1645,21 +1659,37 @@ class BilanSession:
             # On traite les CSV sélectionnés par l'utilisateur
             tuple_csv_stagiaires = tuple(val for val in chemins_csv_a_traiter.values())
             if tuple_csv_stagiaires:
-                vlog.print("Info", f"⏳ Traitement des CSV non déjà présents dans {os.path.basename(self._es._fe_evaluations_formation.chemin_fichier)} :" + "\n".join(f"• {chemin}" for chemin in tuple_csv_stagiaires))
+                vlog.print("Info", f"⏳ Traitement des CSV non déjà présents dans {os.path.basename(self._es._fe_evaluations_formation.chemin_fichier)} :" + "".join(f"\n• {chemin}" for chemin in tuple_csv_stagiaires))
                 self._es = EvalStat.depuis_tuple_csv_stagiaires(tuple_csv_stagiaires=tuple_csv_stagiaires, fe_sessions=self._fe_sessions)
-                self._df_stagiaires = self._es._fe_evaluations_formation._tableaux["Stagiaires"]._df  # MàJ de l'alias pour faciliter le code
+                self._df_stagiaires = self._es._fe_evaluations_formation._tableaux["Stagiaires"]._df.copy()  # MàJ de l'alias pour faciliter le code
+                self._df_stagiaires["Trigramme formation"] = self._df_stagiaires["Trigramme formation"].astype(str)
+                self._df_stagiaires["Code IRIS"] = (
+                    pd.to_numeric(self._df_stagiaires["Code IRIS"], errors="coerce")  # "13414" ou 13414.0 → 13414
+                    .astype("Int64")                               # reste un entier (NaN compatible)
+                    .astype(str)                                   # enfin en texte propre
+                )
+
+            print(self._df_stagiaires)
+
+            # Après traitement des CSV on regarde dans self._df_stagiaires les N° de session
+            #self._exploitationBilan["Exploités pour les évaluations (CSV présents)"] = list(set(self._df_sessions_filtre['Code IRIS']) & set(self._df_stagiaires['Code IRIS']))
+            #codesIRIS_absents_apres_traitement = list(set(self._code_session_absents) - set(self._df_stagiaires['Code IRIS']) - set(self._exploitationBilan["Exclus des évaluations (CSV manquants)"]))
+            #print("codesIRIS_absents_apres_traitement : ", codesIRIS_absents_apres_traitement)
+            #print(set(self._code_session_absents))
+            #print(set(self._df_stagiaires['Code IRIS']))
+
+            #self._exploitationBilan["Exclus des évaluations (problème traitement CSV)"] = self._df_sessions_filtre[self._df_sessions_filtre['Code IRIS'].isin(codesIRIS_absents_apres_traitement)]['N° Session'].tolist()
+
 
             # Affichage selon retours traitement EvalStat
             if (self._es._chemins_csv_traites or self._es._chemins_csv_probleme or self._es._chemins_csv_exclus):
                 vlog.print("Info", "\nBilan traitement des CSV :")
             if self._es._chemins_csv_traites:
-                vlog.print("OK", f"   ✅ Chemins traités : {self._es._chemins_csv_traites}")
+                vlog.print("OK", f"   ✅ Chemins traités : " + "".join(f"\n      • {i_csv}" for i_csv in self._es._chemins_csv_traites))
             if self._es._chemins_csv_probleme:
-                # On trace l'exclusion du CSV
-                self._exploitationBilan["Exclus des évaluations (problème traitement CSV)"].append(self._es._chemins_csv_probleme)
-                vlog.print("Problème traitement CSV", f"   ❌ Chemins ayant eu des problèmes (exclus) : {self._es._chemins_csv_probleme}")
+                vlog.print("Problème traitement CSV", f"   ❌ Chemins ayant eu des problèmes (exclus) : " + "".join(f"\n      • {i_csv}" for i_csv in self._es._chemins_csv_probleme))
             if self._es._chemins_csv_exclus:
-                vlog.print("Problème traitement CSV", f"   ❌ Chemins exclus lors du traitement : {self._es._chemins_csv_exclus}")
+                vlog.print("Problème traitement CSV", f"   ❌ Chemins exclus lors du traitement : " + "".join(f"\n      • {i_csv}" for i_csv in self._es._chemins_csv_exclus))
                 
         else:
             vlog.print("OK", f"✅ Tous les CSV sont bien déjà importés dans {os.path.basename(self._es._fe_evaluations_formation.chemin_fichier)}")
@@ -1667,10 +1697,10 @@ class BilanSession:
 
 
         self._codes_IRIS_communs = list(set(self._df_sessions_filtre['Code IRIS']) & set(self._df_stagiaires['Code IRIS']))
-        codes_IRIS_absents = list(set(self._df_sessions_filtre['Code IRIS']) - set(self._df_stagiaires['Code IRIS']))
-        vlog.print("Info", f"\nIn fine, voici la liste des éléments qui seront :")
-        vlog.print("Info", f"\t• inclus dans le bilan : {self._codes_IRIS_communs}")
-        vlog.print("Info", f"\t• exclus du bilan : {codes_IRIS_absents}")
+        #codes_IRIS_absents = list(set(self._df_sessions_filtre['Code IRIS']) - set(self._df_stagiaires['Code IRIS']))
+        #vlog.print("Info", f"\nIn fine, voici la liste des éléments qui seront :")
+        #vlog.print("Info", f"\t• inclus dans le bilan : {self._codes_IRIS_communs}")
+        #vlog.print("Info", f"\t• exclus du bilan : {codes_IRIS_absents}")
 
 
  
@@ -1688,13 +1718,30 @@ class BilanSession:
             vlog.print("Erreur", f"Erreur il reste encore des disparités avec des CSV non importés qui sont sensés être dans le bilan après traitement : {self._codes_IRIS_absents_fin}")
             exit()
 
-        # On définit la liste finale des CSV traités
-        self._exploitationBilan["Exclus des évaluations (CSV manquants)"] = list(
+        # On définit la liste finale des N° session traités
+        codesIRIS_avec_CSV = list(set(self._df_sessions_filtre['Code IRIS']) & set(self._df_stagiaires_final['Code IRIS']))
+        self._exploitationBilan["Exploités pour les évaluations (CSV présents)"] = self._df_sessions_filtre[self._df_sessions_filtre['Code IRIS'].isin(codesIRIS_avec_CSV)]['N° Session'].tolist()
+        self._exploitationBilan["Exclus des évaluations (problème traitement CSV)"] = list(
             set(self._exploitationBilan["Exploités pour les stats générales"])
             - set(self._exploitationBilan["Exploités pour les évaluations (CSV présents)"])
             - set(self._exploitationBilan["Exclus des évaluations (CSV manquants)"])
-            - set(self._exploitationBilan["Exclus des évaluations (problème traitement CSV)"])
-            )
+        )
+        #self._exploitationBilan["Exploités pour les évaluations (CSV présents)"] = list(
+        #    set(self._exploitationBilan["Exploités pour les stats générales"])
+        #    - set(self._exploitationBilan["Exclus des évaluations (CSV manquants)"])
+        #    - set(self._exploitationBilan["Exclus des évaluations (problème traitement CSV)"])
+        #    )
+
+
+        
+        self._commentairesBilan += "\nListe des sessions :"
+        for critere, lsessions in self._exploitationBilan.items():
+            if lsessions:
+                self._commentairesBilan += f"\n   • {critere} :" + "".join(f"\n       - {isession}" for isession in lsessions)
+        vlog.print("Info", f"\n{self._commentairesBilan}")        
+        
+        
+
 
     def _calculer_stats_criteres(self) -> dict:
         """
@@ -1754,7 +1801,7 @@ class BilanSession:
         # On évalue les valeurs requises pour la fin de la méthode
         #####
         self._periodeSessionsEvaluees = f"{self._periode} {self._annee}"
-        self._chemin_word_bilan_output = os.path.join(self._REPERTOIRE_WORD_BILAN_OUTPUT.replace("###", self._codeFormation)), "Bilan session-"+self._periodeSessionsEvaluees+".docx")
+        self._chemin_word_bilan_output = os.path.join(self._REPERTOIRE_WORD_BILAN_OUTPUT.replace("###", self._codeFormation), "P07-Pr05-F05-Bilan session-"+self._periodeSessionsEvaluees+"-UEM.docx")
 
 
 
@@ -1792,11 +1839,11 @@ class BilanSession:
             if len(self._exploitationBilan["Exploités pour les stats générales"]) != len(self._exploitationBilan["Exploités pour les évaluations (CSV présents)"]) :
                 self._nbSessionsEvaluees += f" ({len(self._codes_IRIS_communs)})"  # Valeur si on ne prend que les données CSV
                 self._numerosSessions += "\n(" + ", ".join(self._df_stagiaires_final_1ligne_session["N° Session"].dropna().astype(str).unique()) + ")"  # Valeur si on ne prend que les données CSV
-                self._nbApprenants += f" ({nb_apprenants})"  # Valeur si on ne prend que les données CSV
-                self._rp += "(" + ", ".join(self._df_stagiaires_final_1ligne_session["Trigramme RP"].dropna().astype(str).unique()) + ")"  # Valeur si on ne prend que les données CSV
-                self._af += "(" + ", ".join(self._df_stagiaires_final_1ligne_session["Trigramme AF"].dropna().astype(str).unique()) + ")"  # Valeur si on ne prend que les données CSV
+                self._nbApprenants += f" ({nb_apprenants:.0f})"  # Valeur si on ne prend que les données CSV
+                self._rp += " (" + ", ".join(self._df_stagiaires_final_1ligne_session["Trigramme RP"].dropna().astype(str).unique()) + ")"  # Valeur si on ne prend que les données CSV
+                self._af += " (" + ", ".join(self._df_stagiaires_final_1ligne_session["Trigramme AF"].dropna().astype(str).unique()) + ")"  # Valeur si on ne prend que les données CSV
 
-            self._commentairesBilan = "Les valeurs entre parenthèses dans les statistiques générales sont les données des sessions pour lesquelles nous avons des CSV exploitables."
+            self._commentairesBilan = "Les valeurs entre parenthèses dans les statistiques générales sont les données des sessions pour lesquelles nous avons des CSV exploitables.\n" + self._commentairesBilan
             
             self._satisfactionGlobale_moy = f'{self._stats_stagiaires["Satisfaction globale"]["Moyenne"]:.1f}'
             self._satisfactionGlobale_com = self._stats_stagiaires["Satisfaction globale"]["Commentaires"].replace("_x000D_", "\n")
@@ -1817,11 +1864,11 @@ class BilanSession:
             self._tauxRetours_val = f"{(nb_stagiaires_retours/nb_apprenants)*100:.0f}%"
 
 
-        # On finit d'écrire la partie commentaires
-        self._commentairesBilan += "\nListe des sessions :"
-        for critere, lsessions in self._exploitationBilan.items():
-            if lsessions:
-                self._commentairesBilan += f"\n   • {critere} :" + [f"\n       - {isession}" for isession in lsessions]
+        # On finit d'écrire la partie commentaires → Déjà écrit dans _maj_evalstat_formation
+        #self._commentairesBilan += "\nListe des sessions :"
+        #for critere, lsessions in self._exploitationBilan.items():
+        #    if lsessions:
+        #        self._commentairesBilan += f"\n   • {critere} :" + "".join(f"\n       - {isession}" for isession in lsessions)
 
 
     def __mergeBilanV3(self) -> None:

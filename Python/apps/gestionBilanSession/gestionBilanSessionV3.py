@@ -20,13 +20,13 @@ def test():
     # === Bilan unique : ok ===
     # periode = ["1er semestre", "2nd semestre", "Année"]
     #BilanSession.bilanUnique("948", 2024, "Année")
-    BilanSession.bilanUnique("TEL", 2022, "Année")
+    #BilanSession.bilanUnique("TEL", 2022, "Année")
 
     # === Plusieurs bilans ===
     bilans_a_traiter = [
-        ("TEL", 2022, "Année"),
-        ("TEL", 2023, "Année"),
-        ("TEL", 2024, "Année"),
+        #("TEL", 2022, "Année"),
+        #("TEL", 2023, "Année"),
+        #("TEL", 2024, "Année"),
         ("TEL", 2025, "Année"),
 
         ("22B", 2022, "Année"),
@@ -45,11 +45,11 @@ def test():
         ("19C", 2025, "Année"),
         
         ("70B", 2022, "Année"),
-        ("19C", 2023, "Année"),
-        ("19C", 2024, "Année"),
-        ("19C", 2025, "Année"),
+        ("70B", 2023, "Année"),
+        ("70B", 2024, "Année"),
+        ("70B", 2025, "Année"),
     ]
-    #BilanSession.plusieursBilans(bilans_a_traiter)
+    BilanSession.plusieursBilans(bilans_a_traiter)
 
     pass
 
