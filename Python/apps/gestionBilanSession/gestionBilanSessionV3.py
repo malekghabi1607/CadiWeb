@@ -8,6 +8,7 @@ def main():
 
     # === Bilan unique : ok ===
     #BilanSession.bilanUnique("948", 2024, "Année")
+    
 
 
     pass
@@ -19,6 +20,7 @@ def test():
     # === Bilan unique : ok ===
     # periode = ["1er semestre", "2nd semestre", "Année"]
     #BilanSession.bilanUnique("948", 2024, "Année")
+    BilanSession.bilanUnique("TEL", 2022, "Année")
 
     # === Plusieurs bilans ===
     bilans_a_traiter = [
@@ -47,7 +49,7 @@ def test():
         ("19C", 2024, "Année"),
         ("19C", 2025, "Année"),
     ]
-    BilanSession.plusieursBilans(bilans_a_traiter)
+    #BilanSession.plusieursBilans(bilans_a_traiter)
 
     pass
 
