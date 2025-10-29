@@ -663,31 +663,28 @@ class EvalStat:
     
 
 
-    # --- Autres variables de la classe
-    _chemin_csv_stagiaires:Optional[str] = None  # Fichier csv EvalStat stagiaire individuel
 
-    _trigrammeFormation:Optional[str] = None
-    _codeIRIS:Optional[str] = None
-
-    _chemin_excel_evaluations_formation:Optional[str] = None  # Chemin du fichier Excel qui contient tous les CSV d'évaluation d'une formation
-    _fe_evaluations_formation:Optional[FichierExcel] = None # Fichier Excel qui contient tous les CSV d'évaluation d'une formation
-    _df_formation_stagiaires:Optional[pd.DataFrame] = None # DataFrame de self._fe_evaluations_formation (Alias)
-
-    _chemin_excel_stagiaires_output:Optional[str] = None  # Fichier xlsx EvalStat stagiaire individuel qu'on va créer à partir du CSV
-    _fe_stagiaires:Optional[FichierExcel] = None  # Objet contenant les données EvalStat stagiaire individuel
-
-    _fe_sessions:Optional[FichierExcel] = None  # Fichier Excel qui contient les extracts IRIS Sessions (ou a minima celles de la période en cours)
-
-    _chemins_csv_traites:List[str] = []
-    _chemins_csv_exclus:List[str] = []
-    _chemins_csv_probleme:List[str] = []
 
     # === CONSTRUCTEUR ===
     def __init__(self) -> None:
-        
+        # --- Autres variables de la classe
+        self._chemin_csv_stagiaires:Optional[str] = None  # Fichier csv EvalStat stagiaire individuel
 
+        self._trigrammeFormation:Optional[str] = None
+        self._codeIRIS:Optional[str] = None
 
-        print()
+        self._chemin_excel_evaluations_formation:Optional[str] = None  # Chemin du fichier Excel qui contient tous les CSV d'évaluation d'une formation
+        self._fe_evaluations_formation:Optional[FichierExcel] = None # Fichier Excel qui contient tous les CSV d'évaluation d'une formation
+        self._df_formation_stagiaires:Optional[pd.DataFrame] = None # DataFrame de self._fe_evaluations_formation (Alias)
+
+        self._chemin_excel_stagiaires_output:Optional[str] = None  # Fichier xlsx EvalStat stagiaire individuel qu'on va créer à partir du CSV
+        self._fe_stagiaires:Optional[FichierExcel] = None  # Objet contenant les données EvalStat stagiaire individuel
+
+        self._fe_sessions:Optional[FichierExcel] = None  # Fichier Excel qui contient les extracts IRIS Sessions (ou a minima celles de la période en cours)
+
+        self._chemins_csv_traites:List[str] = []
+        self._chemins_csv_exclus:List[str] = []
+        self._chemins_csv_probleme:List[str] = []
 
 
     @classmethod
@@ -1321,7 +1318,7 @@ class EvalStat:
             root.attributes('-topmost', False)
 
             if chemin:
-                print(f"✅ Fichier sélectionné : {chemin}")
+                #print(f"✅ Fichier sélectionné : {chemin}")
                 root.destroy()
                 return chemin
 
@@ -1342,8 +1339,6 @@ class EvalStat:
                 print("Réponse inattendue. Fermeture.")
                 root.destroy()
                 sys.exit()
-        
-
 
 class BilanSession:
     """
@@ -1365,7 +1360,7 @@ class BilanSession:
 
 
 
-
+    # === CONSTRUCTEURS ===
     def __init__(self) -> None:
         # Variables d’instance → propres à chaque bilan
         self._chemin_word_bilan_output: Optional[str] = None  # Bilan de session
@@ -1409,7 +1404,6 @@ class BilanSession:
         self._evalInf3_com:str = ""
         self._tauxRetours_val:str = ""
 
-
     @classmethod   
     def bilanUnique(cls, codeFormation:str, annee:int, periode:str) -> None:
 
@@ -1425,8 +1419,8 @@ class BilanSession:
 
         # On met à jour df_sessions_filtre selon les sessions que souhaite garder / exclure l'utilisateur
         instance._demande_sessions_a_exclure()
-        print("\nÉtat de Excel sessions filtré sur période et trigramme :")
-        pprint(instance._df_sessions_filtre)
+        #print("\nÉtat de Excel sessions filtré sur période et trigramme :")
+        #pprint(instance._df_sessions_filtre)
 
         # S'il n'y a plus de session à lire dans _df_sessions_filtre, alors il n'y a plus de raison de faire le bilan
         if len(instance._df_sessions_filtre) != 0 :
@@ -1450,6 +1444,7 @@ class BilanSession:
         for codeFormation, annee, periode in bilans_a_traiter:
             cls.bilanUnique(codeFormation, annee, periode)
 
+    # === MÉTHODES ===
     @classmethod
     def _charger_fe_sessions(cls) -> None:
         """
@@ -1479,7 +1474,6 @@ class BilanSession:
             # Retype "Trigramme formation" et "Code IRIS"
             cls._df_sessions["Trigramme formation"] = cls._df_sessions["Trigramme formation"].astype(str)
             cls._df_sessions["Code IRIS"] = cls._df_sessions["Code IRIS"].astype(str)
-
 
     @staticmethod
     def _demander_entiers(message="Pour exclure des sessions : entrez un ou plusieurs code IRIS (numéro à 5 chiffres) séparés par des espaces (ou rien pour passer) : ") -> List[str]:
@@ -1511,7 +1505,6 @@ class BilanSession:
                 print("Erreur : veuillez entrer uniquement des nombres entiers, séparés par des espaces ou des virgules.")
                 BilanSession._demander_entiers()
 
-            
     def _creer_df_extractIRIS_sessions_periode(self) -> None:
         """
         Méthode pour créer df_sessions_filtre
@@ -1535,7 +1528,8 @@ class BilanSession:
         self._df_sessions_filtre = self.__class__._df_sessions[
             (self._df_sessions['Trigramme formation'] == str(self._codeFormation)) &
             (self._df_sessions['Année début ses.'] == self._annee) &
-            (self._df_sessions['Statut Session'] != "Annulée")
+            (self._df_sessions['Statut Session'] != "Annulée") &
+            (self._df_sessions['Nb. Présents'] != 0)
         ]
         #print(self._df_sessions_filtre)
 
@@ -1569,9 +1563,9 @@ class BilanSession:
         On retourne un dataframe df_sessions_filtre à jour
         """
         # On affiche à l'utilisateur les sessions et dates et statuts 
-        print(f"\nListe des sessions {self._codeFormation} dans {os.path.basename(self._chemin_fichier_session)} - {self._periode} {self._annee}")
+        vlog.print("Info", f"\nListe des sessions {self._codeFormation} dans {os.path.basename(self._chemin_fichier_session)} - {self._periode} {self._annee}", style=["jaune"])
         print(tabulate(
-            self._df_sessions_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Statut Session', 'N° Session']], 
+            self._df_sessions_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Présents', 'Statut Session', 'N° Session']], 
             headers='keys', 
             tablefmt='pretty', 
             showindex=False
@@ -1591,9 +1585,9 @@ class BilanSession:
             pass
 
         # On affiche à l'utilisateur les sessions finalement retenues
-        print("\nSessions retenues pour le bilan :")
+        vlog.print("Info", "\nSessions retenues pour le bilan :", style=["jaune"])
         print(tabulate(
-            self._df_sessions_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Statut Session', 'N° Session']], 
+            self._df_sessions_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Présents', 'Statut Session', 'N° Session']], 
             headers='keys', 
             tablefmt='pretty', 
             showindex=False
@@ -1621,8 +1615,8 @@ class BilanSession:
         )
         
 
-        print(f"\nÉtat de Excel évaluations filtré sur période et trigramme ({self._es._chemin_excel_evaluations_formation}) :")
-        pprint(self._df_stagiaires)
+        #print(f"\nÉtat de Excel évaluations filtré sur période et trigramme ({self._es._chemin_excel_evaluations_formation}) :")
+        #pprint(self._df_stagiaires)
 
         vlog.ajouter_message("OK", f"✅ Lecture du fichier Excel global des évaluations des stagiaires {self._es._fe_evaluations_formation.chemin_fichier}")
         timer.fin()
@@ -1632,8 +1626,8 @@ class BilanSession:
         # --- Gestion des CSV manquants
         # On isole depuis ce fichier les CSV manquants (df_sessions_filtre = sessions demandées par l'utilisateur ; es._df_formation_stagiaires = existant dans l'excel global)
         self._code_session_absents = list(set(self._df_sessions_filtre['Code IRIS']) - set(self._df_stagiaires['Code IRIS']))
-        print(set(self._df_sessions_filtre['Code IRIS']))
-        print(set(self._df_stagiaires['Code IRIS']))
+        #print(set(self._df_sessions_filtre['Code IRIS']))
+        #print(set(self._df_stagiaires['Code IRIS']))
         if self._code_session_absents:
             vlog.print("Info", f"🔎 Des codes session sont absents de l'Excel global des évaluations des stagiaires : {self._code_session_absents}")
 
@@ -1669,7 +1663,7 @@ class BilanSession:
                     .astype(str)                                   # enfin en texte propre
                 )
 
-            print(self._df_stagiaires)
+            #print(self._df_stagiaires)
 
             # Après traitement des CSV on regarde dans self._df_stagiaires les N° de session
             #self._exploitationBilan["Exploités pour les évaluations (CSV présents)"] = list(set(self._df_sessions_filtre['Code IRIS']) & set(self._df_stagiaires['Code IRIS']))
@@ -1739,9 +1733,6 @@ class BilanSession:
             if lsessions:
                 self._commentairesBilan += f"\n   • {critere} :" + "".join(f"\n       - {isession}" for isession in lsessions)
         vlog.print("Info", f"\n{self._commentairesBilan}")        
-        
-        
-
 
     def _calculer_stats_criteres(self) -> dict:
         """
@@ -1883,13 +1874,6 @@ class BilanSession:
             except:
                 pass
 
-        # On finit d'écrire la partie commentaires → Déjà écrit dans _maj_evalstat_formation
-        #self._commentairesBilan += "\nListe des sessions :"
-        #for critere, lsessions in self._exploitationBilan.items():
-        #    if lsessions:
-        #        self._commentairesBilan += f"\n   • {critere} :" + "".join(f"\n       - {isession}" for isession in lsessions)
-
-
     def __mergeBilanV3(self) -> None:
         """
         A partir d'un chemin de fichier word avec des champs de fusion, on crée le bilan de formation final en incluant les données à l'intérieur.
@@ -1937,8 +1921,6 @@ class BilanSession:
             )
         
         document.write(self._chemin_word_bilan_output)
-
-
 
 class BilanFormation:
     """
