@@ -147,34 +147,60 @@ class IHM_console:
     # -------------------------------------------------------------------------
     def demander_saisie(self, message, type_attendu=str):
         """
-        Demande une saisie utilisateur en console, avec validation de type.
+        Demande une saisie utilisateur en console, avec validation et conversion de type.
 
         Paramètres
         ----------
         message : str
             Texte affiché à l’utilisateur pour la saisie.
-        type_attendu : type, optionnel
-            Type attendu pour la conversion (par défaut : str).
-            Peut être `int`, `float`, `bool`, etc.
+        type_attendu : type | str | typing._GenericAlias
+            Type attendu pour la conversion (par ex. int, bool, list[int], etc.)
 
         Retourne
         --------
         valeur : object
             La valeur saisie, convertie au bon type.
 
-        Notes
-        -----
-        - Pour les booléens, les valeurs suivantes sont acceptées comme True :
-          "true", "1", "oui", "o", "y", "yes".
+        Exemples
+        --------
+        - int → "12" ➜ 12
+        - bool → "oui" ➜ True
+        - list[int] → "1, 2, 3" ➜ [1, 2, 3]
+        - list[str] → "A, B, C" ➜ ["A", "B", "C"]
         """
+
+        # Cas : si le type est une chaîne, on le convertit
+        if isinstance(type_attendu, str):
+            mapping_types = {"int": int, "float": float, "bool": bool, "str": str, "list": list}
+            type_attendu = mapping_types.get(type_attendu.lower(), str)
+
+        # Cas : listes typées comme list[int], list[str]...
+        is_list_type = (
+            hasattr(type_attendu, "__origin__")
+            and type_attendu.__origin__ == list
+        )
+
         while True:
             try:
+                # Message adapté selon le type
+                if is_list_type:
+                    sous_type = type_attendu.__args__[0] if type_attendu.__args__ else str
+                    valeur_str = input(f"{message} (liste de {sous_type.__name__} séparés par des virgules) : ")
+                    items = [v.strip() for v in valeur_str.split(",") if v.strip()]
+                    # conversion des éléments
+                    return [sous_type(v) for v in items]
+
                 valeur = input(f"{message} ({getattr(type_attendu, '__name__', str(type_attendu))}) : ")
+
+                # Conversion booléenne
                 if type_attendu == bool:
-                    return valeur.lower() in ["true", "1", "oui", "o", "y", "yes"]
+                    return valeur.strip().lower() in ["true", "1", "oui", "o", "y", "yes"]
+
+                # Conversion simple
                 return type_attendu(valeur)
-            except ValueError:
-                print(f"Erreur : veuillez entrer une valeur de type {type_attendu}.")
+
+            except (ValueError, TypeError):
+                print(f"⚠️ Erreur : veuillez entrer une valeur du type attendu ({type_attendu}).")
 
     # -------------------------------------------------------------------------
     # MÉTHODE : executer_action
