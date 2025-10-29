@@ -838,6 +838,14 @@ def mois_fr_depuis_date(date_val: Union[datetime, str, int, float, pd.Timestamp]
 
     return noms_mois[date_val.month - 1]
 
+
+### --------------------------------------------------------------------
+#  Chaînes de caractères
+### --------------------------------------------------------------------
+def minuscule_premiere_lettre(s: str) -> str:
+    """Met en minuscule uniquement la première lettre d'une chaîne."""
+    return s[:1].lower() + s[1:] if s else s
+
 ### --------------------------------------------------------------------
 #  Fenêtres
 ### --------------------------------------------------------------------

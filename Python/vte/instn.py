@@ -1352,8 +1352,7 @@ class BilanSession:
     _CORPS_MAIL_CHEF_UNITE:str = """
         <p>Bonjour Florent,</p>
         <p>Est-ce que tu peux signer le bilan de session ci-dessous stp.\nLien du bilan de session : <a href="{lien_pdf_bilan}">{lien_pdf_bilan}</a></p> 
-        <p>Il concerne la formation {formation} : {periode}.</p> 
-        <p>Je te remercie, passe une excellente journée,</p>
+        <p>Il concerne la formation {formation} : {periode}.</p>
     """
 
     _CRITERES_A_ENLEVER = [  # Critères à ne pas retenir pour le calcul des moyennes < 3
@@ -1455,6 +1454,13 @@ class BilanSession:
         # On envoie un mail au chef d'unité pour la signature du pdf
         instance._envoyer_mail_chef_unite()
 
+    @classmethod
+    def plusieursBilans_parCodeIRIS(cls, bilans_a_traiter:list[int]) -> None:
+        """
+        Permet de lancer une série de bilans de sessions à partir d'une liste d'entiers (codes IRIS) ex. [61235, 54231]
+        """
+        for codeIRIS in bilans_a_traiter:
+            cls.bilanUnique_parCodeIRIS(codeIRIS)
 
 
     @classmethod   
@@ -1815,7 +1821,7 @@ class BilanSession:
         #    - set(self._exploitationBilan["Exclus des évaluations (problème traitement CSV)"])
         #    )
 
-        pprint(self._exploitationBilan)
+        #pprint(self._exploitationBilan)
         
         self._commentairesBilan += "\nListe des sessions :"
         for critere, lsessions in self._exploitationBilan.items():
@@ -1895,7 +1901,8 @@ class BilanSession:
         # self._codeFormation = codeFormation  # (donné en argument)
         # self._periodeSessionsEvaluees = f"{self._periode} {self._annee}"  # Evalué plus haut
         self._nbSessionsEvaluees = f"{len(self._df_sessions_filtre)}"  # Valeur toutes les données
-        self._numerosSessions = "\n".join(liste_numerosSession_statsgenerales_seulement)  # Valeur toutes les données
+        #self._numerosSessions = "\n".join(liste_numerosSession_statsgenerales_seulement)  # Valeur toutes les données
+        self._numerosSessions = "\n".join(self._df_sessions_filtre["N° Session"].dropna().astype(str).unique())
         self._nbApprenants = f"{self._df_sessions_filtre['Nb. Nommés'].sum()}"  # Valeur toutes les données
         #self._rp = ", ".join(self._df_sessions_filtre["Trigramme RP"].dropna().astype(str).unique())  # Valeur toutes les données
         self._rp = ", ".join(self._df_sessions_filtre["Nom responsable pédag."].dropna().astype(str).unique() + " " + self._df_sessions_filtre["Prénom responsable pédag."].dropna().astype(str).unique())  # Valeur toutes les données
@@ -1921,14 +1928,14 @@ class BilanSession:
             }
 
             # On gère les données entre parenthèses s'il y a des sessions exclues d'une manière ou d'une autre
-            if len(self._exploitationBilan["Exploités pour les stats générales"]) != len(self._exploitationBilan["Exploités pour les évaluations (CSV présents)"]) :
-                self._nbSessionsEvaluees += f" ({len(self._codes_IRIS_communs)})"  # Valeur si on ne prend que les données CSV
-                self._numerosSessions += "\n".join("(" + self._df_stagiaires_final_1ligne_session["N° Session"].dropna().astype(str).unique() + ")")  # Valeur si on ne prend que les données CSV
-                self._nbApprenants += f" ({nb_apprenants:.0f})"  # Valeur si on ne prend que les données CSV
-                #self._rp += " (" + ", ".join(self._df_stagiaires_final_1ligne_session["Trigramme RP"].dropna().astype(str).unique()) + ")"  # Valeur si on ne prend que les données CSV
-                #self._af += " (" + ", ".join(self._df_stagiaires_final_1ligne_session["Trigramme AF"].dropna().astype(str).unique()) + ")"  # Valeur si on ne prend que les données CSV
-
-                self._commentairesBilan = "Les valeurs entre parenthèses dans les statistiques générales sont les données des sessions pour lesquelles nous avons des CSV exploitables.\n" + self._commentairesBilan
+            #if len(self._exploitationBilan["Exploités pour les stats générales"]) != len(self._exploitationBilan["Exploités pour les évaluations (CSV présents)"]) :
+            #    self._nbSessionsEvaluees += f" ({len(self._codes_IRIS_communs)})"  # Valeur si on ne prend que les données CSV
+            #    self._numerosSessions += "\n".join("(" + self._df_stagiaires_final_1ligne_session["N° Session"].dropna().astype(str).unique() + ")")  # Valeur si on ne prend que les données CSV
+            #    self._nbApprenants += f" ({nb_apprenants:.0f})"  # Valeur si on ne prend que les données CSV
+            #    #self._rp += " (" + ", ".join(self._df_stagiaires_final_1ligne_session["Trigramme RP"].dropna().astype(str).unique()) + ")"  # Valeur si on ne prend que les données CSV
+            #    #self._af += " (" + ", ".join(self._df_stagiaires_final_1ligne_session["Trigramme AF"].dropna().astype(str).unique()) + ")"  # Valeur si on ne prend que les données CSV
+            #
+            #    self._commentairesBilan = "Les valeurs entre parenthèses dans les statistiques générales sont les données des sessions pour lesquelles nous avons des CSV exploitables.\n" + self._commentairesBilan
             
             # Si des champs ne sont pas dans le CSV, alors on garde "" qui est déjà définit dans le constructeur
             try:
@@ -2028,7 +2035,7 @@ class BilanSession:
         corps_html = remplacer_champs(self._CORPS_MAIL_CHEF_UNITE, [
             ["lien_pdf_bilan", chemin_pdf_bilan_output],
             ["formation", f"{self._titreFormation} ({self._codeFormation})"],
-            ["periode", self._periode.lower()],
+            ["periode", minuscule_premiere_lettre(self._periode)],
         ])
 
         Mail.creer_mail(

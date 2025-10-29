@@ -1,32 +1,50 @@
 from vte.instn import *
-#from vte.ihm_console import IHM_console
+from vte.ihm_console import IHM_console
 #from vte.ihm_tkinter import IHMTkinter
+
+
+MODE = "console"
+
+
+MENUS = {
+    "Traiter à partir de codes IRIS": {
+        "Code IRIS unique": {
+            "action": BilanSession.bilanUnique_parCodeIRIS,
+            "kwargs": {},
+            "demander": []
+        },
+        "Plusieurs codes IRIS": {
+            "action": BilanSession.plusieursBilans_parCodeIRIS,
+            "kwargs": {},
+            "demander": []
+        },
+    },
+
+    "Traiter pour une période entière (possiblement plusieurs sessions sur un bilan)": {
+        "Code IRIS unique": {
+            "action": BilanSession.bilanUnique_parPeriode,  # BilanSession.bilanUnique_parPeriode("948", 2024, "Année")
+            "kwargs": {},
+            "demander": []
+        },
+        "Plusieurs codes IRIS": {
+            "action": BilanSession.plusieursBilans_parPeriode,
+            "kwargs": {},
+            "demander": []
+        },
+    }
+}
 
 def main():
     
+    vlog.print("Info", "Bienvenue dans le script pour générer des bilans de sessions.", style=["vert clair"])
+
+    print("\nSi vous souhaitez faire un bilan pour une seule session à part")
+
+
+    ihm = IHM_console(MENUS)
+    ihm.afficher_menu()
+
     
-
-    ####
-    # PAR PERIODE
-    ####
-    # periode = ["1er semestre", "2nd semestre", "Année"]
-
-    # === Bilan unique : ok ===
-    #BilanSession.bilanUnique("948", 2024, "Année")
-    
-    # === Plusieurs bilans : ok ===
-    bilans_a_traiter = [
-        ("TEL", 2022, "Année"),
-        ("TEL", 2023, "Année"),
-        ("TEL", 2024, "Année"),
-    ]
-    #BilanSession.plusieursBilans(bilans_a_traiter)
-
-
-
-
-
-    pass
 
 
 
@@ -38,11 +56,11 @@ def test():
     #BilanSession.bilanUnique("TEL", 2022, "Année")
 
     # === Plusieurs bilans ===
-    bilans_a_traiter = [
+    #bilans_a_traiter = [
         #("TEL", 2022, "Année"), OK
         #("TEL", 2023, "Année"), OK
         #("TEL", 2024, "Année"), OK
-        ("TEL", 2025, "Année"), #A REFAIRE MANQUE CSV
+        #("TEL", 2025, "Année"), #A REFAIRE MANQUE CSV
 
         #("19C", 2022, "Année"), OK
         
@@ -87,7 +105,7 @@ def test():
         #("949", 2022, "Année"), OK
 
         #("996", 2022, "Année"), Pas de session
-    ]
+    #]
     #BilanSession.plusieursBilans(bilans_a_traiter)
 
 
@@ -95,18 +113,7 @@ def test():
     #BilanSession.bilanUnique_parCodeIRIS(17343)
     #BilanSession.bilanUnique_parCodeIRIS(16411)
 
-    test = """
-        <p>Bonjour Florent,</p>
-        <p>Est-ce que tu peux signer le bilan de session ci-dessous stp.\nLien du bilan de session : <a href="{lien_pdf_bilan}">{lien_pdf_bilan}</a></p> 
-        <p>Il concerne la formation {formation} : {periode}.</p> 
-        <p>Je te remercie, passe une excellente journée,</p>
-    """
-
-    print(remplacer_champs(test, [
-            ["lien_pdf_bilan", "a"],
-            ["formation", "b"],
-            ["periode", "c"],
-        ]))
+    #BilanSession.plusieursBilans_parCodeIRIS([17343, 16411])
 
     pass
 
@@ -115,19 +122,9 @@ def test():
     
 
 if __name__ == "__main__":
-    test()
+    #test()
+    main()
 
-    # J'ouvre un export session de IRIS et load tous ses tableaux structurés dans des DataFrame (inclus dans un FichierExcel)
-    # Pour l'instant je récupère le plus récent
-
-
-
-    #main()
-
-
-
-# === bilans de session
-#bs = BilanSessionV3("948", 2024, "Année")
 
 
 
