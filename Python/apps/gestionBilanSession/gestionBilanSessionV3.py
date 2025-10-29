@@ -4,11 +4,26 @@ from vte.instn import *
 
 def main():
     
+    
+
+    ####
+    # PAR PERIODE
+    ####
     # periode = ["1er semestre", "2nd semestre", "Année"]
 
     # === Bilan unique : ok ===
     #BilanSession.bilanUnique("948", 2024, "Année")
     
+    # === Plusieurs bilans : ok ===
+    bilans_a_traiter = [
+        ("TEL", 2022, "Année"),
+        ("TEL", 2023, "Année"),
+        ("TEL", 2024, "Année"),
+    ]
+    #BilanSession.plusieursBilans(bilans_a_traiter)
+
+
+
 
 
     pass
@@ -27,7 +42,7 @@ def test():
         #("TEL", 2022, "Année"), OK
         #("TEL", 2023, "Année"), OK
         #("TEL", 2024, "Année"), OK
-        #("TEL", 2025, "Année"), A REFAIRE MANQUE CSV
+        ("TEL", 2025, "Année"), #A REFAIRE MANQUE CSV
 
         #("19C", 2022, "Année"), OK
         
@@ -73,7 +88,25 @@ def test():
 
         #("996", 2022, "Année"), Pas de session
     ]
-    BilanSession.plusieursBilans(bilans_a_traiter)
+    #BilanSession.plusieursBilans(bilans_a_traiter)
+
+
+    # === Bilan unique par code IRIS ===
+    #BilanSession.bilanUnique_parCodeIRIS(17343)
+    #BilanSession.bilanUnique_parCodeIRIS(16411)
+
+    test = """
+        <p>Bonjour Florent,</p>
+        <p>Est-ce que tu peux signer le bilan de session ci-dessous stp.\nLien du bilan de session : <a href="{lien_pdf_bilan}">{lien_pdf_bilan}</a></p> 
+        <p>Il concerne la formation {formation} : {periode}.</p> 
+        <p>Je te remercie, passe une excellente journée,</p>
+    """
+
+    print(remplacer_champs(test, [
+            ["lien_pdf_bilan", "a"],
+            ["formation", "b"],
+            ["periode", "c"],
+        ]))
 
     pass
 

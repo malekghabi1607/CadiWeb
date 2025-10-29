@@ -801,8 +801,8 @@ class EvalStat:
                 traiterCSV = True  # Par défaut, on traite le CSV
 
                 # On vérifie que chemin_csv_session n'est pas déjà dans le fichier session pour savoir si on l'exclue du traitement
-                if df_formation_stagiaires is not None:
-                    if chemin_csv_session in df_formation_stagiaires["Chemin fichier CSV"].drop_duplicates().tolist():  
+                if instance._df_formation_stagiaires is not None:
+                    if chemin_csv_session in instance._df_formation_stagiaires["Chemin fichier CSV"].drop_duplicates().tolist():  
                         traiterCSV = False
                         instance._chemins_csv_exclus.append(chemin_csv_session)
                         print(f"Exclusion car csv déjà dans le fichier global : {chemin_csv_session}")
@@ -827,7 +827,7 @@ class EvalStat:
                             df_formation_stagiaires = pd.concat([df_formation_stagiaires, traite_csv_session._fe_stagiaires._tableaux["Stagiaires"]._df], ignore_index=True)
                         
                         # On ajoute le chemin au tuple des éléments traités
-                        #instance._chemins_csv_traites.append(chemin_csv_session)  # Déjà fait dans depuis_chemin_csv_stagiaires
+                        instance._chemins_csv_traites.append(chemin_csv_session)  # Déjà fait dans depuis_chemin_csv_stagiaires
                         #vlog.ajouter_message("Fichiers traités", chemin_csv_session, style=["vert"])
 
             # On concatène, on sauve et on ferme le fe de tous les CSV de la formation
@@ -1348,6 +1348,13 @@ class BilanSession:
     _REPERTOIRE_FICHIER_SESSION:str = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\IRIS\Extracts complets"
     _CHEMIN_WORD_BILAN_INPUT:str = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\Modèles\P07-Pr05-F05-Bilan-session-V3.docx"
     _REPERTOIRE_WORD_BILAN_OUTPUT:str = r"\\instnt\partage\FORMATIONS_C\###\P07-bilan-sessions-et-bilan-formation"
+    _ADRESSE_MAIL_CHEF_UNITE:str = "florent.lemont@cea.fr"
+    _CORPS_MAIL_CHEF_UNITE:str = """
+        <p>Bonjour Florent,</p>
+        <p>Est-ce que tu peux signer le bilan de session ci-dessous stp.\nLien du bilan de session : <a href="{lien_pdf_bilan}">{lien_pdf_bilan}</a></p> 
+        <p>Il concerne la formation {formation} : {periode}.</p> 
+        <p>Je te remercie, passe une excellente journée,</p>
+    """
 
     _CRITERES_A_ENLEVER = [  # Critères à ne pas retenir pour le calcul des moyennes < 3
         "Comment avez-vous connu cette formation ?", "Avez-vous d'autres besoins de formation ?", "Commentaires, remarques, suggestions", "Recommanderiez-vous cette formation ?"]
@@ -1405,13 +1412,64 @@ class BilanSession:
         self._tauxRetours_val:str = ""
 
     @classmethod   
-    def bilanUnique(cls, codeFormation:str, annee:int, periode:str) -> None:
+    def bilanUnique_parCodeIRIS(cls, code_IRIS:int) -> None:
+        """
+        Permet de générer un bilan de session par code IRIS
+        Ex : BilanSession.bilanUnique_parPeriode(16411)
+        """
+
+        instance = cls()
+
+        # Vérifier que code_iris est bien un entier à 5 chiffres, on le convertit en str
+        est_code_IRIS_valide, instance._code_IRIS = verifier_code_iris(code_IRIS)
+
+        if not est_code_IRIS_valide:
+            vlog.log_erreur(f"Code IRIS en entrée non valide : {code_IRIS}")
+    
+        # Ouverture / création du dataframe de l'extract IRIS sessions de la formation
+        instance._creer_df_extractIRIS_sessions_codeIRIS()
+
+        # Initialisation données
+        instance._codeFormation = instance._df_sessions_filtre["Trigramme formation"].iloc[0]
+        instance._annee = instance._df_sessions_filtre["Année début ses."].iloc[0]
+        moisSession = mois_fr_depuis_date(instance._df_sessions_filtre["Date début ses."].iloc[0])
+        numSession = instance._df_sessions_filtre["N° Session"].iloc[0]
+        instance._periode = f"Session {numSession} uniquement ({moisSession} {instance._annee})"
+        instance._periodeSessionsEvaluees = f"{numSession}"
+
+
+
+        # On met à jour l'Excel evalstat de la formation si des sessions demandées par l'utilisateur ne s'y trouvent pas
+        instance._maj_evalstat_formation()
+
+        # On calcule les stats
+        instance._calculer_stats_criteres()
+        #pprint(instance._stats_stagiaires)
+
+        # On construit le bilan de session (bilan de session V3)
+        instance._bilanSessionV3()
+
+        # On ouvre le word
+        FichierWord.depuisFichier(chemin_fichier=instance._chemin_word_bilan_output, charger_contentControl=False, afficherWord=True)
+
+        # On envoie un mail au chef d'unité pour la signature du pdf
+        instance._envoyer_mail_chef_unite()
+
+
+
+    @classmethod   
+    def bilanUnique_parPeriode(cls, codeFormation:str, annee:int, periode:str) -> None:
+        """
+        Permet de générer un bilan de session selon une période qui est l'un de ces éléments : ["1er semestre", "2nd semestre", "Année"]
+        Ex : BilanSession.bilanUnique_parPeriode("948", 2024, "Année")
+        """
 
         instance = cls()
     
         instance._codeFormation = codeFormation
         instance._annee = annee
         instance._periode = periode
+        instance._periodeSessionsEvaluees = f"{instance._periode} {instance._annee}"
 
 
         # Ouverture / création du dataframe de l'extract IRIS sessions de la formation
@@ -1436,13 +1494,21 @@ class BilanSession:
 
             # On ouvre le word
             FichierWord.depuisFichier(chemin_fichier=instance._chemin_word_bilan_output, charger_contentControl=False, afficherWord=True)
+
+            # On envoie un mail au chef d'unité pour la signature du pdf
+            instance._envoyer_mail_chef_unite()
+
+
         else:
             vlog.print("Info", f"⚠️ Toutes les sessions sont exclues : il n'y a plus de raison de faire le bilan de session.")
 
     @classmethod
-    def plusieursBilans(cls, bilans_a_traiter:list[Tuple[str, int, str]]) -> None:
+    def plusieursBilans_parPeriode(cls, bilans_a_traiter:list[Tuple[str, int, str]]) -> None:
+        """
+        Permet de lancer une série de bilans de sessions à partir d'une liste de tuples ex. [("948", 2022, "Année"), ("948", 2023, "1er semestre"), ("948", 2023, "2nd semestre")]
+        """
         for codeFormation, annee, periode in bilans_a_traiter:
-            cls.bilanUnique(codeFormation, annee, periode)
+            cls.bilanUnique_parPeriode(codeFormation, annee, periode)
 
     # === MÉTHODES ===
     @classmethod
@@ -1504,6 +1570,29 @@ class BilanSession:
             except ValueError:
                 print("Erreur : veuillez entrer uniquement des nombres entiers, séparés par des espaces ou des virgules.")
                 BilanSession._demander_entiers()
+
+    def _creer_df_extractIRIS_sessions_codeIRIS(self) -> None:
+        """
+        Méthode pour créer df_sessions_filtre
+        C'est le dataframe issu de l'extract IRIS session. Il est filtré sur :
+           - le trigramme de la formation en cours ;
+           - l'année de la session ;
+           - Statut Session != "Annulée" ;
+           - la période souhaitée pour le bilan (1er semestre, 2nd semestre ou toute l'année)
+
+        On se base sur l'export session de IRIS le plus récent
+        """
+        # On ouvre et lit l'export sessions IRIS si et seulement si il n'est pas déjà ouvert et lu avant
+        self.__class__._charger_fe_sessions()
+
+        # Application du filtre sur la session
+        self._df_sessions_filtre = self.__class__._df_sessions[self._df_sessions['Code IRIS'] == self._code_IRIS]
+        #print(self._df_sessions_filtre)
+
+        if len(self._df_sessions_filtre) < 1:
+            print(self._df_sessions_filtre)
+            vlog.log_erreur(f"Le fichier Excel Session ne contient pas ce code IRIS : {self._df_sessions_filtre}")
+
 
     def _creer_df_extractIRIS_sessions_periode(self) -> None:
         """
@@ -1726,7 +1815,7 @@ class BilanSession:
         #    - set(self._exploitationBilan["Exclus des évaluations (problème traitement CSV)"])
         #    )
 
-
+        pprint(self._exploitationBilan)
         
         self._commentairesBilan += "\nListe des sessions :"
         for critere, lsessions in self._exploitationBilan.items():
@@ -1791,9 +1880,12 @@ class BilanSession:
         #####
         # On évalue les valeurs requises pour la fin de la méthode
         #####
-        self._periodeSessionsEvaluees = f"{self._periode} {self._annee}"
+        #self._periodeSessionsEvaluees = f"{self._periode} {self._annee}"  #Déjà évalué avant : dépend de si on fait une session unique ou une période
         self._chemin_word_bilan_output = os.path.join(self._REPERTOIRE_WORD_BILAN_OUTPUT.replace("###", self._codeFormation), "P07-Pr05-F05-Bilan session-"+self._periodeSessionsEvaluees+"-UEM.docx")
-
+        liste_numerosSession_statsgenerales_seulement = list(
+            set(self._exploitationBilan["Exploités pour les stats générales"])
+            - set(self._exploitationBilan["Exploités pour les évaluations (CSV présents)"])
+        )
 
 
         #####
@@ -1803,10 +1895,12 @@ class BilanSession:
         # self._codeFormation = codeFormation  # (donné en argument)
         # self._periodeSessionsEvaluees = f"{self._periode} {self._annee}"  # Evalué plus haut
         self._nbSessionsEvaluees = f"{len(self._df_sessions_filtre)}"  # Valeur toutes les données
-        self._numerosSessions = ", ".join(self._df_sessions_filtre["N° Session"].dropna().astype(str).unique())  # Valeur toutes les données
+        self._numerosSessions = "\n".join(liste_numerosSession_statsgenerales_seulement)  # Valeur toutes les données
         self._nbApprenants = f"{self._df_sessions_filtre['Nb. Nommés'].sum()}"  # Valeur toutes les données
-        self._rp = ", ".join(self._df_sessions_filtre["Trigramme RP"].dropna().astype(str).unique())  # Valeur toutes les données
-        self._af = ", ".join(self._df_sessions_filtre["Trigramme AF"].dropna().astype(str).unique())  # Valeur toutes les données
+        #self._rp = ", ".join(self._df_sessions_filtre["Trigramme RP"].dropna().astype(str).unique())  # Valeur toutes les données
+        self._rp = ", ".join(self._df_sessions_filtre["Nom responsable pédag."].dropna().astype(str).unique() + " " + self._df_sessions_filtre["Prénom responsable pédag."].dropna().astype(str).unique())  # Valeur toutes les données
+        #self._af = ", ".join(self._df_sessions_filtre["Trigramme AF"].dropna().astype(str).unique())  # Valeur toutes les données
+        self._af = ", ".join(self._df_sessions_filtre["Créée par"].dropna().astype(str).unique())  # Valeur toutes les données
 
 
         # On n'affecte les champs suivants que si des CSV sont disponibles pour les stats
@@ -1829,10 +1923,10 @@ class BilanSession:
             # On gère les données entre parenthèses s'il y a des sessions exclues d'une manière ou d'une autre
             if len(self._exploitationBilan["Exploités pour les stats générales"]) != len(self._exploitationBilan["Exploités pour les évaluations (CSV présents)"]) :
                 self._nbSessionsEvaluees += f" ({len(self._codes_IRIS_communs)})"  # Valeur si on ne prend que les données CSV
-                self._numerosSessions += "\n(" + ", ".join(self._df_stagiaires_final_1ligne_session["N° Session"].dropna().astype(str).unique()) + ")"  # Valeur si on ne prend que les données CSV
+                self._numerosSessions += "\n".join("(" + self._df_stagiaires_final_1ligne_session["N° Session"].dropna().astype(str).unique() + ")")  # Valeur si on ne prend que les données CSV
                 self._nbApprenants += f" ({nb_apprenants:.0f})"  # Valeur si on ne prend que les données CSV
-                self._rp += " (" + ", ".join(self._df_stagiaires_final_1ligne_session["Trigramme RP"].dropna().astype(str).unique()) + ")"  # Valeur si on ne prend que les données CSV
-                self._af += " (" + ", ".join(self._df_stagiaires_final_1ligne_session["Trigramme AF"].dropna().astype(str).unique()) + ")"  # Valeur si on ne prend que les données CSV
+                #self._rp += " (" + ", ".join(self._df_stagiaires_final_1ligne_session["Trigramme RP"].dropna().astype(str).unique()) + ")"  # Valeur si on ne prend que les données CSV
+                #self._af += " (" + ", ".join(self._df_stagiaires_final_1ligne_session["Trigramme AF"].dropna().astype(str).unique()) + ")"  # Valeur si on ne prend que les données CSV
 
                 self._commentairesBilan = "Les valeurs entre parenthèses dans les statistiques générales sont les données des sessions pour lesquelles nous avons des CSV exploitables.\n" + self._commentairesBilan
             
@@ -1921,6 +2015,29 @@ class BilanSession:
             )
         
         document.write(self._chemin_word_bilan_output)
+
+    def _envoyer_mail_chef_unite(self, pj:Optional[List[str]] = None):
+        """
+        Envoie un mail au chef d'unité avec en lien le PDF à signer
+        """       
+        
+
+
+        chemin_pdf_bilan_output = self._chemin_word_bilan_output.replace(".docx", ".pdf")
+        #self._CORPS_MAIL_CHEF_UNITE.replace()
+        corps_html = remplacer_champs(self._CORPS_MAIL_CHEF_UNITE, [
+            ["lien_pdf_bilan", chemin_pdf_bilan_output],
+            ["formation", f"{self._titreFormation} ({self._codeFormation})"],
+            ["periode", self._periode.lower()],
+        ])
+
+        Mail.creer_mail(
+            destinataires=self._ADRESSE_MAIL_CHEF_UNITE,
+            sujet=f"Signature bilan de session {self._titreFormation} ({self._codeFormation}) : {os.path.basename(chemin_pdf_bilan_output)}",
+            corps_html=corps_html,
+            pieces_jointes=pj,
+            envoyer_mail=False  # envoie directement sans afficher
+        ) 
 
 class BilanFormation:
     """
@@ -3166,6 +3283,66 @@ class Traiter_contactsApprentis:
 ### --------------------------------------------------------------------
 #  Fonctions globales INSTN
 ### --------------------------------------------------------------------
+def verifier_code_iris(valeur: Any, type_sortie: Type = str) -> Tuple[bool, Any]:
+    """
+    Vérifie si une valeur correspond à un entier à 5 chiffres (code IRIS).
+
+    Args:
+        valeur (Any):
+            La valeur à tester. Peut être de n'importe quel type (int, float, str, etc.).
+        type_sortie (Type, optionnel):
+            Le type dans lequel renvoyer la valeur si elle est valide.
+            Par défaut : str.
+            Autres valeurs possibles : int, float, etc.
+
+    Returns:
+        Tuple[bool, Any]:
+            - Le premier élément est un booléen indiquant si la valeur est un entier à 5 chiffres.
+            - Le second élément est la valeur convertie dans le type demandé (ou None si invalide).
+
+    Exemple:
+        >>> verifier_code_iris(12345)
+        (True, '12345')
+
+        >>> verifier_code_iris("01234")
+        (True, '01234')
+
+        >>> verifier_code_iris("9999")
+        (False, None)
+
+        >>> verifier_code_iris("12345.0")
+        (True, '12345')
+
+        >>> verifier_code_iris("abcde")
+        (False, None)
+
+        >>> verifier_code_iris("67890", int)
+        (True, 67890)
+
+    Remarques:
+        - Les zéros initiaux sont conservés si le type de sortie est `str`.
+        - Les valeurs numériques flottantes représentant un entier à 5 chiffres (ex: "12345.0") sont acceptées.
+        - Si la valeur ne correspond pas à 5 chiffres, la fonction renvoie (False, None).
+    """
+    # Conversion en chaîne pour analyse initiale
+    if isinstance(valeur, str):
+        str_val = valeur.strip()
+    else:
+        try:
+            # On convertit float -> int -> str pour éviter les ".0"
+            str_val = str(int(float(valeur)))
+        except (ValueError, TypeError):
+            return False, None
+
+    # Vérifie qu'on a bien 5 chiffres
+    if str_val.isdigit() and len(str_val) == 5:
+        try:
+            valeur_convertie = type_sortie(str_val)
+        except Exception:
+            return False, None
+        return True, valeur_convertie
+
+    return False, None
 
 def lire_fdc(chemin_fdc):
 

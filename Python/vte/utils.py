@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, List, Tuple, Optional, Union
+from typing import Dict, List, Tuple, Optional, Union, Any, Type
 
 import pandas as pd
 
@@ -15,6 +15,7 @@ import platform
 import subprocess
 import re
 import time as time_module
+import locale
 import copy
 import ctypes
 from ctypes import wintypes
@@ -588,7 +589,53 @@ def nettoyer_nom_colonne(nom:str) -> str:
 
     return nom
 
+def remplacer_champs(
+    str_in: str,
+    liste_remplacements: list[list[str]],
+    format_champ: str = "{%s}"
+) -> str:
+    """
+    Remplace dans une chaîne de texte des champs encadrés par des accolades par leurs valeurs associées.
 
+    Chaque champ à remplacer doit être écrit dans le texte sous la forme d'accolades.
+    Exemple : "Bonjour {nom}, votre formation {formation} est prévue."
+
+    Args:
+        str_in (str): 
+            Le texte d’entrée contenant des champs à remplacer.
+        liste_remplacements (list[list[str]]): 
+            Liste de paires [nom_champ, valeur_remplacement].
+            Exemple : [["nom", "Dupont"], ["formation", "Python avancé"]]
+        format_champ (str, optionnel): 
+            Format des champs à rechercher. 
+            Doit contenir "%s" à l’emplacement du nom du champ.
+            Par défaut "{%s}" correspond à "{champ}".
+            Exemples valides :
+                - "{%s}" → {champ}
+                - "<%s>" → <champ>
+
+    Returns:
+        str: 
+            Le texte de sortie après remplacement de tous les champs.
+
+    Exemples:
+        >>> texte = "Bonjour {nom}, votre formation {formation} est prévue le {date}."
+        >>> remplacements = [["nom", "Dupont"], ["formation", "Python"], ["date", "15/03/2025"]]
+        >>> resultat = remplacer_champs(texte, remplacements)
+        >>> print(resultat)
+        Bonjour Dupont, votre formation Python est prévue le 15/03/2025.
+
+        >>> texte2 = "Bonjour <nom>, bienvenue dans la formation <formation>."
+        >>> remplacements2 = [["nom", "Alice"], ["formation", "Pandas"]]
+        >>> resultat2 = remplacer_champs(texte2, remplacements2, format_champ="<%s>")
+        >>> print(resultat2)
+        Bonjour Alice, bienvenue dans la formation Pandas.
+    """
+    str_out = str_in
+    for champ, valeur in liste_remplacements:
+        champ_formate = format_champ % champ
+        str_out = str_out.replace(champ_formate, str(valeur))
+    return str_out
 
 ### --------------------------------------------------------------------
 #  Conversions
@@ -728,6 +775,68 @@ def convertir_tuple_str(input:str|Tuple[str]) -> Tuple[str]:
         else:
             return input
 
+### --------------------------------------------------------------------
+#  Dates
+### --------------------------------------------------------------------
+def mois_fr_depuis_date(date_val: Union[datetime, str, int, float, pd.Timestamp], 
+                        use_locale: bool = False) -> str:
+    """
+    Renvoie le nom du mois en français à partir d'une valeur de date (Excel, datetime ou texte).
+
+    Args:
+        date_val (Union[datetime, str, int, float, pd.Timestamp]): 
+            Valeur représentant une date (ex. : datetime, timestamp, texte ISO ou valeur Excel).
+            Si Excel stocke une date comme nombre (ex. 45678), la fonction la convertira automatiquement.
+        use_locale (bool, optional): 
+            Si True, utilise la locale système ("fr_FR") pour récupérer le mois.
+            Si False (par défaut), utilise une liste interne de mois en français.
+
+    Returns:
+        str: Le nom du mois en français, par exemple "avril".
+
+    Raises:
+        ValueError: Si la valeur ne peut pas être convertie en date valide.
+
+    Exemple:
+    --------
+    >>> mois_fr_depuis_date("2024-04-15")
+    'avril'
+
+    >>> mois_fr_depuis_date(datetime(2025, 10, 27))
+    'octobre'
+
+    >>> mois_fr_depuis_date(45678)  # Valeur Excel correspondant à une date
+    'janvier'
+
+    >>> mois_fr_depuis_date("2025/12/01", use_locale=True)
+    'décembre'
+    """
+
+    # Conversion en datetime si nécessaire
+    if not isinstance(date_val, datetime):
+        date_val = pd.to_datetime(date_val, errors="coerce")
+
+    if pd.isna(date_val):
+        raise ValueError(f"Impossible de convertir la valeur '{date_val}' en date valide.")
+
+    # Option 1 : via locale système
+    if use_locale:
+        try:
+            locale.setlocale(locale.LC_TIME, "fr_FR.UTF-8")
+        except locale.Error:
+            try:
+                locale.setlocale(locale.LC_TIME, "fr_FR")
+            except locale.Error:
+                pass  # Fallback si non disponible
+        return date_val.strftime("%B").capitalize()
+
+    # Option 2 : liste interne (plus fiable sur Windows)
+    noms_mois = [
+        "janvier", "février", "mars", "avril", "mai", "juin",
+        "juillet", "août", "septembre", "octobre", "novembre", "décembre"
+    ]
+
+    return noms_mois[date_val.month - 1]
 
 ### --------------------------------------------------------------------
 #  Fenêtres
