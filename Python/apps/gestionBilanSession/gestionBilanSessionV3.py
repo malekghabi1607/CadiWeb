@@ -1,6 +1,8 @@
 from vte.instn import *
 from vte.ihm_console import IHM_console
-#from vte.ihm_tkinter import IHMTkinter
+
+from colorama import init
+init(autoreset=True)
 
 
 MODE = "console"

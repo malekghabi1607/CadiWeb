@@ -641,30 +641,33 @@ def remplacer_champs(
         str_out = str_out.replace(champ_formate, str(valeur))
     return str_out
 
-def charger_config_user():
+def charger_config_user() -> ModuleType:
     """
-    Charge dynamiquement le module user_config.py situé dans le même dossier
-    que le script principal (même après compilation en .exe).
+    Charge dynamiquement le module user_config.py.
+    Compatible avec :
+    - l'exécution directe depuis VSCode (script .py)
+    - l'exécutable compilé (.exe avec PyInstaller)
     """
-
-    # === Étape 1 : déterminer le dossier de base ===
-    if getattr(sys, 'frozen', False):
-        # Cas d’un exécutable PyInstaller
-        base_dir = os.path.dirname(sys.executable)
+    # === Étape 1 : Déterminer le bon dossier racine ===
+    if getattr(sys, "frozen", False):
+        # Cas exécutable PyInstaller
+        base_path = sys._MEIPASS  # dossier temporaire interne à PyInstaller
+        # Mais le user_config.py sera à côté de l'exe, donc on corrige :
+        base_path = os.path.dirname(sys.executable)
     else:
-        # Cas d’une exécution normale (ex : depuis VSCode)
-        base_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+        # Cas développement (dans VSCode, etc.)
+        base_path = os.path.dirname(os.path.abspath(sys.argv[0]))
 
-    # === Étape 2 : construire le chemin complet vers user_config.py ===
-    chemin_config = os.path.join(base_dir, "user_config.py")
+    config_path = os.path.join(base_path, "user_config.py")
 
-    if not os.path.exists(chemin_config):
+    # === Étape 2 : Vérifier l’existence ===
+    if not os.path.exists(config_path):
         raise FileNotFoundError(
-            f"⚠️ Le fichier user_config.py est introuvable à l'emplacement attendu :\n{chemin_config}"
+            f"Le fichier de configuration utilisateur est introuvable :\n{config_path}"
         )
 
-    # === Étape 3 : charger dynamiquement le module ===
-    spec = importlib.util.spec_from_file_location("user_config", chemin_config)
+    # === Étape 3 : Charger dynamiquement ===
+    spec = importlib.util.spec_from_file_location("user_config", config_path)
     user_config = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(user_config)  # type: ignore
 

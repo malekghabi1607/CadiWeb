@@ -27,3 +27,13 @@ python main.py
 
 # Voir la liste des évolutions dans git :
 git log --oneline
+
+# Créer un exe
+faire un cd pour aller dans le répertoire de l'appli à compiler :
+cd "C:\Users\vt238770\Documents\_CEA\Prog\Python\gestionBilanSessionV3"
+
+pyinstaller --onefile --name GestionBilanSession gestionBilanSessionV3.py --paths "C:\Users\vt238770\Documents\_CEA\Prog\Python"
+
+Si pyinstaller pas dans le path :
+python -m PyInstaller --onefile --name GestionBilanSession gestionBilanSessionV3.py --paths "C:\Users\vt238770\Documents\_CEA\Prog\Python"
+
