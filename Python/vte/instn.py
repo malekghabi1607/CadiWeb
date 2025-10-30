@@ -1455,12 +1455,21 @@ class BilanSession:
         instance._envoyer_mail_chef_unite()
 
     @classmethod
-    def plusieursBilans_parCodeIRIS(cls, bilans_a_traiter:list[int]) -> None:
+    def plusieursBilans_parCodeIRIS(cls, liste_codes_IRIS:list[int]) -> None:
         """
         Permet de lancer une série de bilans de sessions à partir d'une liste d'entiers (codes IRIS) ex. [61235, 54231]
         """
-        for codeIRIS in bilans_a_traiter:
+        print(liste_codes_IRIS)
+        for codeIRIS in liste_codes_IRIS:
+            print(codeIRIS)
             cls.bilanUnique_parCodeIRIS(codeIRIS)
+
+    @classmethod
+    def plusieursBilans_parCodeIRIS_fichierConfig(cls, liste_codes_IRIS:list[int]) -> None:
+        user_conf = charger_config_user()
+        
+
+        cls.plusieursBilans_parCodeIRIS(user_conf.liste_codes_IRIS)
 
 
     @classmethod   
@@ -1509,11 +1518,11 @@ class BilanSession:
             vlog.print("Info", f"⚠️ Toutes les sessions sont exclues : il n'y a plus de raison de faire le bilan de session.")
 
     @classmethod
-    def plusieursBilans_parPeriode(cls, bilans_a_traiter:list[Tuple[str, int, str]]) -> None:
+    def plusieursBilans_parPeriode(cls, liste_periodes:list[Tuple[str, int, str]]) -> None:
         """
         Permet de lancer une série de bilans de sessions à partir d'une liste de tuples ex. [("948", 2022, "Année"), ("948", 2023, "1er semestre"), ("948", 2023, "2nd semestre")]
         """
-        for codeFormation, annee, periode in bilans_a_traiter:
+        for codeFormation, annee, periode in liste_periodes:
             cls.bilanUnique_parPeriode(codeFormation, annee, periode)
 
     # === MÉTHODES ===

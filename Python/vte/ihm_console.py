@@ -1,305 +1,267 @@
 import inspect
+from typing import Any, Callable, List, Optional, Union
+import re
 
 class IHM_console:
     """
-    Interface Homme-Machine en mode console.
+    Interface Homme-Machine en mode console, générique.
 
-    Cette classe permet d’afficher des menus hiérarchiques en console,
-    et d’exécuter des actions associées. Elle a été pensée pour rester générique :
-    - L’affichage est ici textuel, mais la même logique peut être utilisée
-      dans une interface graphique (chaque entrée devient un bouton).
-    - Les menus peuvent être statiques (actions fixes) ou dynamiques
-      (choix dans une liste d’objets, comme des entretiens ou des fichiers à envoyer).
+    Cette classe permet :
+    - d'afficher des menus hiérarchiques (statique ou dynamique),
+    - d'exécuter des actions associées,
+    - de demander à l'utilisateur les arguments manquants automatiquement,
+    - d'afficher des indications facultatives pour aider l'utilisateur.
 
-    Exemple d’utilisation
-    ---------------------
-    >>> menus = {
-    ...     # Lancer une action avec sélection
-    ...     "Mails": {  
-    ...         "Mail de premier contact": {
-    ...             "action": ca.creer_mails_contactInitial, # Action à employer
-    ...             "kwargs": {}, # Arguments donnés automatiquement à la fonction – Pëut être enlevé si vide
-    ...             "demander": [] # Arguments demandés spécifiquement à l'utilisateur – Tout argument obligatoire non spécifié en kwarg est automatiquement demandé (pas besoin de respécifier) – Pëut être enlevé si vide
-    ...         }
-    ...     },
-    ...     # Liste les valeurs (string) d'une liste (ici ca._entretiens est une liste d'objets et on récupère pour chaque item ca._entretiens.sujet qui est un string)
-    ...     "RDV Outlook": {
-    ...         "Créer un RDV pour un entretien": {
-    ...             "sous-menu": [ca._entretiens, "sujet"],  # affiche l’attribut .sujet
-    ...             "action": ca.creer_rdv,
-    ...             "kwargs": lambda p: {"prop": p},  # injecte la string choisie dans l’appel (i.e. le nom de prop)
-    ...             "demander": []
-    ...         }
-    ...     },
-    ...     # Liste les valeurs (string) d'une liste (ici ca._relances est une liste de string donc pas de 2ème argument à la liste)
-    ...     "Relances": {
-    ...         "Choisir un type de relance": {
-    ...             "sous-menu": [ca._relances, None],  # liste de str, donc on affiche directement str(obj)
-    ...             "action": ca.creer_mails_relances,
-    ...             "kwargs": lambda r: {"relance": r},  # injecte la string choisie dans l’appel (i.e. le nom de la relance)
-    ...             "demander": []
-    ...         }
-    ...     }
-    ...     # Liste les valeurs (string) d'une liste de str (donc pas de 2nd argument) ; l'action applique la fonction de la clef (i.e du choix)
-    ...     # On ne met ni kwargs ni demander car vides et ces clefs sont facultatives
-    ...     "Choisir le contexte": {
-    ...         "sous-menu": [list(mapping.keys()), None],  # affiche directement les noms des contextes ; mapping est un dictionnaire {"UGA": Traiter_contactsApprentis.UGA,"L3D": Traiter_contactsApprentis.L3D}
-    ...         "action": lambda choix: mapping[choix]()   # crée l'instance correspondante
-    ...     }
-    ... }
+    Exemple de menu :
+
+    menus = {
+        "Mails": {
+            "Mail de premier contact": {
+                "action": ca.creer_mails_contactInitial,
+                "kwargs": {},
+                "demander": []
+            },
+        },
+        "RDV Outlook": {
+            "Créer un RDV pour un entretien": {
+                "sous-menu": [ca._entretiens, "sujet"],
+                "action": ca.creer_rdv,
+                "kwargs": lambda e: {"entretien": e},
+                "demander": []
+            }
+        },
+        "Relances": {
+            "Choisir un type de relance": {
+                "sous-menu": [ca._relances, None],
+                "action": ca.creer_mails_relances,
+                "kwargs": lambda r: {"relance": r},
+                "demander": []
+            }
+        }
+    }
+
+    Exemple d'utilisation :
+
     >>> ihm = IHM_console(menus)
     >>> ihm.afficher_menu()
     """
 
-    def __init__(self, menus, contexte=None):
+    def __init__(self, menus: dict, contexte: Any = None):
         """
-        Initialise l’IHM avec un dictionnaire de menus.
+        Étape 1 : Initialisation
 
         Paramètres
         ----------
         menus : dict
-            Dictionnaire décrivant l’arborescence des menus.
-            Chaque entrée peut être :
-              - un sous-menu (dict imbriqué)
-              - une action directe (dict avec "action", "kwargs", "demander")
-              - un menu dynamique avec "sous-menu"
-
-        contexte : object, optionnel
-            Un objet partagé qui peut être transmis aux callbacks
-            si besoin (par ex. l’instance de gestion des apprentis).
+            Arborescence des menus avec actions et sous-menus
+        contexte : Any, optionnel
+            Objet partagé passé aux callbacks si nécessaire (ex. instance de gestion)
         """
-        self.menus:str = menus
+        self.menus = menus
         self.contexte = contexte
-
-
-    @classmethod
-    def depuis_sous_menu(cls, liste, action=None, attr=None, titre="Sous-menu"):
-        """
-        Constructeur rapide pour créer un menu console à partir d'une liste
-        et récupérer directement le choix utilisateur.
-
-        Exemple d’usage :
-        -----------------
-        >>> mapping = {"UGA": Traiter_contactsApprentis.UGA, "L3D": Traiter_contactsApprentis.L3D}
-        >>> contexte = IHM_console.depuis_sous_menu(
-        ...     liste=list(mapping.keys()),
-        ...     action=lambda choix: mapping[choix](),
-        ...     titre="Choisir le contexte"
-        ... )
-        (renvoie l’objet contexte sélectionné)
-
-        Paramètres
-        ----------
-        liste : list
-            Liste d’éléments à afficher (chaînes ou objets)
-        action : callable
-            Fonction à exécuter sur l’élément choisi. Peut renvoyer un résultat.
-        attr : str | None
-            Si non None, on affiche getattr(obj, attr) pour chaque élément.
-            Si None, on affiche directement str(obj).
-        titre : str
-            Titre affiché pour le sous-menu.
-
-        Retour
-        ------
-        Tout objet renvoyé par `action(élément_choisi)`, ou l’élément lui-même si action=None.
-        None si l’utilisateur quitte (choix 0).
-        """
-        print(f"\n--- {titre} ---")
-
-        # Préparation du sous-menu
-        if attr:
-            sous_menu_temp = {getattr(obj, attr): obj for obj in liste}
-        else:
-            sous_menu_temp = {str(obj): obj for obj in liste}
-
-        # Boucle d’interaction utilisateur
-        while True:
-            options = list(sous_menu_temp.keys())
-            for i, opt in enumerate(options, start=1):
-                print(f"{i}. {opt}")
-            print("0. Retour")
-
-            try:
-                choix = int(input("Votre choix : "))
-            except ValueError:
-                print("⚠️ Entrée invalide, merci de saisir un nombre.")
-                continue
-
-            if choix == 0:
-                return None  # Quitter sans rien renvoyer
-
-            if not (1 <= choix <= len(options)):
-                print("⚠️ Choix invalide, réessayez.")
-                continue
-
-            label = options[choix - 1]
-            element_choisi = sous_menu_temp[label]
-
-            # Retourne le résultat de l’action si fournie, sinon l’élément choisi
-            if action:
-                return action(element_choisi)
-            else:
-                return element_choisi
 
     # -------------------------------------------------------------------------
     # MÉTHODE : demander_saisie
     # -------------------------------------------------------------------------
-    def demander_saisie(self, message, type_attendu=str):
+
+    def demander_saisie(self, texte: str, type_attendu: type = str) -> Any:
         """
-        Demande une saisie utilisateur en console, avec validation et conversion de type.
+        Demande une saisie utilisateur en console, conversion robuste.
 
-        Paramètres
-        ----------
-        message : str
-            Texte affiché à l’utilisateur pour la saisie.
-        type_attendu : type | str | typing._GenericAlias
-            Type attendu pour la conversion (par ex. int, bool, list[int], etc.)
-
-        Retourne
-        --------
-        valeur : object
-            La valeur saisie, convertie au bon type.
-
-        Exemples
-        --------
-        - int → "12" ➜ 12
-        - bool → "oui" ➜ True
-        - list[int] → "1, 2, 3" ➜ [1, 2, 3]
-        - list[str] → "A, B, C" ➜ ["A", "B", "C"]
+        - Gère types simples (int, float, str, bool).
+        - Gère listes typées (list[int], list[str], List[int], etc.).
+        - Séparateurs acceptés pour listes : virgules et/ou espaces.
         """
 
-        # Cas : si le type est une chaîne, on le convertit
+        # Normalisation si annotation donnée comme chaîne (ex: "list[int]" ou "int")
         if isinstance(type_attendu, str):
-            mapping_types = {"int": int, "float": float, "bool": bool, "str": str, "list": list}
-            type_attendu = mapping_types.get(type_attendu.lower(), str)
+            s = type_attendu.lower()
+            if "list" in s and "int" in s:
+                type_attendu = list[int]
+            elif "list" in s and "str" in s:
+                type_attendu = list[str]
+            elif s in ("int", "integer"):
+                type_attendu = int
+            elif s == "float":
+                type_attendu = float
+            elif s in ("bool", "boolean"):
+                type_attendu = bool
+            else:
+                type_attendu = str
 
-        # Cas : listes typées comme list[int], list[str]...
-        is_list_type = (
-            hasattr(type_attendu, "__origin__")
-            and type_attendu.__origin__ == list
-        )
+        # helper: obtenir callable pour un sous-type (int/str/float)
+        def _get_callable(t):
+            # si typing alias (ex list[int]) on prend le premier arg
+            if hasattr(t, "__origin__") and getattr(t, "__args__", None):
+                inner = t.__args__[0]
+                # si inner est typing alias like 'int' as str, try to map
+                if isinstance(inner, str):
+                    m = {"int": int, "str": str, "float": float, "bool": bool}
+                    return m.get(inner.lower(), str)
+                return inner if callable(inner) else str
+            # si t est type direct
+            if isinstance(t, type) and callable(t):
+                return t
+            return str
 
         while True:
             try:
-                # Message adapté selon le type
-                if is_list_type:
-                    sous_type = type_attendu.__args__[0] if type_attendu.__args__ else str
-                    valeur_str = input(f"{message} (liste de {sous_type.__name__} séparés par des virgules) : ")
-                    items = [v.strip() for v in valeur_str.split(",") if v.strip()]
-                    # conversion des éléments
-                    return [sous_type(v) for v in items]
+                # Affichage du libellé du type attendu (lisible)
+                type_label = getattr(type_attendu, "__name__", str(type_attendu))
+                saisie = input(f"{texte} ({type_label}) : ").strip()
 
-                valeur = input(f"{message} ({getattr(type_attendu, '__name__', str(type_attendu))}) : ")
-
-                # Conversion booléenne
+                # Booléen
                 if type_attendu == bool:
-                    return valeur.strip().lower() in ["true", "1", "oui", "o", "y", "yes"]
+                    return saisie.lower() in ("o", "oui", "y", "yes", "true", "1")
 
-                # Conversion simple
-                return type_attendu(valeur)
+                # Cas liste typée : detecte list[...] via __origin__
+                origin = getattr(type_attendu, "__origin__", None)
+                args = getattr(type_attendu, "__args__", None) or ()
 
-            except (ValueError, TypeError):
-                print(f"⚠️ Erreur : veuillez entrer une valeur du type attendu ({type_attendu}).")
+                if origin is list or origin is list or (isinstance(type_attendu, type) and issubclass(type_attendu, list) if isinstance(type_attendu, type) else False):
+                    # récupère type interne si possible, sinon str
+                    inner_callable = _get_callable(type_attendu)
+                    # split flexible : accepte virgules et/ou espaces
+                    parts = [p for p in re.split(r"[,\s]+", saisie) if p != ""]
+                    parsed = []
+                    for p in parts:
+                        try:
+                            parsed.append(inner_callable(p))
+                        except Exception:
+                            # si conversion échoue, garde la string brute
+                            parsed.append(p)
+                    # DEBUG — tu peux commenter la ligne suivante si tu veux
+                    # print(f"[DEBUG] parsed list for '{texte}': {parsed}")
+                    return parsed
 
-    # -------------------------------------------------------------------------
+                # Cas liste non-typée (annotation exactly 'list')
+                if type_attendu is list:
+                    parts = [p for p in re.split(r"[,\s]+", saisie) if p != ""]
+                    return parts
+
+                # Types simples (int/float/str)
+                if callable(type_attendu):
+                    try:
+                        return type_attendu(saisie)
+                    except Exception:
+                        # si conversion échoue, on alerte et reprompt
+                        print(f"⚠️ Impossible de convertir '{saisie}' en {type_label}. Réessayez.")
+                        continue
+
+                # Par défaut : retourne chaîne
+                return saisie
+
+            except Exception as e:
+                print(f"⚠️ Erreur de saisie ({e}). Réessayez.")
+
+# -------------------------------------------------------------------------
     # MÉTHODE : executer_action
     # -------------------------------------------------------------------------
-    def executer_action(self, action_def, choix_sousmenu=None):
+    def executer_action(self, action_def: dict, choix_sousmenu: Any = None) -> Any:
         """
-        Exécute une action définie dans un menu.
+        Étape 3 : Exécuter l'action d'un menu
 
         Paramètres
         ----------
         action_def : dict
-            Dictionnaire décrivant l’action :
-              - "action"   : fonction à appeler
-              - "kwargs"   : dict d’arguments fixes ou fonction prenant le choix utilisateur
-              - "demander" : liste de noms d’arguments à demander explicitement
-        choix_sousmenu : object, optionnel
-            Élément choisi par l’utilisateur dans un sous-menu (si applicable).
-            Peut être un objet métier (ex. PropEntretien) ou une simple string.
+            Définition d'une action, pouvant contenir :
+            - "action" : callable
+            - "kwargs" : dict ou callable pour générer kwargs dynamiquement
+            - "demander" : liste des arguments à demander explicitement
+            - "indications" : texte facultatif pour guider l'utilisateur
+        choix_sousmenu : Any
+            Objet choisi par l'utilisateur dans un sous-menu dynamique
 
         Retourne
         --------
-        result : object
-            Résultat de l’appel à la fonction associée.
-
-        Notes
-        -----
-        - Si "kwargs" est un callable, on l’évalue avec choix_sousmenu.
-        - Si des paramètres obligatoires ne sont pas fournis, ils sont demandés
-          en console à l’utilisateur.
+        result : Any
+            Résultat de la fonction exécutée
         """
-        action = action_def["action"]
-        kwargs_def = action_def.get("kwargs", {})
-        demander = action_def.get("demander", [])
+        action = action_def.get("action")
+        if not callable(action):
+            raise ValueError("Action non exécutable.")
 
-        # Cas 1 : kwargs est une fonction → on la calcule avec l’élément choisi
+        # Étape 3a : afficher indications facultatives
+        if "indications" in action_def and action_def["indications"]:
+            print("\n💡 Indications :")
+            print(action_def["indications"].strip())
+            print()
+
+        # Étape 3b : préparer les kwargs
+        kwargs_def = action_def.get("kwargs", {})
         if callable(kwargs_def):
+            if choix_sousmenu is None:
+                raise ValueError("Un choix de sous-menu est requis pour générer les kwargs.")
             kwargs = kwargs_def(choix_sousmenu)
         else:
             kwargs = dict(kwargs_def)
 
-        # Vérification de la signature de la fonction
+        # Étape 3c : introspection pour récupérer les paramètres manquants
         sig = inspect.signature(action)
+        demander = list(action_def.get("demander", []))
 
-        # Demande automatique des arguments obligatoires manquants
         for nom, param in sig.parameters.items():
-            if nom in kwargs:
+            if nom == "cls":  # ignorer cls dans les classmethods
                 continue
-            if param.default == inspect.Parameter.empty:
-                # Type attendu si indiqué dans l’annotation
-                type_attendu = param.annotation if param.annotation != inspect._empty else str
+            if nom not in kwargs and param.default == inspect.Parameter.empty:
+                # Type attendu (par annotation si dispo)
+                type_attendu = (
+                    param.annotation
+                    if (hasattr(param, "annotation") and param.annotation != inspect._empty)
+                    else str
+                )
+                # 🔥 Correction : on garde le type brut, pas son nom en str
                 kwargs[nom] = self.demander_saisie(f"Entrez {nom}", type_attendu)
 
-        # Demande explicite des arguments listés dans "demander"
+        # Étape 3d : demander explicitement les arguments dans "demander"
         for nom in demander:
             if nom not in kwargs:
                 param = sig.parameters.get(nom)
-                type_attendu = str
-                if param and param.annotation != inspect._empty:
-                    type_attendu = param.annotation
+                type_attendu = (
+                    param.annotation
+                    if (param and param.annotation != inspect._empty)
+                    else str
+                )
                 kwargs[nom] = self.demander_saisie(f"Entrez {nom}", type_attendu)
 
+        # Étape 3e : message avant exécution (placé APRÈS les saisies)
+        print("\n\t→ Exécute l'action\n")
+
+        # Étape 3f : exécution finale
         return action(**kwargs)
 
     # -------------------------------------------------------------------------
     # MÉTHODE : afficher_menu
     # -------------------------------------------------------------------------
-    def afficher_menu(self, menu=None, titre="Menu principal", arret_apres_action=False):
+    def afficher_menu(self, menu: Optional[dict] = None, titre: str = "Menu principal"):
         """
-        Affiche un menu interactif en console et permet à l’utilisateur
-        de naviguer dans les options.
+        Étape 4 : Afficher le menu et gérer la navigation
 
         Paramètres
         ----------
         menu : dict, optionnel
-            Le menu à afficher. Si None, affiche le menu racine.
+            Menu à afficher (par défaut menu racine)
         titre : str
-            Titre affiché en en-tête du menu.
+            Titre du menu
 
         Notes
         -----
-        - L’utilisateur saisit un nombre correspondant à une entrée.
-        - L’entrée "0" permet de revenir en arrière ou quitter.
-        - Les sous-menus dynamiques peuvent être définis ainsi :
-            "sous-menu": [liste, "attribut"]   → affichage basé sur getattr(obj, "attribut")
-            "sous-menu": [liste, None]         → affichage basé sur str(obj)
+        - "0" permet de revenir ou quitter
+        - Les sous-menus dynamiques sont de la forme :
+            "sous-menu": [liste_objets, attribut_affichage]
+            - attribut_affichage=None → str(obj)
+            - attribut_affichage='sujet' → getattr(obj, 'sujet')
         """
         if menu is None:
-            menu = self.menus  # Menu racine par défaut
+            menu = self.menus
 
         while True:
             print(f"\n=== {titre} ===")
-
-            # Affiche toutes les options disponibles
             options = list(menu.keys())
-            for i, opt in enumerate(options, start=1):
+            for i, opt in enumerate(options, 1):
                 print(f"{i}. {opt}")
             print("0. Quitter / Retour")
 
-            # Lecture du choix utilisateur
             try:
                 choix = int(input("Votre choix : "))
             except ValueError:
@@ -307,7 +269,7 @@ class IHM_console:
                 continue
 
             if choix == 0:
-                return  # Retour au menu précédent
+                return
 
             if not (1 <= choix <= len(options)):
                 print("⚠️ Choix invalide, réessayez.")
@@ -316,20 +278,17 @@ class IHM_console:
             cle = options[choix - 1]
             valeur = menu[cle]
 
-            # Cas 1 : sous-menu dynamique
+            # Étape 4a : sous-menu dynamique
             if isinstance(valeur, dict) and "sous-menu" in valeur:
-                liste, attr = valeur["sous-menu"]
+                liste_objets, attr = valeur["sous-menu"]
+                if attr:
+                    sous_menu_temp = {getattr(obj, attr): obj for obj in liste_objets}
+                else:
+                    sous_menu_temp = {str(obj): obj for obj in liste_objets}
 
-                # Préparation des options utilisateur
-                if attr:  # on affiche un attribut spécifique
-                    sous_menu_temp = {getattr(obj, attr): obj for obj in liste}
-                else:  # on affiche directement la valeur
-                    sous_menu_temp = {str(obj): obj for obj in liste}
-
-                # Affichage du sous-menu
                 print(f"\n--- {cle} ---")
                 sous_options = list(sous_menu_temp.keys())
-                for i, opt in enumerate(sous_options, start=1):
+                for i, opt in enumerate(sous_options, 1):
                     print(f"{i}. {opt}")
                 print("0. Retour")
 
@@ -340,26 +299,19 @@ class IHM_console:
                     continue
 
                 if sous_choix == 0:
-                    continue  # Retour au menu parent
-
-                if not (1 <= sous_choix <= len(sous_options)):
-                    print("⚠️ Choix invalide, réessayez.")
                     continue
 
                 label = sous_options[sous_choix - 1]
                 element_choisi = sous_menu_temp[label]
 
-                # Exécute l’action avec l’élément choisi
+                # Étape 4b : exécuter action sur l'élément choisi
                 self.executer_action(valeur, choix_sousmenu=element_choisi)
 
-            # Cas 2 : action directe
+            # Étape 4c : action directe
             elif isinstance(valeur, dict) and "action" in valeur:
-                resultat_action = self.executer_action(valeur)
-                
-                if arret_apres_action:
-                    return resultat_action  # quitte la boucle directement
+                self.executer_action(valeur)
 
-            # Cas 3 : sous-menu statique
+            # Étape 4d : sous-menu statique
             elif isinstance(valeur, dict):
                 self.afficher_menu(valeur, titre=cle)
 

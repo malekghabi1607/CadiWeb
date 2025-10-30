@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Dict, List, Tuple, Optional, Union, Any, Type
+from typing import Dict, List, Tuple, Optional, Union, Any, Type, Callable
+from types import ModuleType
 
 import pandas as pd
 
@@ -11,6 +12,7 @@ import xlwings as xw
 
 import inspect
 import os
+import sys
 import platform
 import subprocess
 import re
@@ -34,6 +36,8 @@ from tkinter import filedialog
 from bs4 import BeautifulSoup
 
 import pygetwindow as gw
+
+import importlib.util
 
 ### --------------------------------------------------------------------
 #  Tests (log et timer)
@@ -636,6 +640,146 @@ def remplacer_champs(
         champ_formate = format_champ % champ
         str_out = str_out.replace(champ_formate, str(valeur))
     return str_out
+
+def charger_config_user():
+    """
+    Charge dynamiquement le module user_config.py situé dans le même dossier
+    que le script principal (même après compilation en .exe).
+    """
+
+    # === Étape 1 : déterminer le dossier de base ===
+    if getattr(sys, 'frozen', False):
+        # Cas d’un exécutable PyInstaller
+        base_dir = os.path.dirname(sys.executable)
+    else:
+        # Cas d’une exécution normale (ex : depuis VSCode)
+        base_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+
+    # === Étape 2 : construire le chemin complet vers user_config.py ===
+    chemin_config = os.path.join(base_dir, "user_config.py")
+
+    if not os.path.exists(chemin_config):
+        raise FileNotFoundError(
+            f"⚠️ Le fichier user_config.py est introuvable à l'emplacement attendu :\n{chemin_config}"
+        )
+
+    # === Étape 3 : charger dynamiquement le module ===
+    spec = importlib.util.spec_from_file_location("user_config", chemin_config)
+    user_config = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(user_config)  # type: ignore
+
+    return user_config
+
+
+def chargement_config_demander_verif_utilisateur(
+    nom_variable: str,
+    fonction_execution: Callable[[Any], None],
+) -> bool:
+    """
+    Demande à l'utilisateur de vérifier les données de `user_config.py`
+    avant d'exécuter une fonction avec la variable correspondante.
+
+    Paramètres
+    ----------
+    nom_variable : str
+        Nom de la variable définie dans `user_config.py` (ex. : 'liste_codes_IRIS')
+    fonction_execution : Callable[[Any], None]
+        Fonction à exécuter si l'utilisateur valide (reçoit la variable en argument)
+
+    Retour
+    ------
+    bool
+        True si l'action a été validée et exécutée, False si l'utilisateur a annulé.
+    """
+
+    while True:
+        # === Étape 1 : Charger la configuration utilisateur ===
+        user_conf = charger_config_user()
+
+        if not hasattr(user_conf, nom_variable):
+            print(f"⚠️ Le fichier user_config.py ne contient pas la variable '{nom_variable}'.")
+            return False
+
+        valeur = getattr(user_conf, nom_variable)
+
+        # === Étape 2 : Afficher le contenu actuel ===
+        print("\n📂 Voici la donnée actuellement chargée depuis user_config.py :")
+        print(f"\n{nom_variable} = {valeur}\n")
+
+        # === Étape 3 : Demander à l'utilisateur quoi faire ===
+        saisie = input(
+            "Si vous voulez :\n"
+            "  • valider, appuyer sur Entrée\n"
+            "  • adapter le fichier puis saisir 1 pour recharger\n"
+            "  • annuler la procédure, saisir 0\n"
+            "Votre choix : "
+        ).strip()
+
+        # === Étape 4 : Gérer le choix ===
+        if saisie == "":
+            print("\n→ Exécution de l’action...\n")
+            fonction_execution(valeur)
+            return True
+
+        elif saisie == "1":
+            print("\n↻ Rechargement du fichier user_config.py...\n")
+            continue  # reboucle après modification du fichier
+
+        elif saisie == "0":
+            print("\n❌ Procédure annulée par l'utilisateur.\n")
+            return False
+
+        else:
+            print("⚠️ Saisie invalide, veuillez appuyer sur Entrée, saisir 1 ou 0.\n")
+
+def charger_config_user_BAK(nom_fichier: str = "user_config.py") -> Optional[ModuleType]:
+    """
+    Charge dynamiquement un fichier de configuration utilisateur Python.
+
+    Cette fonction recherche le fichier dans :
+    1. Le dossier courant (utile pour les tests dans VSCode)
+    2. Le dossier contenant l'exécutable (utile après compilation avec PyInstaller)
+
+    Paramètres
+    ----------
+    nom_fichier : str
+        Nom du fichier de configuration utilisateur (par défaut : "user_config.py")
+
+    Retour
+    ------
+    types.ModuleType | None
+        Le module importé s’il existe, sinon None.
+
+    Exemple
+    -------
+    >>> conf = charger_config_user()
+    >>> if conf:
+    ...     print(conf.liste_codes_IRIS)
+    ...     print(conf.liste_periodes)
+    """
+    # 1️⃣ - Chemin du fichier selon le mode d’exécution
+    if getattr(sys, 'frozen', False):  # Cas EXE (PyInstaller)
+        base_dir = os.path.dirname(sys.executable)
+    else:  # Cas développement (VSCode, script Python classique)
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+
+    chemin_conf = os.path.join(base_dir, nom_fichier)
+
+    # 2️⃣ - Vérification existence
+    if not os.path.exists(chemin_conf):
+        print(f"⚠️ Fichier de configuration non trouvé : {chemin_conf}. → Exit()")
+        #return None
+        exit()
+
+    # 3️⃣ - Chargement dynamique du module
+    spec = importlib.util.spec_from_file_location("user_config", chemin_conf)
+    user_config = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None  # pour typer proprement
+    spec.loader.exec_module(user_config)
+
+    print(f"✅ Configuration utilisateur chargée depuis : {chemin_conf}")
+    return user_config
+
 
 ### --------------------------------------------------------------------
 #  Conversions

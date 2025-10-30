@@ -8,38 +8,47 @@ MODE = "console"
 
 MENUS = {
     "Traiter à partir de codes IRIS": {
-        "Code IRIS unique": {
+        "Code IRIS unique (manuel)": {
             "action": BilanSession.bilanUnique_parCodeIRIS,
             "kwargs": {},
             "demander": []
         },
-        "Plusieurs codes IRIS": {
+        "Plusieurs codes IRIS (manuel)": {
             "action": BilanSession.plusieursBilans_parCodeIRIS,
             "kwargs": {},
-            "demander": []
+            "demander": [],
+            "indications":"Entrez les codes IRIS séparés par des virgules (ex. : 16411, 17343)"
+        },
+        "Plusieurs codes IRIS (depuis user_config.py)": {
+            "action": chargement_config_demander_verif_utilisateur,
+            "kwargs": {"nom_variable": "liste_codes_IRIS", 'fonction_execution':BilanSession.plusieursBilans_parCodeIRIS_fichierConfig},
+            "demander": [],
+            "indications":"Entrez les codes IRIS séparés par des virgules (ex. : 16411, 17343)"
         },
     },
 
     "Traiter pour une période entière (possiblement plusieurs sessions sur un bilan)": {
-        "Code IRIS unique": {
+        "Période unique (manuel)": {
             "action": BilanSession.bilanUnique_parPeriode,  # BilanSession.bilanUnique_parPeriode("948", 2024, "Année")
             "kwargs": {},
-            "demander": []
+            "demander": [],
+            "indications":"codeFormation = trigramme IRIS en majuscule si besoin (ex. : TEL)\n"
+                        + "annee = année à 4 chiffres (ex. : 2025)\n"
+                        + "periode = [1er semestre, 2nd semestre, Année] (ex. : 2nd semestre)"
         },
-        "Plusieurs codes IRIS": {
-            "action": BilanSession.plusieursBilans_parPeriode,
-            "kwargs": {},
-            "demander": []
+        "Plusieurs périodes (depuis user_config.py)": {
+            "action": chargement_config_demander_verif_utilisateur,
+            "kwargs": {"nom_variable": "liste_periodes", 'fonction_execution':BilanSession.plusieursBilans_parPeriode},
+            "demander": [],
+            "indications":"Entrez les codes IRIS séparés par des virgules (ex. : 16411, 17343)"
         },
     }
 }
 
+
 def main():
     
-    vlog.print("Info", "Bienvenue dans le script pour générer des bilans de sessions.", style=["vert clair"])
-
-    print("\nSi vous souhaitez faire un bilan pour une seule session à part")
-
+    vlog.print("Info", "*************\nBienvenue dans le script pour générer des bilans de sessions.\n*************", style=["vert clair"])
 
     ihm = IHM_console(MENUS)
     ihm.afficher_menu()
