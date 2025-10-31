@@ -1550,10 +1550,7 @@ class BilanSession:
         if cls._fe_IRIS_sessions is None:
 
             # Lecture de l'Excel
-            timer.debut(f"Lecture de {cls._chemin_excel_IRIS_sessions}")
-            cls._fe_IRIS_sessions = FichierExcel.depuis_fichier(cls._chemin_excel_IRIS_sessions)
-            vlog.ajouter_message("OK", f"✅ Lecture de {cls._chemin_excel_IRIS_sessions}")
-            timer.fin()
+            cls._fe_IRIS_sessions = FichierExcel.depuis_fichier(cls._chemin_excel_IRIS_sessions, repertoire_recherche_ini=config.REPERTOIRE_EXCEL_IRIS_SESSIONS)
 
             # Copie du tableau structuré "Sessions"
             cls._df_sessions = cls._fe_IRIS_sessions._tableaux["Sessions"]._df.copy()
