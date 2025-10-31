@@ -597,21 +597,23 @@ def nettoyer_nom_colonne(nom:str) -> str:
 
 def remplacer_champs(
     str_in: str,
-    liste_remplacements: list[list[str]],
+    liste_remplacements: list[list[str]] | list[str],
     format_champ: str = "{%s}"
 ) -> str:
     """
-    Remplace dans une chaîne de texte des champs encadrés par des accolades par leurs valeurs associées.
+    Remplace dans une chaîne de texte des champs encadrés par des accolades (ou autre format) par leurs valeurs associées.
 
-    Chaque champ à remplacer doit être écrit dans le texte sous la forme d'accolades.
+    Chaque champ à remplacer doit être écrit dans le texte sous la forme définie par `format_champ`.
     Exemple : "Bonjour {nom}, votre formation {formation} est prévue."
 
     Args:
         str_in (str): 
             Le texte d’entrée contenant des champs à remplacer.
-        liste_remplacements (list[list[str]]): 
-            Liste de paires [nom_champ, valeur_remplacement].
-            Exemple : [["nom", "Dupont"], ["formation", "Python avancé"]]
+        liste_remplacements (list[list[str]] | list[str]): 
+            - Soit une liste de paires [nom_champ, valeur_remplacement].
+              Exemple : [["nom", "Dupont"], ["formation", "Python avancé"]]
+            - Soit une seule paire [nom_champ, valeur_remplacement] pour un seul remplacement.
+              Exemple : ["nom", "Dupont"]
         format_champ (str, optionnel): 
             Format des champs à rechercher. 
             Doit contenir "%s" à l’emplacement du nom du champ.
@@ -636,7 +638,17 @@ def remplacer_champs(
         >>> resultat2 = remplacer_champs(texte2, remplacements2, format_champ="<%s>")
         >>> print(resultat2)
         Bonjour Alice, bienvenue dans la formation Pandas.
+
+        >>> # Cas d'un seul remplacement
+        >>> texte3 = "Bonjour {nom} !"
+        >>> resultat3 = remplacer_champs(texte3, ["nom", "Bob"])
+        >>> print(resultat3)
+        Bonjour Bob !
     """
+    # Normalisation : si un seul remplacement est fourni sous forme [clé, valeur]
+    if isinstance(liste_remplacements[0], str):
+        liste_remplacements = [liste_remplacements]
+
     str_out = str_in
     for champ, valeur in liste_remplacements:
         champ_formate = format_champ % champ
