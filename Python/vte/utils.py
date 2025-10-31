@@ -506,6 +506,8 @@ def obtenir_fichier_plus_recent_repertoire(repertoire: str, motif: str):
 
     # Tri par date de création (ou de modification selon le système)
     fichier_plus_recent = max(fichiers_correspondants, key=lambda f: f.stat().st_ctime)
+    
+    print(f"✅ Récupération de l'extract IRIS Sessions le plus récent : {os.path.basename(fichier_plus_recent)}")
 
     return str(fichier_plus_recent)
 
@@ -641,38 +643,81 @@ def remplacer_champs(
         str_out = str_out.replace(champ_formate, str(valeur))
     return str_out
 
+
+
+### --------------------------------------------------------------------
+#  Chargement config
+### --------------------------------------------------------------------
+
+def _get_app_dir() -> str:
+    """
+    Retourne le dossier racine de l'application.
+    Gère l'exécution normale et l'exécutable PyInstaller.
+    """
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(sys.argv[0]))
+
+def _charger_module_depuis_chemin(path: str, nom_module: str) -> ModuleType:
+    """Charge dynamiquement un module Python depuis un fichier."""
+    spec = importlib.util.spec_from_file_location(nom_module, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)  # type: ignore
+    return module
+
+def charger_config() -> Tuple[ModuleType, Optional[ModuleType]]:
+    """
+    Charge les modules de configuration :
+    - config.py (global, obligatoire)
+    - user_config.py (optionnel)
+
+    Retourne
+    -------
+    tuple(ModuleType, Optional[ModuleType]) :
+        (config, user_config)
+    """
+    app_dir = _get_app_dir()
+
+    # --- config.py (global) ---
+    config_path_local = os.path.join(app_dir, "config.py")
+    if os.path.exists(config_path_local):
+        config = _charger_module_depuis_chemin(config_path_local, "config")
+        print(f"✅ Configuration globale chargée depuis {config_path_local}")
+    else:
+        try:
+            import vte.config as config
+            print("⚙️ Configuration globale importée depuis vte.config")
+        except ModuleNotFoundError:
+            raise FileNotFoundError(
+                "Impossible de trouver config.py ni dans le dossier local ni dans vte/"
+            )
+
+    # --- user_config.py (optionnel) ---
+    user_config_path = os.path.join(app_dir, "user_config.py")
+    if os.path.exists(user_config_path):
+        user_config = _charger_module_depuis_chemin(user_config_path, "user_config")
+        print(f"✅ Configuration utilisateur chargée depuis {user_config_path}")
+    else:
+        user_config = None
+        print("ℹ️ Aucun fichier user_config.py trouvé — ce n’est pas bloquant.")
+
+    return config, user_config
+
 def charger_config_user() -> ModuleType:
     """
-    Charge dynamiquement le module user_config.py.
-    Compatible avec :
-    - l'exécution directe depuis VSCode (script .py)
-    - l'exécutable compilé (.exe avec PyInstaller)
+    Recharge uniquement le module user_config.py.
     """
-    # === Étape 1 : Déterminer le bon dossier racine ===
-    if getattr(sys, "frozen", False):
-        # Cas exécutable PyInstaller
-        base_path = sys._MEIPASS  # dossier temporaire interne à PyInstaller
-        # Mais le user_config.py sera à côté de l'exe, donc on corrige :
-        base_path = os.path.dirname(sys.executable)
-    else:
-        # Cas développement (dans VSCode, etc.)
-        base_path = os.path.dirname(os.path.abspath(sys.argv[0]))
+    app_dir = _get_app_dir()
+    user_config_path = os.path.join(app_dir, "user_config.py")
 
-    config_path = os.path.join(base_path, "user_config.py")
-
-    # === Étape 2 : Vérifier l’existence ===
-    if not os.path.exists(config_path):
+    if not os.path.exists(user_config_path):
         raise FileNotFoundError(
-            f"Le fichier de configuration utilisateur est introuvable :\n{config_path}"
+            f"Le fichier de configuration utilisateur est introuvable : {user_config_path}"
         )
 
-    # === Étape 3 : Charger dynamiquement ===
-    spec = importlib.util.spec_from_file_location("user_config", config_path)
-    user_config = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(user_config)  # type: ignore
-
+    user_config = _charger_module_depuis_chemin(user_config_path, "user_config")
+    print(f"✅ Configuration utilisateur rechargée depuis {user_config_path}")
     return user_config
-
 
 def chargement_config_demander_verif_utilisateur(
     nom_variable: str,
@@ -783,6 +828,7 @@ def charger_config_user_BAK(nom_fichier: str = "user_config.py") -> Optional[Mod
     print(f"✅ Configuration utilisateur chargée depuis : {chemin_conf}")
     return user_config
 
+ 
 
 ### --------------------------------------------------------------------
 #  Conversions
