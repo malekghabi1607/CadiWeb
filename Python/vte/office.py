@@ -785,8 +785,8 @@ class FichierExcel:
 
 
     # Attributs "privés" / semi-privés
-    _repertoire: Optional[str] = None
-    _chemin_fichier: Optional[str] = None
+    _repertoire: Optional[Path] = None
+    _chemin_fichier: Optional[Path] = None
     _tableaux: Dict[str, FichierExcel._TableauExcel] = {}
 
     # openpyxl
@@ -799,28 +799,29 @@ class FichierExcel:
 
 
     # === Constructeur de FichierExcel ===
-    def __init__(self, chemin_fichier: Optional[str] = None) -> None:
+    def __init__(self, chemin_fichier: Optional[Path] = None) -> None:
         self._chemin_fichier = chemin_fichier
         self._tableaux = {}
         if chemin_fichier:
-            self._repertoire = os.path.dirname(chemin_fichier)
+            self._repertoire = chemin_fichier.parent
 
     # === Constructeurs alternatifs de FichierExcel ===
     @classmethod
-    def depuis_repertoire(cls, repertoire: str) -> FichierExcel:
+    def depuis_repertoire(cls, repertoire: Path) -> FichierExcel:
         instance = cls()
         instance._repertoire = repertoire
         return instance
 
     @classmethod
     def depuis_fichier(cls,
-                      chemin_fichier: Optional[str] = None,
+                      chemin_fichier: Optional[Path] = None,
                       avec_ouverture_wb: bool = True,
                       charger_tableau: bool = True,
                       nom_onglet: Optional[str] = None,
                       nom_tableau: Optional[str] = None,
                       nbLignes_avantET: int = 0,
-                      charger_df: bool = True) -> FichierExcel:
+                      charger_df: bool = True,
+                      repertoire_recherche_ini:Optional[Path] = None) -> FichierExcel:
         """
         Fabrique un FichierExcel à partir d'un chemin. Par défaut ouvre le workbook et 
         charge les tableaux structurés (ou un seul tableau, si nom_onglet fourni).
@@ -836,9 +837,9 @@ class FichierExcel:
 
         # Si aucun fichier d'entrée, alors l'utilisateur le pointe avec filedialog
         if not chemin_fichier:
-            chemin_fichier = cls.choisirFichiers_filedialog()
+            chemin_fichier = cls.choisirFichiers_filedialog(initialdir=repertoire_recherche_ini)
 
-        instance = cls.depuis_repertoire(os.path.dirname(chemin_fichier))
+        instance = cls.depuis_repertoire(chemin_fichier.parent)
         instance._chemin_fichier = chemin_fichier
 
         if avec_ouverture_wb:
@@ -861,7 +862,8 @@ class FichierExcel:
                       nom_onglet: Optional[str] = None,
                       nom_tableau: Optional[str] = None,
                       nbLignes_avantET: int = 0,
-                      charger_df: bool = True) -> FichierExcel:
+                      charger_df: bool = True,
+                      repertoire_recherche_ini:Optional[Path] = None) -> FichierExcel:
         """
         Charge un modèle Excel (et soit tous ses tableaux structurés, soit un tableau non structuré dans un onglet à donner).
         Si chemin_fichier_sauv est fourni, copie physiquement le modèle vers ce chemin, puis ouvre la copie.
@@ -876,7 +878,8 @@ class FichierExcel:
             nom_onglet=nom_onglet,
             nom_tableau=nom_tableau,
             nbLignes_avantET=nbLignes_avantET,
-            charger_df=charger_df
+            charger_df=charger_df,
+            repertoire_recherche_ini=repertoire_recherche_ini
         )
 
         if chemin_fichier_sauv:
@@ -912,7 +915,7 @@ class FichierExcel:
             wb.Close(SaveChanges=False)
             excel.Quit()
 
-    def _sauver_fichier(self, chemin_cible: str, copier: bool = False) -> None:
+    def _sauver_fichier(self, chemin_cible: Path, copier: bool = False) -> None:
         """
         Méthode interne factorisée pour sauvegarder le fichier Excel.
         
@@ -926,7 +929,7 @@ class FichierExcel:
             vlog.log_erreur("Chemin cible non défini pour la sauvegarde")
             return
 
-        os.makedirs(os.path.dirname(chemin_cible), exist_ok=True)
+        chemin_cible.parent.mkdir(parents=True, exist_ok=True)
 
         if copier:
             if not self._chemin_fichier:
@@ -935,7 +938,7 @@ class FichierExcel:
             try:
                 shutil.copy2(self._chemin_fichier, chemin_cible)
                 self._chemin_fichier = chemin_cible
-                self._repertoire = os.path.dirname(chemin_cible)
+                self._repertoire = chemin_cible.parent
                 self.recharger_workbook_openpyxl()
             except Exception as e:
                 vlog.log_erreur(f"Erreur lors de la copie du fichier vers {chemin_cible} : {e}")
@@ -948,12 +951,12 @@ class FichierExcel:
             except Exception as e:
                 vlog.log_erreur(f"Erreur lors de l'enregistrement du fichier {chemin_cible} : {e}")
 
-    def save(self, nouveau_chemin_fichier: Optional[str] = None) -> None:
+    def save(self, nouveau_chemin_fichier: Optional[Path] = None) -> None:
         """Sauvegarde le fichier avec openpyxl (écriture du workbook en mémoire)."""
         chemin = nouveau_chemin_fichier or self._chemin_fichier
         self._sauver_fichier(chemin, copier=False)
 
-    def save_copie_physique(self, nouveau_chemin: str) -> None:
+    def save_copie_physique(self, nouveau_chemin: Path) -> None:
         """Crée une copie physique du fichier Excel sur disque et recharge le workbook."""
         self._sauver_fichier(nouveau_chemin, copier=True)
 
@@ -1109,15 +1112,15 @@ class FichierExcel:
 
     # === Méthodes utilitaires statiques ===
     @staticmethod
-    def choisirFichiers_filedialog(initialdir: Optional[str] = None) -> str:
+    def choisirFichiers_filedialog(initialdir: Optional[Path] = None) -> Path:
         """
         Lister/sélectionner les documents à concaténer
         """
         # Je ne peux pas faire appel à self._input.repertoire comme initial dir car j'ai un appel avant création de mon instance (i.e. : pas de self)
-        chemin_fichier = filedialog.askopenfilename(
+        chemin_fichier = Path(filedialog.askopenfilename(
             title="Sélectionner le fichier à charger",
             filetype=[("Fichiers Excel", "*.xlsx")],
-            initialdir=initialdir or os.getcwd())
+            initialdir=initialdir or os.getcwd()))
         if not chemin_fichier:
             vlog.log_erreur("click sur cancel du filedialog → Pas de chemins de fichier")
         return chemin_fichier
@@ -1133,19 +1136,22 @@ class FichierExcel:
 
     # === Propriétés ===
     @property
-    def chemin_fichier(self) -> Optional[str]:
+    def chemin_fichier(self) -> Optional[Path]:
         return self._chemin_fichier
 
     @chemin_fichier.setter
-    def chemin_fichier(self, nouveau_chemin: Optional[str]) -> None:
+    def chemin_fichier(self, nouveau_chemin: Optional[str|Path]) -> None:
         if nouveau_chemin == self._chemin_fichier:
             return  # pas besoin de recharger si même chemin
 
+        if isinstance(nouveau_chemin, str):
+            nouveau_chemin = Path(nouveau_chemin)
+
         self._chemin_fichier = nouveau_chemin
-        self._repertoire = os.path.dirname(nouveau_chemin) if nouveau_chemin else None
+        self._repertoire = nouveau_chemin.parent if nouveau_chemin else None
 
         # Recharge automatiquement le fichier si il existe
-        if nouveau_chemin and os.path.isfile(nouveau_chemin):
+        if nouveau_chemin and nouveau_chemin.is_file():
             try:
                 self._wb = load_workbook(nouveau_chemin)
             except Exception as e:
@@ -1155,14 +1161,14 @@ class FichierExcel:
             self._wb = None
 
     @property
-    def repertoire(self) -> Optional[str]:
-        return os.path.dirname(self._chemin_fichier) if self._chemin_fichier else None
+    def repertoire(self) -> Optional[Path]:
+        return self._chemin_fichier.parent if self._chemin_fichier else None
 
     @property
-    def nom_fichier(self) -> Optional[str]:
+    def nom_fichier(self) -> Optional[Path]:
         if self._chemin_fichier is None:
             return None
-        return os.path.basename(self._chemin_fichier)
+        return self._chemin_fichier.name
 
     @property
     def wb(self) -> Optional[Workbook]:
@@ -1249,8 +1255,8 @@ class FichierWord:
     """
 
     # === Variables de classe ===
-    _repertoire: Optional[str] = None # TODO Dangereux car redondant avec _chemin_fichier
-    _chemin_fichier: Optional[str] = None
+    _repertoire: Optional[Path] = None # TODO Dangereux car redondant avec _chemin_fichier
+    _chemin_fichier: Optional[Path] = None
 
     _cc: Optional[Dict[str, str]] = None #_cc[nomCC, ValeurCC] (content control de Word)
     _doc: Optional[Document] = None
@@ -1260,8 +1266,8 @@ class FichierWord:
 
 
     def __init__(self,
-        chemin_fichier: Optional[str] = None,
-        repertoire: Optional[str] = None,
+        chemin_fichier: Optional[Path] = None,
+        repertoire: Optional[Path] = None,
         content_controls: Optional[Dict[str, str]] = None,
         doc_obj: Optional[Document] = None,
         com_word_app: Optional[win32com.client.CDispatch] = None,
@@ -1278,7 +1284,7 @@ class FichierWord:
 
     @classmethod
     def depuisFichier(cls,
-        chemin_fichier: Optional[str] = None,
+        chemin_fichier: Optional[Path] = None,
         charger_contentControl: bool = True,
         afficherWord: bool = False
     ) -> FichierWord:
@@ -1302,15 +1308,15 @@ class FichierWord:
         if chemin_fichier is None:
             root = Tk()
             root.withdraw()
-            chemin_fichier = filedialog.askopenfilename(
+            chemin_fichier = Path(filedialog.askopenfilename(
                 filetypes=[("Fichiers Word", "*.docx *.doc")],
                 title="Sélectionner un fichier Word"
-            )
+            ))
             root.destroy()
             if not chemin_fichier:
                 raise ValueError("Aucun fichier sélectionné")
 
-        repertoire = os.path.dirname(chemin_fichier)
+        repertoire = chemin_fichier.parent
 
         content_controls = None
         doc_obj = None
@@ -1324,7 +1330,7 @@ class FichierWord:
             com_word_doc = com_word_app.Documents.Open(chemin_fichier)
         else:
             # Charger docx via python-docx
-            doc_obj = Document(chemin_fichier)
+            doc_obj = Document(str(chemin_fichier))
 
         if charger_contentControl:
             try:
@@ -1406,7 +1412,7 @@ class FichierWord:
 
         return dico_cc
 
-    def save(self, nouveau_chemin_fichier: Optional[str] = None) -> None:
+    def save(self, nouveau_chemin_fichier: Optional[Path] = None) -> None:
         """
         Sauvegarde le document.
 
@@ -1420,9 +1426,9 @@ class FichierWord:
         """
         chemin = nouveau_chemin_fichier if nouveau_chemin_fichier is not None else self._chemin_fichier
         if self._doc and chemin:
-            self._doc.save(chemin)
+            self._doc.save(str(chemin))
         elif self._com_word_doc and chemin:
-            self._com_word_doc.SaveAs(chemin)
+            self._com_word_doc.SaveAs(str(chemin))
         else:
             raise RuntimeError("Pas de document chargé ou chemin de sauvegarde invalide.")
 
@@ -1444,33 +1450,34 @@ class FichierWord:
         self._doc = None
 
     @property
-    def chemin_fichier(self) -> Optional[str]:
+    def chemin_fichier(self) -> Optional[Path]:
         """Chemin complet du fichier."""
         return self._chemin_fichier
 
     @chemin_fichier.setter
-    def chemin_fichier(self, valeur: str) -> None:
+    def chemin_fichier(self, valeur: Path|str) -> None:
+        if isinstance(valeur, str):
+            valeur = Path(valeur)
         self._chemin_fichier = valeur
+        self._repertoire = valeur.parent
 
     @property
-    def repertoire(self) -> Optional[str]:
+    def repertoire(self) -> Optional[Path]:
         """Répertoire du fichier."""
         return self._repertoire
 
     @repertoire.setter
-    def repertoire(self, valeur: str) -> None:
+    def repertoire(self, valeur: Path|str) -> None:
+        if isinstance(valeur, str):
+            valeur = Path(valeur)
         self._repertoire = valeur
 
     @property
-    def nom_fichier(self) -> Optional[str]:
+    def nom_fichier(self) -> Optional[Path]:
         """Nom du fichier (sans le chemin)."""
         if self._chemin_fichier:
-            return os.path.basename(self._chemin_fichier)
+            return self._chemin_fichier.name
         return None
-
-    @property
-    def repertoire(self) -> Optional[str]:
-        return self._repertoire
 
     @property
     def cc(self) -> Optional[Dict[str, str]]:

@@ -515,26 +515,76 @@ def obtenir_fichier_plus_recent_repertoire(repertoire: str, motif: str):
 ### --------------------------------------------------------------------
 #  Réseau
 ### --------------------------------------------------------------------
-
-def chemin_vers_unc(path) -> str:
+def chemin_vers_unc(path:Path|str, retour_type:Type[Path]|Type[str]=Path) -> Path|str:
     """
-    Permet d'obtenir le chemin réseau complet même si l'utilisateur a défini un lecteur réseau (i.e. lettre de raccourci)
-    """
-    class UNIVERSAL_NAME_INFO(ctypes.Structure):
-        _fields_ = [("lpUniversalName", wintypes.LPWSTR)]
+    Convertit un chemin local (y compris via un lecteur réseau mappé, ex: 'Z:\\...') 
+    en chemin réseau complet de type UNC (ex: '\\\\serveur\\partage\\...') sous Windows.
 
+    Si le chemin n'est pas un lecteur réseau ou si la conversion échoue,
+    la fonction renvoie le chemin normalisé d'origine.
+
+    Paramètres
+    ----------
+    path : str | Path
+        Chemin à convertir. Peut être une chaîne (`str`) ou un objet `pathlib.Path`.
+    retour_type : type, optionnel
+        Type de retour souhaité : `Path` (par défaut) ou `str`.
+
+    Retour
+    ------
+    Path | str
+        Le chemin UNC complet sous le type spécifié (`Path` ou `str`).
+        Si la conversion échoue, retourne le chemin d'origine converti au bon type.
+
+    Notes
+    -----
+    - Fonctionne uniquement sous **Windows**.
+    - Nécessite l'accès à `mpr.dll` (via ctypes) pour appeler `WNetGetUniversalNameW`.
+
+    Exemples
+    --------
+    >>> from pathlib import Path
+    >>> chemin_local = Path("Z:/projets/formation/stagiaires.csv")
+
+    # Retourne un Path (par défaut)
+    >>> chemin_vers_unc(chemin_local)
+    WindowsPath('\\\\serveur\\projets\\formation\\stagiaires.csv')
+
+    # Retourne une chaîne de caractères
+    >>> chemin_vers_unc(chemin_local, retour_type=str)
+    '\\\\serveur\\projets\\formation\\stagiaires.csv'
+
+    # Fonctionne aussi si l'entrée est déjà une str
+    >>> chemin_vers_unc("Z:/projets/formation/stagiaires.csv")
+    WindowsPath('\\\\serveur\\projets\\formation\\stagiaires.csv')
+    """
+
+    # Vérification et conversion du type d'entrée
+    if isinstance(path, Path):
+        path = str(path)
+    elif not isinstance(path, str):
+        raise TypeError("L'argument 'path' doit être une chaîne ou un objet Path.")
+
+    # Normalisation du chemin
     path = os.path.normpath(path)
 
+    # Conversion en chemin absolu si nécessaire
     if not os.path.isabs(path):
         path = os.path.abspath(path)
 
+    # Si le chemin ne correspond pas à un lecteur local (ex: 'C:\\'), on renvoie tel quel
     if not path[1:3] == ':\\':
-        return path
+        return retour_type(path)
 
-    buf = ctypes.create_string_buffer(1024)  # buffer brut pour la structure
+    # Définition de la structure UNIVERSAL_NAME_INFO
+    class UNIVERSAL_NAME_INFO(ctypes.Structure):
+        _fields_ = [("lpUniversalName", wintypes.LPWSTR)]
+
+    # Création du buffer pour recevoir le résultat
+    buf = ctypes.create_string_buffer(1024)
     size = ctypes.c_ulong(ctypes.sizeof(buf))
 
-    # Appel à WNetGetUniversalNameW
+    # Appel à l'API Windows pour obtenir le chemin UNC
     result = ctypes.windll.mpr.WNetGetUniversalNameW(
         path,
         0x00000001,  # UNIVERSAL_NAME_INFO_LEVEL
@@ -542,15 +592,14 @@ def chemin_vers_unc(path) -> str:
         ctypes.byref(size)
     )
 
+    # Si succès
     if result == 0:
-        # Cast du buffer en pointeur vers UNIVERSAL_NAME_INFO
         uni_name_info = ctypes.cast(buf, ctypes.POINTER(UNIVERSAL_NAME_INFO)).contents
-        return uni_name_info.lpUniversalName
+        unc_path = uni_name_info.lpUniversalName
+        return retour_type(unc_path)
     else:
-        print("Marche pas, code erreur :", result)
-        return path
-
-
+        print(f"Conversion UNC échouée (code erreur : {result}). Chemin renvoyé tel quel.")
+        return retour_type(path)
 ### --------------------------------------------------------------------
 #  Divers
 ### --------------------------------------------------------------------
