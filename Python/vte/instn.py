@@ -120,10 +120,10 @@ class IRIS:
         "Inscriptions" : "R04500",
         }
     _dict_DE_IRIS["PropExportIRIS"] = {
-        "Sessions" : _sessions, 
-        "Formations" : _formations,
-        "Ventes" : _ventes,
-        "Inscriptions" : _inscriptions
+        "Sessions" : config.IRIS_SESSIONS, 
+        "Formations" : config.IRIS_FORMATIONS,
+        "Ventes" : config.IRIS_VENTES,
+        "Inscriptions" : config.IRIS_INSCRIPTIONS
         }
     _dict_DE_IRIS["Fichiers"] = {
         "Sessions" : user_config._tSessions,
@@ -3413,7 +3413,7 @@ def fenetreBilanFormation():
     frame_boutons = ttk.Frame(fenetre)
     frame_boutons.pack(pady=10)
 
-    bouton_generer = ttk.Button(frame_boutons, text="Générer bilan", state="disabled", command=generer_bilan)
+    bouton_generer = ttk.Button(frame_boutons, text="Générer bilan", state="disabled", command=generer_bilan_formation)
     bouton_generer.grid(row=0, column=0, padx=5)
 
     bouton_annuler = ttk.Button(frame_boutons, text="Annuler", command=annuler)
