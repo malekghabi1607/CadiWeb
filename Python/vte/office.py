@@ -842,6 +842,8 @@ class FichierExcel:
         instance = cls.depuis_repertoire(chemin_fichier.parent)
         instance._chemin_fichier = chemin_fichier
 
+        timer.debut(f"Lecture de {instance._chemin_fichier}")
+
         if avec_ouverture_wb:
             instance.charger_wb()
 
@@ -851,12 +853,15 @@ class FichierExcel:
             else:
                 instance.charger_tableaux(charger_df=charger_df)
 
+        vlog.ajouter_message("OK", f"✅ Lecture de {instance._chemin_fichier}")
+        timer.fin()
+
         return instance
 
     @classmethod
     def depuis_modele(cls,
-                      chemin_modele: Optional[str] = None,
-                      chemin_fichier_sauv: Optional[str] = None,
+                      chemin_modele: Optional[Path] = None,
+                      chemin_fichier_sauv: Optional[Path] = None,
                       avec_ouverture_wb: bool = True,
                       charger_tableau: bool = True,
                       nom_onglet: Optional[str] = None,
@@ -1113,17 +1118,7 @@ class FichierExcel:
     # === Méthodes utilitaires statiques ===
     @staticmethod
     def choisirFichiers_filedialog(initialdir: Optional[Path] = None) -> Path:
-        """
-        Lister/sélectionner les documents à concaténer
-        """
-        # Je ne peux pas faire appel à self._input.repertoire comme initial dir car j'ai un appel avant création de mon instance (i.e. : pas de self)
-        chemin_fichier = Path(filedialog.askopenfilename(
-            title="Sélectionner le fichier à charger",
-            filetype=[("Fichiers Excel", "*.xlsx")],
-            initialdir=initialdir or os.getcwd()))
-        if not chemin_fichier:
-            vlog.log_erreur("click sur cancel du filedialog → Pas de chemins de fichier")
-        return chemin_fichier
+        return choisirFichiers_filedialog_excel(initialdir=initialdir)
 
     @staticmethod
     def definir_rangeExcel(min_row: int, min_col: int, max_row: int, max_col: int) -> str:

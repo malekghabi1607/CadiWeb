@@ -1023,8 +1023,8 @@ def html_vers_texte(html: str) -> str:
 
     return texte_final
 
-def convertir_tuple_str(input:str|Tuple[str]) -> Tuple[str]:
-        if isinstance(input, str):
+def convertir_tuple_path(input:Path|Tuple[Path]) -> Tuple[Path]:
+        if isinstance(input, Path):
             return (input,)
         else:
             return input
@@ -1103,7 +1103,32 @@ def minuscule_premiere_lettre(s: str) -> str:
 ### --------------------------------------------------------------------
 #  Fenêtres
 ### --------------------------------------------------------------------
+def choisirFichiers_filedialog_excel(initialdir: Optional[Path] = None) -> Path:
+    """
+    Lister/sélectionner les documents à concaténer.
+    Le filedialog s'affiche au premier plan.
+    """
+    # Crée une fenêtre racine temporaire
+    root = tk.Tk()
+    root.withdraw()            # cache la fenêtre principale
+    root.attributes('-topmost', True)  # met le filedialog au premier plan
 
+    # Affiche le filedialog
+    chemin_fichier = filedialog.askopenfilename(
+        title="Sélectionner le fichier à charger",
+        filetypes=[("Fichiers Excel", "*.xlsx")],
+        initialdir=initialdir or os.getcwd()
+    )
+
+    # Détruire la fenêtre racine pour libérer les ressources
+    root.destroy()
+
+    chemin_fichier = Path(chemin_fichier) if chemin_fichier else None
+
+    if not chemin_fichier:
+        print("Click sur cancel du filedialog → Pas de chemins de fichier")
+
+    return chemin_fichier
 
 def arranger_fenetres(word_app, excel_app):
     """
@@ -1135,6 +1160,16 @@ def arranger_fenetres(word_app, excel_app):
     excel_window.Height = screen_height
 
     # Note : Excel est visible et à côté, Word reste au premier plan
+
+
+
+
+
+
+
+
+
+
 
 
 
