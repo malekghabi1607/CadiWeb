@@ -7,7 +7,6 @@ init(autoreset=True)
 
 MODE = "console"
 
-
 MENUS = {
     "Traiter à partir de codes IRIS": {
         "Code IRIS unique (manuel)": {
