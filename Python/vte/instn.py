@@ -25,6 +25,7 @@ config:ConfigType  # type hint explicite
 #  Définitions classes et fonctions spécifiques INSTN
 ### --------------------------------------------------------------------
 
+
 @dataclass
 class InfosExportsIRIS:
     repertoire:Optional[Path]
@@ -40,25 +41,21 @@ class PropExportIRIS:
                 codeExport:str, 
                 
                 repertoire_input:Path, 
-                nom_onglet_input:str, 
-                nbLignes_avantET_input:int, 
+                nom_onglet_input:str = "Data", 
+                nbLignes_avantET_input:int = 0, 
                 
-                repertoire_modele:Optional[Path] = None, 
+                repertoire_modele:Optional[Path] = config.REPERTOIRES_MODELES, 
                 nom_fichier_modele:Optional[str|Path] = None, 
                 
-                repertoire_output:Optional[Path] = None, 
+                repertoire_output:Optional[Path] = config.REPERTOIRE_EXCEL_IRIS_OUTPUT, 
                 nom_fichier_output:Optional[str|Path] = None
             ):
         # Type d'export
         self._nom_typeExport:str = nom_typeExport
         self._codeExport:str = codeExport
 
-        if not repertoire_modele:
-            repertoire_modele = config.REPERTOIRES_MODELES
         if not nom_fichier_modele:
             nom_fichier_modele = Path(f"{codeExport}_{nom_typeExport}-Modèle.xlsx")
-        if not repertoire_output:
-            repertoire_output = config.REPERTOIRE_EXCEL_IRIS_OUTPUT
         if not nom_fichier_output:
             nom_fichier_output = Path(f"{codeExport}_{nom_typeExport}-COMPLET-{date.today():%Y.%m.%d}.xlsx")
 
@@ -105,6 +102,8 @@ class PropExportIRIS:
             f"{afficher_infos('Modèle', self._modele)}\n"
             f"{afficher_infos('Output', self._output)}"
         )
+
+
 
 class IRIS:
     "C'est la classe qui contient l'environnement pour bosser sur des fichiers Exports IRIS"
@@ -593,9 +592,9 @@ class EvalStat:
         self._chemin_excel_evaluations_stagiaires:Optional[Path] = None  # Fichier xlsx EvalStat stagiaire individuel qu'on va créer à partir du CSV
         self._fe_evaluations_stagiaires:Optional[FichierExcel] = None  # Objet contenant les données EvalStat stagiaire individuel
 
-        self._chemins_csv_traites:List[Path] = []
-        self._chemins_csv_exclus:List[Path] = []
-        self._chemins_csv_probleme:List[Path] = []
+        self._chemins_csv_traites:list[Path] = []
+        self._chemins_csv_exclus:list[Path] = []
+        self._chemins_csv_probleme:list[Path] = []
 
 
     @classmethod
@@ -1474,7 +1473,7 @@ class BilanSession:
             cls._df_sessions["Code IRIS"] = cls._df_sessions["Code IRIS"].astype(str)
 
     @staticmethod
-    def _demander_entiers(message="Pour exclure des sessions : entrez un ou plusieurs code IRIS (numéro à 5 chiffres) séparés par des espaces (ou rien pour passer) : ") -> List[str]:
+    def _demander_entiers(message="Pour exclure des sessions : entrez un ou plusieurs code IRIS (numéro à 5 chiffres) séparés par des espaces (ou rien pour passer) : ") -> list[str]:
         while True:
             entree = input(message).strip()
             if not entree:
@@ -1950,7 +1949,7 @@ class BilanSession:
         
         document.write(self._chemin_word_bilan_session_output)
 
-    def _envoyer_mail_chef_unite(self, pj:Optional[List[str]] = None):
+    def _envoyer_mail_chef_unite(self, pj:Optional[list[str]] = None):
         """
         Envoie un mail au chef d'unité avec en lien le PDF à signer
         """       
@@ -2149,19 +2148,19 @@ class BilanFormation:
 @dataclass
 class TypeIntervenant:
     nom:str
-    docs:List[REE.DocREE]
+    docs:list[REE.DocREE]
 
 class REE:
     
     @dataclass
     class DocREE:
-        frequence_maj:Optional[List[str]] = None
+        frequence_maj:Optional[list[str]] = None
         nom_fichier:Optional[str] = None
         chemin_fichier:Optional[str] = None
-        intervenants:Optional[List[str]] = None
+        intervenants:Optional[list[str]] = None
 
     """
-    def enregistrer_docRee_dico(nom: str, frequence_maj:Optional[List[str]], nom_fichier:Optional[str] = None) -> DocREE:
+    def enregistrer_docRee_dico(nom: str, frequence_maj:Optional[list[str]], nom_fichier:Optional[str] = None) -> DocREE:
         doc = DocREE(nom, frequence_maj, nom_fichier)
         REE._docsREE[nom] = doc
         return doc
@@ -2280,8 +2279,8 @@ class REE:
     # === ENVOI MAIL REE ===
     def envoyerMail_REE(self, 
         statut:str, 
-        destinataire:Optional[Union[str, List[str], pd.Series]] = None, 
-        copie:Optional[Union[str, List[str], pd.Series]] = None
+        destinataire:Optional[Union[str, list[str], pd.Series]] = None, 
+        copie:Optional[Union[str, list[str], pd.Series]] = None
     ) -> None:
         # TODO : comment récupérer le statu depuis Excel ?
         # TODO : comment faire une boucle auto sur les personnes à qui envoyer ?
@@ -2300,11 +2299,11 @@ class REE:
             statut (str):
                 Statut de l'intervenant (ex. `"Vacataire"`, `"CEA"`, `"Auto-entrepreneur"`, ...).
                 Sert à filtrer les documents associés à ce type d'intervenant.
-            destinataire (Optional[Union[str, List[str], pd.Series]], optional):
+            destinataire (Optional[Union[str, list[str], pd.Series]], optional):
                 Adresse(s) e-mail des destinataires principaux.
                 Peut être une chaîne unique, une liste de chaînes ou une série Pandas.
                 Exemple : `"nom.prenom@domaine.com"` ou `["a@x.com", "b@y.com"]`.
-            copie (Optional[Union[str, List[str], pd.Series]], optional):
+            copie (Optional[Union[str, list[str], pd.Series]], optional):
                 Adresse(s) e-mail des destinataires en copie (CC).
 
         Returns:
@@ -2334,7 +2333,7 @@ class REE:
 
         
         listeInfos:str = ""
-        listePJ:List[str] = []
+        listePJ:list[str] = []
         #self._correspondance_frequence_texte
         for nom_doc, doc in self._docsREE.items():
             if statut in doc.intervenants:
@@ -2422,7 +2421,7 @@ class REE:
         else :
             print(self._repertoire_sauvegarde_fichiersREE)
 
-    def _deplacer_fichiers(self, destination: str = None) -> List[str]:
+    def _deplacer_fichiers(self, destination: str = None) -> list[str]:
         """
         Ouvre un dialogue pour sélectionner des fichiers, puis les déplace vers un dossier choisi.
 
@@ -2431,7 +2430,7 @@ class REE:
                                         Si None, un dialogue s'ouvrira pour le choisir.
         """
 
-        fichiers_sortie:List[str] = []
+        fichiers_sortie:list[str] = []
 
         # Fenêtre Tkinter cachée
         root = tk.Tk()
@@ -2505,7 +2504,7 @@ class REE:
         excel_ficheIntervenant.save()
         excel_ficheIntervenant.close()
 
-    def _envoyer_mail_gestionnaire_ree_instn(self, pj:Optional[List[str]] = None, delai: Optional[timedelta] = None):
+    def _envoyer_mail_gestionnaire_ree_instn(self, pj:Optional[list[str]] = None, delai: Optional[timedelta] = None):
         """
         Envoie un mail au gestionnaire des REE de l'INSTN (Laëtitia Da Mota)
 
@@ -2644,9 +2643,9 @@ class Traiter_contactsApprentis:
     _chemin_modele_mail_priseContact:Optional[str] = None
     _mail_responsables_univ:Optional[str] = None
     
-    _entretiens:List[PropEntretien] = []
-    _relances:List[str] = []
-    _fichiersARenvoyer:List[PropFichierARenvoyer] = []
+    _entretiens:list[PropEntretien] = []
+    _relances:list[str] = []
+    _fichiersARenvoyer:list[PropFichierARenvoyer] = []
 
     _envoyer_mail:bool = False
 
@@ -3221,6 +3220,20 @@ class Traiter_contactsApprentis:
 ### --------------------------------------------------------------------
 #  Fonctions globales INSTN
 ### --------------------------------------------------------------------
+
+def initialiser_PropExportIRIS_de_config() -> None:
+    """
+    Initialise les dataclass PropExportIRIS de config.py
+    Je suis obligé de fonctionner comme ça car sinon :
+       - config.py importe instn.py
+       - instn.py importe config.py
+    → Référence circulaire
+    """
+    config.IRIS_SESSIONS = PropExportIRIS(**config.IRIS_SESSIONS_PARAMS)
+    config.IRIS_FORMATIONS = PropExportIRIS(**config.IRIS_FORMATIONS_PARAMS)
+    config.IRIS_VENTES = PropExportIRIS(**config.IRIS_VENTES_PARAMS)
+    config.IRIS_INSCRIPTIONS = PropExportIRIS(**config.IRIS_INSCRIPTIONS_PARAMS)
+
 def verifier_code_iris(valeur: Any, type_sortie: Type = str) -> Tuple[bool, Any]:
     """
     Vérifie si une valeur correspond à un entier à 5 chiffres (code IRIS).
@@ -3437,6 +3450,9 @@ def fenetreBilanFormation():
 ### --------------------------------------------------------------------
 #  Initialisations variables globales communes
 ### --------------------------------------------------------------------
+
+# Requis pour avoir des PropExportIRIS dans config.py (dinon références circulaires à l'import)
+initialiser_PropExportIRIS_de_config()
 
 # Pour couleur barres de progression
 colorama.init(autoreset=True)
