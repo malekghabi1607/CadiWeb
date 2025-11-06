@@ -604,7 +604,7 @@ def chemin_vers_unc(path:Path|str, retour_type:Type[Path]|Type[str]=Path) -> Pat
 #  Divers
 ### --------------------------------------------------------------------
 
-def trouve_encodage_csv(chemin_fichier: str) -> str:
+def trouve_encodage_csv(chemin_fichier: str|Path) -> str:
     """
     Détecte l'encodage d'un fichier CSV.
 
@@ -743,15 +743,29 @@ def charger_config() -> Tuple[ModuleType, Optional[ModuleType]]:
     config_path_local = os.path.join(app_dir, "config.py")
     if os.path.exists(config_path_local):
         config = _charger_module_depuis_chemin(config_path_local, "config")
-        print(f"✅ Configuration globale chargée depuis {config_path_local}")
+        print(f"✅ Configuration globale config.py chargée depuis {config_path_local}")
     else:
         try:
             import vte.config as config
-            print("⚙️ Configuration globale importée depuis vte.config")
+            print("⚙️ Configuration globale config.py importée depuis vte.config")
         except ModuleNotFoundError:
             raise FileNotFoundError(
                 "Impossible de trouver config.py ni dans le dossier local ni dans vte/"
             )
+
+    # --- config_extractsIRIS.py (global optionnel) ---
+    config_path_local = os.path.join(app_dir, "config_extractsIRIS.py")
+    if os.path.exists(config_path_local):
+        config_extractsIRIS = _charger_module_depuis_chemin(config_path_local, "config_extractsIRIS")
+        print(f"✅ Configuration globale config_extractsIRIS.py chargée depuis {config_path_local}")
+    else:
+        try:
+            import vte.config_extractsIRIS as config_extractsIRIS
+            print("⚙️ Configuration globale config_extractsIRIS.py importée depuis vte.config")
+        except ModuleNotFoundError:
+            config_extractsIRIS = None
+            print("ℹ️ Impossible de trouver config_extractsIRIS.py ni dans le dossier local ni dans vte/ — ce n’est pas bloquant.")
+
 
     # --- user_config.py (optionnel) ---
     user_config_path = os.path.join(app_dir, "user_config.py")
@@ -762,7 +776,7 @@ def charger_config() -> Tuple[ModuleType, Optional[ModuleType]]:
         user_config = None
         print("ℹ️ Aucun fichier user_config.py trouvé — ce n’est pas bloquant.")
 
-    return config, user_config
+    return config, config_extractsIRIS, user_config
 
 def charger_config_user() -> ModuleType:
     """

@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+from vte.config import UNITE
 from .office import *
 
 import math
@@ -17,7 +19,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import config as ConfigType  # pour que Pylance ait une base d’autocomplétion
 
-config, user_config = charger_config()
+config, config_extractsIRIS, user_config = charger_config()
 
 config:ConfigType  # type hint explicite
 
@@ -125,10 +127,10 @@ class IRIS:
         "Inscriptions" : config.IRIS_INSCRIPTIONS
         }
     _dict_DE_IRIS["Fichiers"] = {
-        "Sessions" : user_config._tSessions,
-        "Formations" : user_config._tFormations,
-        "Ventes" : user_config._tVentes,
-        "Inscriptions" : user_config._tInscriptions
+        "Sessions" : config_extractsIRIS._tSessions,
+        "Formations" : config_extractsIRIS._tFormations,
+        "Ventes" : config_extractsIRIS._tVentes,
+        "Inscriptions" : config_extractsIRIS._tInscriptions
         }
 
 
@@ -188,7 +190,6 @@ class IRIS:
         #nom_onglet = instance._output.nom_onglet
 
         # Création du chemin pour l'output
-        #chemin_fichier_output = os.path.join(instance._output.repertoire, instance._output.nom_fichier[:-5] + "-" + date.today().strftime("%Y.%m.%d") + ".xlsx") #ou f"{datetime.now():%Y.%m.%d}")
         chemin_fichier_output = instance._output.chemin_fichier
         
 
@@ -243,7 +244,7 @@ class IRIS:
                 print(Style.BRIGHT + Fore.YELLOW + "\nTraitement des exports " + clef)
                 fichiers_formates = ["\n\t" + f for f in IRIS._dict_DE_IRIS["Fichiers"][clef]]
                 print("Liste des fichiers traités : " + ", ".join(fichiers_formates))
-                chemins_fichiersInput = tuple(os.path.join(IRIS._dict_DE_IRIS["PropExportIRIS"][clef]._input.repertoire, nom) for nom in IRIS._dict_DE_IRIS["Fichiers"][clef])
+                chemins_fichiersInput = tuple((IRIS._dict_DE_IRIS["PropExportIRIS"][clef]._input.repertoire / nom) for nom in IRIS._dict_DE_IRIS["Fichiers"][clef])
                 IRIS.avecEcritureOutputDefaut(IRIS._dict_DE_IRIS["PropExportIRIS"][clef], chemins_fichiersInput=chemins_fichiersInput)
 
     @staticmethod
@@ -584,7 +585,7 @@ class EvalStat:
 
         self._chemin_modele_excel_evaluations_stagiaires:Path = config.CHEMIN_MODELE_EXCEL_EVALUATIONS_STAGIAIRES # Modèle Excel à employer pour y coller les évaluations CSV stagiaires
 
-        self._chemin_excel_evaluations_formation:Path = config.CHEMIN_EXCEL_EVALUATIONS_FORMATION  # Chemin du fichier Excel qui contient tous les CSV d'évaluation d'une formation
+        self._chemin_excel_evaluations_formation:Optional[Path] = None # config.CHEMIN_EXCEL_EVALUATIONS_FORMATION  mais pas encore utile car il me manque le trigramme→ Je ferai l'import plus tard au bon moment # Chemin du fichier Excel qui contient tous les CSV d'évaluation d'une formation
         self._fe_evaluations_formation:Optional[FichierExcel] = None # Fichier Excel qui contient tous les CSV d'évaluation d'une formation
         self._df_evaluations_formation:Optional[pd.DataFrame] = None # DataFrame de self._fe_evaluations_formation (Alias)
 
@@ -605,11 +606,13 @@ class EvalStat:
         # On crée l'instance et on complète les infos avec les valeurs facultatives
         instance = EvalStat()
 
+        instance._trigramme_formation = trigramme_formation
+
         # On définit le chemin vers les évaluations de la formation (le fichier qui va concaténer toutes les évaluation d'une formation)
-        instance._chemin_excel_evaluations_formation = config.chemin_modele_excel_evaluations(trigramme_formation)
+        instance._chemin_excel_evaluations_formation = config.format_path(config.CHEMIN_EXCEL_EVALUATIONS_FORMATION, trigramme_formation=instance._trigramme_formation)
 
         #instance._ouvrir_fe_evaluations_formation()
-        instance._ouvrir_ou_creer_evaluationsFormation(trigramme_formation)
+        instance._ouvrir_ou_creer_evaluationsFormation()
 
         return instance
 
@@ -628,7 +631,7 @@ class EvalStat:
             instance._fe_IRIS_sessions._tableaux["Sessions"]._df["Code IRIS"] = instance._fe_IRIS_sessions._tableaux["Sessions"]._df["Code IRIS"].astype(str)
 
         # On récupère le trigramme de la formation depuis le chemin du CSV
-        instance._trigramme_formation = instance._recupere_trig_formation_depuis_chemin(chemin_csv_stagiaires)
+        instance._trigramme_formation = recupere_trig_formation_depuis_chemin(instance._chemin_csv_evaluations_stagiaires)
         
         # Pour le nom de l'Excel output : on reprend le nom du csv et on remplace par xlsx
         instance._chemin_excel_evaluations_stagiaires = instance._chemin_csv_evaluations_stagiaires.with_suffix(".xlsx")
@@ -638,7 +641,7 @@ class EvalStat:
 
         # Ouverture du dossier à la fin
         if ouvrirDossier:
-            ouvrir_dossier(os.path.dirname(instance._chemin_excel_evaluations_stagiaires))
+            ouvrir_dossier(instance._chemin_excel_evaluations_stagiaires.parent)
 
         # On ajoute le chemin au tuple des éléments traités
         instance._chemins_csv_traites.append(chemin_csv_stagiaires)
@@ -649,10 +652,10 @@ class EvalStat:
 
     @classmethod
     def depuis_tuple_csv_stagiaires(cls, 
-                                    tuple_csv_stagiaires:Tuple(Path), 
-                                    chemin_excel_evaluations_formation:Optional[Path]=None,
-                                    chemin_modele_excel_evaluations_stagiaires:Optional[Path]=None, 
-                                    chemin_excel_IRIS_sessions:Optional[Path]=None, 
+                                    tuple_csv_stagiaires:Tuple[Path], 
+                                    #chemin_excel_evaluations_formation:Optional[Path]=None,
+                                    #chemin_modele_excel_evaluations_stagiaires:Optional[Path]=None, 
+                                    #chemin_excel_IRIS_sessions:Optional[Path]=None, 
                                     fe_IRIS_sessions:Optional[FichierExcel]=None, 
                                     ouvrirDossier:bool=False
         ) -> EvalStat:
@@ -670,12 +673,12 @@ class EvalStat:
         # On crée l'instance et on complète les infos avec les valeurs facultatives
         instance = EvalStat()
 
-        if chemin_excel_evaluations_formation is not None:
-            instance._chemin_excel_evaluations_formation = chemin_excel_evaluations_formation
-        if chemin_modele_excel_evaluations_stagiaires is not None:
-            instance._chemin_modele_excel_evaluations_stagiaires = chemin_modele_excel_evaluations_stagiaires
-        if chemin_excel_IRIS_sessions is not None:
-            instance._chemin_excel_IRIS_sessions = chemin_excel_IRIS_sessions
+        #if chemin_excel_evaluations_formation is not None:
+        #    instance._chemin_excel_evaluations_formation = chemin_excel_evaluations_formation
+        #if chemin_modele_excel_evaluations_stagiaires is not None:
+        #    instance._chemin_modele_excel_evaluations_stagiaires = chemin_modele_excel_evaluations_stagiaires
+        #if chemin_excel_IRIS_sessions is not None:
+        #    instance._chemin_excel_IRIS_sessions = chemin_excel_IRIS_sessions
         if fe_IRIS_sessions is not None:
             instance._fe_IRIS_sessions = fe_IRIS_sessions
         
@@ -692,20 +695,23 @@ class EvalStat:
         # On convertit le tuple de strings en dictionnaire avec les trigrammes formation en clef
         dico_chemins_csv_session = defaultdict(list)  #Dictionnaire spécial : lorsqu’on accède à une clé qui n’existe pas encore, il va automatiquement créer une nouvelle entrée avec une valeur par défaut, ici une liste vide (list())
         for chemin in tuple_csv_stagiaires:
-            trigramme_formation = instance._recupere_trig_formation_depuis_chemin(chemin)
+            trigramme_formation = recupere_trig_formation_depuis_chemin(chemin)
             dico_chemins_csv_session[trigramme_formation].append(chemin)
         dico_chemins_csv_session = dict(dico_chemins_csv_session)  # Optionnel : conversion en dict normal
 
 
         # Pour chaque trigramme on va traiter chaque session et soit créer soit append le fichier excel global de la formation
-        for chemins_csv_session in tuple_csv_stagiaires: #chemins est la liste des chemins des évaluations pour chaque sessions de ce trigramme formation
+        #for chemins_csv_session in tuple_csv_stagiaires: #chemins est la liste des chemins des évaluations pour chaque sessions de ce trigramme formation~
+        for trigramme_formation in dico_chemins_csv_session.keys() :  # chemins_csv_session est la liste des chemins des évaluations pour chaque sessions de ce trigramme formation~
             print(f"\n\n{Style.BRIGHT}{Fore.RED}Gestion des formations {trigramme_formation}")
 
+            instance._trigramme_formation = trigramme_formation
+
             # On ouvre ou on créée (si inexistant) le fichier Excel qui concatène toutes les sessions d'une formation
-            instance._fe_evaluations_formation, instance._df_evaluations_formation, supprimeDonneesEtRemplace_evaluations_formation = instance._ouvrir_ou_creer_evaluationsFormation(trigramme_formation)
+            instance._fe_evaluations_formation, instance._df_evaluations_formation, supprimeDonneesEtRemplace_evaluations_formation = instance._ouvrir_ou_creer_evaluationsFormation()
 
             # Pour chaque chemin de session, on crée le fe_stagiaire dédié de la session et on ajoute les lignes de son dataframe au dataframe de fe_evaluations_formation
-            for chemin_csv_session in chemins_csv_session:
+            for chemin_csv_session in dico_chemins_csv_session[trigramme_formation]:
                 print(f"\n{Style.BRIGHT}{Fore.YELLOW}Gestion de la session {chemin_csv_session}")
                 traiterCSV = True  # Par défaut, on traite le CSV
 
@@ -761,178 +767,6 @@ class EvalStat:
 
 
     # === Méthodes internes ===
-    def _recupere_trig_formation_depuis_chemin(self, chemin: Optional[Path | str]) -> str:
-        """
-        Extrait un trigramme (3 lettres/chiffres) depuis un chemin, ou le demande à l'utilisateur si introuvable.
-        Gère les slashs / et \\ de manière robuste, et accepte un `Path` ou une `str`.
-
-        Paramètres
-        ----------
-        chemin : Path | str | None
-            Chemin d'où extraire le trigramme. Peut être un objet `pathlib.Path`, une chaîne, ou `None`.
-
-        Retour
-        ------
-        str
-            Le trigramme de la formation (3 caractères alphanumériques).
-            Si aucun trigramme n'est trouvé dans le chemin, la méthode le demande à l'utilisateur.
-
-        Exemples
-        --------
-        >>> self._recupere_trig_formation_depuis_chemin("C:/Formations/L3D/stagiaires.csv")
-        'L3D'
-
-        >>> self._recupere_trig_formation_depuis_chemin(Path("D:/data/UGA/stagiaires.csv"))
-        'UGA'
-
-        >>> self._recupere_trig_formation_depuis_chemin(None)
-        [ouvre une boîte de dialogue pour demander le trigramme]
-        """
-
-        trigramme = None
-
-        if chemin:
-            # Conversion en chaîne si c’est un Path
-            if isinstance(chemin, Path):
-                chemin_str = str(chemin)
-            elif isinstance(chemin, str):
-                chemin_str = chemin
-            else:
-                raise TypeError("Le paramètre 'chemin' doit être un Path, une str ou None.")
-
-            # Normalise les slashs (utile sous Windows)
-            chemin_normalise = chemin_str.replace("\\", "/")
-
-            # Découpe le chemin en segments
-            parties = chemin_normalise.split("/")
-
-            # Recherche un segment de 3 caractères alphanumériques
-            for part in parties:
-                if re.fullmatch(r"[A-Za-z0-9]{3}", part):
-                    trigramme = part
-                    break
-
-            # Si rien trouvé, on demande à l'utilisateur
-            if not trigramme:
-                trigramme = self._demander_code("Trigramme formation")
-
-        else:
-            # Aucun chemin fourni → demande directe à l'utilisateur
-            trigramme = self._demander_code("Trigramme formation")
-
-        return trigramme
-
-    def _demander_code(self, typeCode:str) -> int|str:
-        # Initialisation en fonction du type de code
-        match typeCode:
-            case "Code IRIS":
-                print("Cas code IRIS")
-                nbCaracteres = 5
-                chemin_a_tester = self._chemin_csv_evaluations_stagiaires
-            case "Trigramme formation":
-                print("Cas trigramme formation")
-                nbCaracteres = 3
-                chemin_a_tester = self._chemin_csv_evaluations_stagiaires
-            case _:
-                log_erreur(f"cas non valide : soit 'IRIS' soit 'Trigramme formation', demandé : {typeCode} → exit()")
-                exit()
-
-            
-        def verifier_entree(*args):
-            val = entry_code.get()
-            bouton_valider.config(state="normal" if val.isdigit() and len(val) == nbCaracteres else "disabled")
-            if typeCode=="Code IRIS":
-                bouton_renommer.config(state="normal" if val.isdigit() and len(val) == nbCaracteres else "disabled")
-
-        def valider():
-            nonlocal code # Adaptation : changer en "code"
-            code = entry_code.get()            
-            fenetre.destroy()
-
-        # Cas IRIS uniquement : ne pas toucher / ne pas afficher si cas Trigramme formation
-        def valider_et_renommer():
-            nonlocal code
-            code = entry_code.get()
-            nouveau_nom = f"S-{code}-Stagiaires.csv"
-            nouveau_chemin = os.path.join(
-                os.path.dirname(self._chemin_csv_evaluations_stagiaires),
-                nouveau_nom
-            )
-
-            try:
-                os.rename(self._chemin_csv_evaluations_stagiaires, nouveau_chemin)
-                self._chemin_csv_evaluations_stagiaires = nouveau_chemin
-            except Exception as e:
-                tk.messagebox.showerror("Erreur", f"Impossible de renommer le fichier :\n{e}")
-                log_erreur("Erreur", f"Impossible de renommer le fichier :\n{e}")
-                return  # Ne pas fermer la fenêtre si erreur
-
-            fenetre.destroy()
-
-        def annuler():
-            fenetre.destroy()
-            log_erreur(f"{typeCode} non renseignée pour {chemin_a_tester} → exit()")
-            exit()
-
-        code = None
-
-        fenetre = tk.Tk()
-        fenetre.title(f"{typeCode} à renseigner manuellement")
-        fenetre.resizable(False, False)
-        fenetre.geometry("500x180")
-        fenetre.eval('tk::PlaceWindow . center')
-
-        # Fermer avec Échap
-        fenetre.bind("<Escape>", lambda e: annuler())
-        # Entrée = bouton Valider
-        fenetre.bind("<Return>", lambda e: bouton_valider.invoke())
-
-        label_warning = tk.Label(
-            fenetre,
-            text=f"⚠ {typeCode} non trouvé automatiquement.\nVeuillez le spécifier manuellement",
-            font=("Segoe UI", 10, "bold"),
-            fg="orange"
-        )
-        label_warning.pack(pady=(10, 5))
-
-        label_chemin = tk.Label(
-            fenetre,
-            text=f"Chemin du fichier source :\n  *{chemin_a_tester}*",
-            font=("Segoe UI", 9),
-            justify="left",
-            wraplength=480
-        )
-        label_chemin.pack(pady=(0, 10))
-
-        frame_saisie = tk.Frame(fenetre)
-        frame_saisie.pack()
-
-        entry_code = tk.Entry(frame_saisie, width=10, justify="center", font=("Segoe UI", 12))
-        entry_code.pack()
-        entry_code.focus()
-
-        entry_code_var = tk.StringVar()
-        entry_code["textvariable"] = entry_code_var
-        entry_code_var.trace_add("write", verifier_entree)
-
-        frame_boutons = tk.Frame(fenetre)
-        frame_boutons.pack(pady=10)
-
-        bouton_valider = tk.Button(frame_boutons, text="Valider", state="disabled", width=20, command=valider)
-        bouton_valider.grid(row=0, column=0, padx=5)
-
-        if typeCode == "Code IRIS":
-            bouton_renommer = tk.Button(frame_boutons, text="Valider et remplacer le nom du CSV", state="disabled", width=30, command=valider_et_renommer)
-            bouton_renommer.grid(row=0, column=1, padx=5)
-
-        bouton_annuler = tk.Button(frame_boutons, text="Annuler", width=10, command=annuler)
-        bouton_annuler.grid(row=0, column=2, padx=5)
-
-        fenetre.mainloop()
-
-        code = int(code) if code.isdigit() else str(code)
-        return code
-
     def _construit_FichierExcel_depuis_CSV(self, fe_IRIS_sessions:FichierExcel=None, remplace_df:bool=False):
         ######
         # === Import et traitement du CSV d'evalStat ===
@@ -953,11 +787,11 @@ class EvalStat:
             df_csv_stagiaires = df_csv_stagiaires.drop(df_csv_stagiaires.columns[[1, 2]], axis=1)
         
         # On rajoute le chemin du CSV en première colonne
-        df_csv_stagiaires.insert(0, "Chemin fichier CSV", self._chemin_csv_evaluations_stagiaires)
+        df_csv_stagiaires.insert(0, "Chemin fichier CSV", str(self._chemin_csv_evaluations_stagiaires))
 
         # Définition self._codeIRIS. Sinon Non existant, on récupère le numéro IRIS depuis le CSV (c'est la plus sur)
         if self._codeIRIS is None:
-            match = re.search(r"\b\d{5}\b", self._chemin_csv_evaluations_stagiaires)
+            match = re.search(r"\b\d{5}\b", str(self._chemin_csv_evaluations_stagiaires))
             if match:
                 self._codeIRIS = match.group(0)
             else:
@@ -975,13 +809,13 @@ class EvalStat:
 
         # A cause des espaces à la con qui trainent dans les noms des colonnes des CSV, je vais reload le dataframe depuis l'excel que je viens de créer car les colonnes du modèle sont bien nommées
         # Ainsi on sauve ici plutôt qu'à la fin et on reload le DataFrame
-        self._fe_evaluations_stagiaires = FichierExcel.depuis_modele(chemin_modele=self._CHEMIN_MODELE_EXCEL_STAGIAIRES, chemin_fichier_sauv=self._chemin_excel_stagiaires_output)
+        self._fe_evaluations_stagiaires = FichierExcel.depuis_modele(chemin_modele=self._chemin_modele_excel_evaluations_stagiaires, chemin_fichier_sauv=self._chemin_excel_evaluations_stagiaires)
         if remplace_df:
             self._fe_evaluations_stagiaires._tableaux["CSV_stagiaires"].remplace_df(df_csv_stagiaires)
         self._fe_evaluations_stagiaires._tableaux["CSV_stagiaires"].ecrit_dataFrame_dans_tableauStructure(df_csv_stagiaires, supprimeDonneesEtRemplace=True)
-        self._fe_evaluations_stagiaires.save(self._chemin_excel_stagiaires_output)
+        self._fe_evaluations_stagiaires.save(self._chemin_excel_evaluations_stagiaires)
         self._fe_evaluations_stagiaires.close()
-        self._fe_evaluations_stagiaires = FichierExcel.depuis_fichier(self._chemin_excel_stagiaires_output)
+        self._fe_evaluations_stagiaires = FichierExcel.depuis_fichier(self._chemin_excel_evaluations_stagiaires)
         self._fe_evaluations_stagiaires._tableaux["CSV_stagiaires"].charge_df()
         df_csv_stagiaires = self._fe_evaluations_stagiaires._tableaux["CSV_stagiaires"]._df
         
@@ -1112,7 +946,7 @@ class EvalStat:
         self._fe_evaluations_stagiaires.actualiser_TCD()
         #timer.fin()
 
-    def _ouvrir_ou_creer_evaluationsFormation(self, trigramme_formation:str) -> Tuple[FichierExcel, pd.DataFrame, bool] :
+    def _ouvrir_ou_creer_evaluationsFormation(self) -> Tuple[FichierExcel, pd.DataFrame, bool] :
         """
         Ouvre ou crée le fichier Excel d'évaluations globales pour une formation donnée.
 
@@ -1129,14 +963,13 @@ class EvalStat:
                 (`True` si nouveau fichier créé, `False` sinon).
         """ 
         # On définit le chemin vers les évaluations de la formation (le fichier qui va concaténer toutes les évaluation d'une formation)
-        #self._chemin_excel_evaluations_formation = remplacer_champs(self._chemin_excel_evaluations_formation, ["trigramme_formation", trigramme_formation])
-        self._chemin_excel_evaluations_formation = config.chemin_modele_excel_evaluations(trigramme_formation)
+        self._chemin_excel_evaluations_formation = config.format_path(config.CHEMIN_EXCEL_EVALUATIONS_FORMATION, trigramme_formation=self._trigramme_formation)
 
-        # On vérifie que le répertoire dédié existe sinon on le créée : \\instnt\partage\FORMATIONS_C\###\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations
-        os.makedirs(os.path.dirname(self._chemin_excel_evaluations_formation), exist_ok=True)
+        # On vérifie que le répertoire dédié existe sinon on le créée : \\instnt\partage\FORMATIONS_C\###\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\AAAA
+        self._chemin_excel_evaluations_formation.parent.mkdir(parents=True, exist_ok=True)
         
         # On regarde si Evaluation-Stagiaires-Global-XXX.xlsx existe
-        if os.path.isfile(self._chemin_excel_evaluations_formation):
+        if self._chemin_excel_evaluations_formation.is_file():
             # Alors on l'ouvre
             self._fe_evaluations_formation, self._df_evaluations_formation = self._ouvrir_fe_evaluations_formation()
             
@@ -1152,7 +985,7 @@ class EvalStat:
             supprimeDonneesEtRemplace = False  
         else :
             # On créée le fichier : on ouvre le modèle (on sauvera avec le bon nom à la fin)
-            self._fe_evaluations_formation = FichierExcel.depuis_modele(chemin_modele=self._CHEMIN_MODELE_EXCEL_STAGIAIRES, chemin_fichier_sauv=self._chemin_excel_evaluations_formation)
+            self._fe_evaluations_formation = FichierExcel.depuis_modele(chemin_modele=self._chemin_modele_excel_evaluations_stagiaires, chemin_fichier_sauv=self._chemin_excel_evaluations_formation)
             self._df_evaluations_formation = self._fe_evaluations_formation._tableaux["Stagiaires"]._df  # Alias
 
             # Il faudra supprimer les anciennes données de fe_evaluations_formation
@@ -1229,18 +1062,14 @@ class EvalStat:
         root = tk.Tk()
         root.withdraw()
 
-        # Prépare le chemin initial
         if (trigramme_formation is None) and (self._chemin_excel_evaluations_formation is not None):
-            trigramme = self._chemin_excel_evaluations_formation
+            trigramme_formation = recupere_trig_formation_depuis_chemin(self._chemin_excel_evaluations_formation)
 
         if trigramme_formation:
-            chemin_repertoire_csv = optimiseCheminRepertoire(
-                os.path.dirname(
-                    remplacer_champs(self._chemin_excel_evaluations_formation, ["trigramme_formation", trigramme_formation])
-                )
-            )
+            #chemin_repertoire_csv = optimiseCheminRepertoire(os.path.dirname(remplacer_champs(self._chemin_excel_evaluations_formation, ["trigramme_formation", trigramme_formation])))
+            chemin_repertoire_csv = optimiseCheminRepertoire(self._chemin_excel_evaluations_formation.parent)
         else:
-            chemin_repertoire_csv = os.getcwd()
+            chemin_repertoire_csv = Path.cwd()
 
         # --- Boucle principale ---
         while True:
@@ -1292,6 +1121,9 @@ class BilanSession:
     _fe_IRIS_sessions:Optional[FichierExcel] = None  # Fichier Excel qui contient les extracts IRIS Sessions (ou a minima celles de la période en cours)
     _df_sessions:Optional[pd.DataFrame] = None  # DataFrame de _fe_IRIS_sessions (self._fe_IRIS_sessions._tableaux["Sessions"]._df)
 
+
+    _CRITERES_A_ENLEVER:list[str] = [  # Critères à ne pas retenir pour le calcul des moyennes < 3
+        "Comment avez-vous connu cette formation ?", "Avez-vous d'autres besoins de formation ?", "Commentaires, remarques, suggestions", "Recommanderiez-vous cette formation ?"]
 
 
     # === CONSTRUCTEURS ===
@@ -1460,7 +1292,7 @@ class BilanSession:
         if cls._fe_IRIS_sessions is None:
 
             # Lecture de l'Excel
-            cls._fe_IRIS_sessions = FichierExcel.depuis_fichier(repertoire_recherche_ini=config.IRIS_SESSIONS._input.repertoire)
+            cls._fe_IRIS_sessions = FichierExcel.depuis_fichier(repertoire_recherche_ini=config.IRIS_SESSIONS._output.repertoire)
 
             # Copie du tableau structuré "Sessions"
             cls._df_sessions = cls._fe_IRIS_sessions._tableaux["Sessions"]._df.copy()
@@ -1655,7 +1487,7 @@ class BilanSession:
             chemins_csv_manquants = {}
             for code_IRIS in self._code_session_absents:
                 # L'utilisateur sélectionne le CSV de code_IRIS
-                chemin_csv_supp = self._es._filedialog_csv(code_IRIS=code_IRIS, trigramme=self._codeFormation)
+                chemin_csv_supp = self._es._filedialog_csv(code_IRIS=code_IRIS, trigramme_formation=self._codeFormation)
                 
                 if chemin_csv_supp is not None: # CSV sélectionné 
                     chemins_csv_a_traiter[code_IRIS] = chemin_vers_unc(chemin_csv_supp)
@@ -1811,8 +1643,7 @@ class BilanSession:
         # On évalue les valeurs requises pour la fin de la méthode
         #####
         #self._periodeSessionsEvaluees = f"{self._periode} {self._annee}"  #Déjà évalué avant : dépend de si on fait une session unique ou une période
-        #self._chemin_word_bilan_session_output = os.path.join(self._REPERTOIRE_WORD_BILAN_OUTPUT.replace("###", self._codeFormation), "P07-Pr05-F05-Bilan session-"+self._periodeSessionsEvaluees+"-UEM.docx")
-        self._chemin_word_bilan_session_output = config.chemin_word_bilan_session_output(trigramme_formation=self._codeFormation, periode=self._periodeSessionsEvaluees)
+        self._chemin_word_bilan_session_output = config.format_path(config.CHEMIN_WORD_BILAN_SESSION_OUTPUT, trigramme_formation=self._codeFormation, annee=self._annee, periode=self._periodeSessionsEvaluees, unite=config.UNITE)
         
         #liste_numerosSession_statsgenerales_seulement = list(
         #    set(self._exploitationBilan["Exploités pour les stats générales"])
@@ -1947,6 +1778,10 @@ class BilanSession:
             tauxRetours_val = self._tauxRetours_val
             )
         
+        # On crée le répertoire pour les bilans de session de cette année s'il n'existe pas
+        self._chemin_word_bilan_session_output.parent.mkdir(parents=True, exist_ok=True)
+
+        # On écrit le fichier
         document.write(self._chemin_word_bilan_session_output)
 
     def _envoyer_mail_chef_unite(self, pj:Optional[list[str]] = None):
@@ -1958,15 +1793,15 @@ class BilanSession:
 
         chemin_pdf_bilan_output = self._chemin_word_bilan_session_output.with_suffix(".pdf")
         #self._CORPS_MAIL_CHEF_UNITE.replace()
-        corps_html = remplacer_champs(self._CORPS_MAIL_CHEF_UNITE, [
+        corps_html = remplacer_champs(config.CORPS_MAIL_CHEF_UNITE, [
             ["lien_pdf_bilan", chemin_pdf_bilan_output],
             ["formation", f"{self._titreFormation} ({self._codeFormation})"],
             ["periode", minuscule_premiere_lettre(self._periode)],
         ])
 
         Mail.creer_mail(
-            destinataires=self._ADRESSE_MAIL_CHEF_UNITE,
-            sujet=f"Signature bilan de session {self._titreFormation} ({self._codeFormation}) : {os.path.basename(chemin_pdf_bilan_output)}",
+            destinataires=config.ADRESSE_MAIL_CHEF_UNITE,
+            sujet=f"Signature bilan de session {self._titreFormation} ({self._codeFormation}) : {chemin_pdf_bilan_output.name}",
             corps_html=corps_html,
             pieces_jointes=pj,
             envoyer_mail=False  # envoie directement sans afficher
@@ -2042,8 +1877,8 @@ class BilanFormation:
         self._chemin_specsPedagogiques = filedialog.askopenfilename(title="Sélectionner les dernières specs pédagogiques", filetype=[("Fichiers PDF", "*.pdf"), ("Documents Word", "*.docx")], initialdir=optimiseCheminRepertoire(self._repertoire_specsPedagogiques_defaut.replace("XXX", self._codeFormation)))
         if not chemin_fichier_session:
             log_erreur("click sur cancel du filedialog → Pas de chemin des specs pédagogiques")
-        self._dateSpecs = time.localtime(os.path.getmtime(self._chemin_specsPedagogiques))
-        self._sDateSpecs = f"{self._dateSpecs[2]:02}/{self._dateSpecs[1]:02}/{self._dateSpecs[0]:04}"
+        self._dateSpecs = datetime.fromtimestamp(self._chemin_specsPedagogiques.stat().st_mtime)
+        self._sDateSpecs = self._dateSpecs.strftime("%d/%m/%Y")
         #print(self._sDateSpecs)
 
 
@@ -2054,8 +1889,8 @@ class BilanFormation:
         self._chemin_fdc = filedialog.askopenfilename(title="Sélectionner la dernière fiche de coûts", filetype=[("Fichiers Excel", "*.xlsx")], initialdir=optimiseCheminRepertoire(self._repertoire_fdc_defaut.replace("XXX", self._codeFormation)))
         if not chemin_fichier_session:
             log_erreur("click sur cancel du filedialog → Pas de chemin de fiche de coûts")
-        self._dateFdC = time.localtime(os.path.getmtime(self._chemin_fdc))
-        self._sDateFdC = f"{self._dateFdC[2]:02}/{self._dateFdC[1]:02}/{self._dateFdC[0]:04}"
+        self._dateFdC = datetime.fromtimestamp(self._chemin_fdc.stat().st_mtime)
+        self._sDateFdC = self._dateFdC.strftime("%d/%m/%Y")
         
         self._df_fdc_infos, self._df_fdc_couts, self._prixVenteRetenuParParticipant, self._dateCreationFormation, self._dureeJours_fdc, self._osThematique, self._nbCible_fcd = lire_fdc(self._chemin_fdc)
         
@@ -2272,7 +2107,7 @@ class REE:
             if doc.nom_fichier is not None:
                 # accès direct à la variable de classe REE._repertoire_documents_ree
                 doc.chemin_fichier = os.path.join(self._repertoire_documents_ree, doc.nom_fichier)"""
-        print()
+        pass
 
 
 
@@ -2418,6 +2253,7 @@ class REE:
         #print(self._repertoire_sauvegarde_fichiersREE)
         if not test:
             os.makedirs(self._repertoire_sauvegarde_fichiersREE, exist_ok=True)
+            # TODO : self._repertoire_sauvegarde_fichiersREE.mkdir(parents=True, exist_ok=True)
         else :
             print(self._repertoire_sauvegarde_fichiersREE)
 
@@ -3379,6 +3215,7 @@ def lire_fdc(chemin_fdc):
 
     return df_fdc_infos, df_fdc_couts, prixVenteRetenuParParticipant, dateCreationFormation, dureeJours_fdc, osThematique, nbCible_fcd
 
+
 def fenetreBilanFormation():
     def valider_champs(*args):
         trig = entry_trigramme.get().strip()
@@ -3445,7 +3282,315 @@ def fenetreBilanFormation():
     # Lancer la fenêtre
     fenetre.mainloop()
 
+def recupere_trig_formation_depuis_chemin(chemin:Optional[Path] = None) -> str:
+    """
+    Extrait un trigramme (3 lettres/chiffres) depuis un chemin, ou le demande à l'utilisateur si introuvable.
+    Gère les slashs / et \\ de manière robuste, et accepte un `Path` ou une `str`.
 
+    Paramètres
+    ----------
+    chemin : Path | str | None
+        Chemin d'où extraire le trigramme. Peut être un objet `pathlib.Path`, une chaîne, ou `None`.
+
+    Retour
+    ------
+    str
+        Le trigramme de la formation (3 caractères alphanumériques).
+        Si aucun trigramme n'est trouvé dans le chemin, la méthode le demande à l'utilisateur.
+
+    Exemples
+    --------
+    >>> self._recupere_trig_formation_depuis_chemin("C:/Formations/L3D/stagiaires.csv")
+    'L3D'
+
+    >>> self._recupere_trig_formation_depuis_chemin(Path("D:/data/UGA/stagiaires.csv"))
+    'UGA'
+
+    >>> self._recupere_trig_formation_depuis_chemin(None)
+    [ouvre une boîte de dialogue pour demander le trigramme]
+    """
+
+    trigramme_formation = None
+
+    if chemin:
+        # Découpe le chemin en segments
+        parties = chemin.parts
+
+        # Recherche un segment de 3 caractères alphanumériques
+        for part in parties:
+            if re.fullmatch(r"[A-Z0-9]{3}", part):
+                trigramme_formation = part
+                break
+
+        # Si rien trouvé, on demande à l'utilisateur
+        if not trigramme_formation:
+            trigramme_formation = demander_code(typeCode="Trigramme formation", chemin=chemin)
+
+    else:
+        # Aucun chemin fourni → demande directe à l'utilisateur
+        trigramme_formation = demander_code(typeCode="Trigramme formation", chemin=chemin)
+
+    return trigramme_formation
+
+def demander_code(typeCode:str, chemin:Path) -> int|str:
+    # Initialisation en fonction du type de code
+    
+    match typeCode:
+        case "Code IRIS":
+            print("Cas code IRIS")
+            nbCaracteres = 5
+        case "Trigramme formation":
+            print("Cas trigramme formation")
+            nbCaracteres = 3
+        case _:
+            log_erreur(f"cas non valide : soit 'IRIS' soit 'Trigramme formation', demandé : {typeCode} → exit()")
+            exit()
+
+        
+    def verifier_entree(*args):
+        val = entry_code.get()
+        bouton_valider.config(state="normal" if val.isdigit() and len(val) == nbCaracteres else "disabled")
+
+    def valider():
+        nonlocal code # Adaptation : changer en "code"
+        code = entry_code.get()            
+        fenetre.destroy()
+
+
+    def annuler():
+        fenetre.destroy()
+        log_erreur(f"{typeCode} non renseigné → exit()")
+        exit()
+
+    code = None
+
+    fenetre = tk.Tk()
+    fenetre.title(f"{typeCode} à renseigner manuellement")
+    fenetre.resizable(False, False)
+    fenetre.geometry("500x180")
+    fenetre.eval('tk::PlaceWindow . center')
+
+    # Fermer avec Échap
+    fenetre.bind("<Escape>", lambda e: annuler())
+    # Entrée = bouton Valider
+    fenetre.bind("<Return>", lambda e: bouton_valider.invoke())
+
+    label_warning = tk.Label(
+        fenetre,
+        text=f"⚠ {typeCode} non trouvé automatiquement.\nVeuillez le spécifier manuellement",
+        font=("Segoe UI", 10, "bold"),
+        fg="orange"
+    )
+    label_warning.pack(pady=(10, 5))
+
+    label_chemin = tk.Label(
+        fenetre,
+        text=f"Chemin du fichier source :\n  *{chemin}*",
+        font=("Segoe UI", 9),
+        justify="left",
+        wraplength=480
+    )
+    label_chemin.pack(pady=(0, 10))
+
+    frame_saisie = tk.Frame(fenetre)
+    frame_saisie.pack()
+
+    entry_code = tk.Entry(frame_saisie, width=10, justify="center", font=("Segoe UI", 12))
+    entry_code.pack()
+    entry_code.focus()
+
+    entry_code_var = tk.StringVar()
+    entry_code["textvariable"] = entry_code_var
+    entry_code_var.trace_add("write", verifier_entree)
+
+    frame_boutons = tk.Frame(fenetre)
+    frame_boutons.pack(pady=10)
+
+    bouton_valider = tk.Button(frame_boutons, text="Valider", state="disabled", width=20, command=valider)
+    bouton_valider.grid(row=0, column=0, padx=5)
+
+    bouton_annuler = tk.Button(frame_boutons, text="Annuler", width=10, command=annuler)
+    bouton_annuler.grid(row=0, column=2, padx=5)
+
+    fenetre.mainloop()
+
+    code = int(code) if code.isdigit() else str(code)
+    return code
+
+
+
+def recupere_trig_formation_depuis_chemin_avec_renommage(chemin:Optional[Path] = None, pointeur_chemin:Optional[list[Path]] = None, renommage:Optional[Callable[[Path], None]] = None) -> str:
+    """
+    Extrait un trigramme (3 lettres/chiffres) depuis un chemin, ou le demande à l'utilisateur si introuvable.
+    Gère les slashs / et \\ de manière robuste, et accepte un `Path` ou une `str`.
+
+    J'emploie une astuce :
+        Dans demander_code() il peut il y avoir un changement denom du fichier chemin
+        Comme il n'existe pas de pointeurs dans Python, j'emploie un objet mutable (i.e. qui peut être modifié en dehors comme des pointeurs : ici une liste)
+        Donc s'il n'y a pas de chemin entrée, il faut que ce soit son pointeur
+
+    Paramètres
+    ----------
+    chemin : Path | str | None
+        Chemin d'où extraire le trigramme. Peut être un objet `pathlib.Path`, une chaîne, ou `None`.
+
+    Retour
+    ------
+    str
+        Le trigramme de la formation (3 caractères alphanumériques).
+        Si aucun trigramme n'est trouvé dans le chemin, la méthode le demande à l'utilisateur.
+
+    Exemples
+    --------
+    >>> self._recupere_trig_formation_depuis_chemin("C:/Formations/L3D/stagiaires.csv")
+    'L3D'
+
+    >>> self._recupere_trig_formation_depuis_chemin(Path("D:/data/UGA/stagiaires.csv"))
+    'UGA'
+
+    >>> self._recupere_trig_formation_depuis_chemin(None)
+    [ouvre une boîte de dialogue pour demander le trigramme]
+    """
+
+    trigramme_formation = None
+
+    # On vérifie qu'il y a soit chemin, soit pointeur_chemin sinon on coupe
+    if (not chemin) and (not pointeur_chemin):
+        raise TypeError("Il faut que soit chemin, soit pointeur_chemin soit renseigné")
+
+    chemin_a_tester = None
+    if chemin:
+        chemin_a_tester = chemin
+    elif pointeur_chemin:
+        chemin_a_tester = pointeur_chemin[0]
+
+    if chemin_a_tester:
+        # Découpe le chemin en segments
+        parties = chemin.parts
+
+        # Recherche un segment de 3 caractères alphanumériques
+        for part in parties:
+            if re.fullmatch(r"[A-Z0-9]{3}", part):
+                trigramme_formation = part
+                break
+
+        # Si rien trouvé, on demande à l'utilisateur
+        if not trigramme_formation:
+            #trigramme_formation = demander_code("Trigramme formation", renommage=renommage)
+            trigramme_formation = demander_code("Trigramme formation", renommage=renommage)
+
+    else:
+        # Aucun chemin fourni → demande directe à l'utilisateur
+        trigramme_formation = demander_code("Trigramme formation", renommage=renommage)
+
+    return trigramme_formation
+
+def demander_code_avec_renommage(typeCode:str, chemin:Path, renommage:Optional[Callable[[Path], None]] = None) -> int|str:
+    # Initialisation en fonction du type de code
+    
+    match typeCode:
+        case "Code IRIS":
+            print("Cas code IRIS")
+            nbCaracteres = 5
+        case "Trigramme formation":
+            print("Cas trigramme formation")
+            nbCaracteres = 3
+        case _:
+            log_erreur(f"cas non valide : soit 'IRIS' soit 'Trigramme formation', demandé : {typeCode} → exit()")
+            exit()
+
+        
+    def verifier_entree(*args):
+        val = entry_code.get()
+        bouton_valider.config(state="normal" if val.isdigit() and len(val) == nbCaracteres else "disabled")
+        if typeCode=="Code IRIS":
+            bouton_renommer.config(state="normal" if val.isdigit() and len(val) == nbCaracteres else "disabled")
+
+    def valider():
+        nonlocal code # Adaptation : changer en "code"
+        code = entry_code.get()            
+        fenetre.destroy()
+
+    # Cas IRIS uniquement : ne pas toucher / ne pas afficher si cas Trigramme formation
+    def valider_et_renommer():
+        nonlocal code
+        code = entry_code.get()
+        nouveau_nom = f"S-{code}-Stagiaires.csv"
+        nouveau_chemin = chemin.parent / nouveau_nom
+
+        try:
+            os.rename(chemin, nouveau_chemin)
+            renommage(chemin)  # On appelle le callback
+        except Exception as e:
+            tk.messagebox.showerror("Erreur", f"Impossible de renommer le fichier :\n{e}")
+            log_erreur("Erreur", f"Impossible de renommer le fichier :\n{e}")
+            return  # Ne pas fermer la fenêtre si erreur
+
+        fenetre.destroy()
+
+    def annuler():
+        fenetre.destroy()
+        log_erreur(f"{typeCode} non renseigné pour {chemin} → exit()")
+        exit()
+
+    code = None
+
+    fenetre = tk.Tk()
+    fenetre.title(f"{typeCode} à renseigner manuellement")
+    fenetre.resizable(False, False)
+    fenetre.geometry("500x180")
+    fenetre.eval('tk::PlaceWindow . center')
+
+    # Fermer avec Échap
+    fenetre.bind("<Escape>", lambda e: annuler())
+    # Entrée = bouton Valider
+    fenetre.bind("<Return>", lambda e: bouton_valider.invoke())
+
+    label_warning = tk.Label(
+        fenetre,
+        text=f"⚠ {typeCode} non trouvé automatiquement.\nVeuillez le spécifier manuellement",
+        font=("Segoe UI", 10, "bold"),
+        fg="orange"
+    )
+    label_warning.pack(pady=(10, 5))
+
+    label_chemin = tk.Label(
+        fenetre,
+        text=f"Chemin du fichier source :\n  *{chemin}*",
+        font=("Segoe UI", 9),
+        justify="left",
+        wraplength=480
+    )
+    label_chemin.pack(pady=(0, 10))
+
+    frame_saisie = tk.Frame(fenetre)
+    frame_saisie.pack()
+
+    entry_code = tk.Entry(frame_saisie, width=10, justify="center", font=("Segoe UI", 12))
+    entry_code.pack()
+    entry_code.focus()
+
+    entry_code_var = tk.StringVar()
+    entry_code["textvariable"] = entry_code_var
+    entry_code_var.trace_add("write", verifier_entree)
+
+    frame_boutons = tk.Frame(fenetre)
+    frame_boutons.pack(pady=10)
+
+    bouton_valider = tk.Button(frame_boutons, text="Valider", state="disabled", width=20, command=valider)
+    bouton_valider.grid(row=0, column=0, padx=5)
+
+    if typeCode == "Code IRIS":
+        bouton_renommer = tk.Button(frame_boutons, text="Valider et remplacer le nom du CSV", state="disabled", width=30, command=valider_et_renommer)
+        bouton_renommer.grid(row=0, column=1, padx=5)
+
+    bouton_annuler = tk.Button(frame_boutons, text="Annuler", width=10, command=annuler)
+    bouton_annuler.grid(row=0, column=2, padx=5)
+
+    fenetre.mainloop()
+
+    code = int(code) if code.isdigit() else str(code)
+    return code
 
 ### --------------------------------------------------------------------
 #  Initialisations variables globales communes

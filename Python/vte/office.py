@@ -1279,7 +1279,7 @@ class FichierWord:
 
     @classmethod
     def depuisFichier(cls,
-        chemin_fichier: Optional[Path] = None,
+        chemin_fichier: Optional[Path|str] = None,
         charger_contentControl: bool = True,
         afficherWord: bool = False
     ) -> FichierWord:
@@ -1322,7 +1322,7 @@ class FichierWord:
             # Ouvrir Word via COM visible
             com_word_app = win32com.client.Dispatch("Word.Application")
             com_word_app.Visible = True
-            com_word_doc = com_word_app.Documents.Open(chemin_fichier)
+            com_word_doc = com_word_app.Documents.Open(str(chemin_fichier))
         else:
             # Charger docx via python-docx
             doc_obj = Document(str(chemin_fichier))

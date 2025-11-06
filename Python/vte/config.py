@@ -19,6 +19,7 @@ REPERTOIRE_FORMATION:Path = GED / "FORMATIONS_C/{trigramme_formation}"
 
 REPERTOIRE_BILANS:Path = REPERTOIRE_FORMATION / "P07-bilan-sessions-et-bilan-formation"
 REPERTOIRE_CSV_EVALUATIONS:Path = REPERTOIRE_BILANS / "rapports-sessions-CSV-evaluations"
+REPERTOIRE_BILANS_SESSIONS:Path = REPERTOIRE_BILANS / "{annee}"
 
 REPERTOIRE_CONCEPTION:Path = REPERTOIRE_FORMATION / "P05-P06-dossier-conception-referentiel"
 REPERTOIRE_FDC:Path = REPERTOIRE_CONCEPTION / "fiche-de-cout-et-code-de-formation"
@@ -105,18 +106,17 @@ CHEMIN_EXCEL_EVALUATIONS_FORMATION:Path = REPERTOIRE_CSV_EVALUATIONS / "Evaluati
 # === Bilan de session ===
 ###
 CHEMIN_MODELE_WORD_BILAN_SESSION:Path = REPERTOIRES_MODELES / "P07-Pr05-F05-Bilan-session-V3.docx"
-CHEMIN_WORD_BILAN_SESSION_OUTPUT:Path = REPERTOIRE_BILANS / "P07-Pr05-F05-Bilan session-{periode}-{unite}.docx"
+CHEMIN_WORD_BILAN_SESSION_OUTPUT:Path = REPERTOIRE_BILANS_SESSIONS / "P07-Pr05-F05-Bilan session-{periode}-{unite}.docx"
 
 
 ADRESSE_MAIL_CHEF_UNITE:str = "florent.lemont@cea.fr"
 CORPS_MAIL_CHEF_UNITE:str = """
     <p>Bonjour Florent,</p>
-    <p>Est-ce que tu peux signer le bilan de session ci-dessous stp.\nLien du bilan de session : <a href="{lien_pdf_bilan}">{lien_pdf_bilan}</a></p> 
+    <p>Est-ce que tu peux signer le bilan de session ci-dessous stp.<br>
+    Lien du bilan de session : <a href="{lien_pdf_bilan}">{lien_pdf_bilan}</a></p> 
     <p>Il concerne la formation {formation} : {periode}.</p>
 """
 
-CRITERES_A_ENLEVER:list[str] = [  # Critères à ne pas retenir pour le calcul des moyennes < 3
-    "Comment avez-vous connu cette formation ?", "Avez-vous d'autres besoins de formation ?", "Commentaires, remarques, suggestions", "Recommanderiez-vous cette formation ?"]
 
 
 
