@@ -8,7 +8,7 @@ init(autoreset=True)
 MODE = "console"
 
 MENUS = {
-    "Traiter à partir de codes IRIS": {
+    "Traiter à partir de codes IRIS (une seule session par bilan)": {
         "Code IRIS unique (manuel)": {
             "action": BilanSession.bilanUnique_parCodeIRIS,
             "kwargs": {},

@@ -643,9 +643,14 @@ class EvalStat:
         if ouvrirDossier:
             ouvrir_dossier(instance._chemin_excel_evaluations_stagiaires.parent)
 
-        # On ajoute le chemin au tuple des éléments traités
-        instance._chemins_csv_traites.append(chemin_csv_stagiaires)
-        vlog.ajouter_message("Fichiers traités", str(chemin_csv_stagiaires), style=["vert"])
+        if (instance._fe_evaluations_stagiaires):
+            # On ajoute le chemin au tuple des éléments traités
+            instance._chemins_csv_traites.append(chemin_csv_stagiaires)
+            vlog.ajouter_message("Fichier traité", str(chemin_csv_stagiaires), style=["vert"])
+        else:
+            # Alors le fichier csv n'avait aucune ligne
+            instance._chemins_csv_probleme.append(chemin_csv_stagiaires)
+            vlog.print("Fichier exclu car CSV aucune ligne", f"❌ CSV {chemin_csv_stagiaires} : pas de CSV disponible pour cette session, session exclue.", style=["rouge"])
         
         timer.fin()
         return instance        
@@ -733,17 +738,20 @@ class EvalStat:
                         print(f"❌ Erreur de traitement sur le CSV {chemin_csv_session} (CSV exclu) :", e)
                     else:
                         #timer.debut("Copie des Dataframe csv et stagiaires")
-                        # #Si df_formation_csv est vide, il faut l'initialiser avec le premier df sinon on concatène
-                        if df_formation_csv is None:
-                            df_formation_csv = traite_csv_session._fe_evaluations_stagiaires._tableaux["CSV_stagiaires"]._df.copy()
-                            df_formation_stagiaires = traite_csv_session._fe_evaluations_stagiaires._tableaux["Stagiaires"]._df.copy()
-                        else:
-                            df_formation_csv = pd.concat([df_formation_csv, traite_csv_session._fe_evaluations_stagiaires._tableaux["CSV_stagiaires"]._df], ignore_index=True)
-                            df_formation_stagiaires = pd.concat([df_formation_stagiaires, traite_csv_session._fe_evaluations_stagiaires._tableaux["Stagiaires"]._df], ignore_index=True)
-                        
-                        # On ajoute le chemin au tuple des éléments traités
-                        instance._chemins_csv_traites.append(chemin_csv_session)  # Déjà fait dans depuis_chemin_csv_evaluations_stagiaires
-                        #vlog.ajouter_message("Fichiers traités", chemin_csv_session, style=["vert"])
+
+                        # On vérifie l'existance de traite_csv_session._fe_evaluations_stagiaires (i.e. le csv avait au moins 1 ligne)
+                        if traite_csv_session._fe_evaluations_stagiaires:
+                            #Si df_formation_csv est vide, il faut l'initialiser avec le premier df sinon on concatène
+                            if df_formation_csv is None:
+                                df_formation_csv = traite_csv_session._fe_evaluations_stagiaires._tableaux["CSV_stagiaires"]._df.copy()
+                                df_formation_stagiaires = traite_csv_session._fe_evaluations_stagiaires._tableaux["Stagiaires"]._df.copy()
+                            else:
+                                df_formation_csv = pd.concat([df_formation_csv, traite_csv_session._fe_evaluations_stagiaires._tableaux["CSV_stagiaires"]._df], ignore_index=True)
+                                df_formation_stagiaires = pd.concat([df_formation_stagiaires, traite_csv_session._fe_evaluations_stagiaires._tableaux["Stagiaires"]._df], ignore_index=True)
+                            
+                            # On ajoute le chemin au tuple des éléments traités
+                            instance._chemins_csv_traites.append(chemin_csv_session)  # Déjà fait dans depuis_chemin_csv_evaluations_stagiaires
+                            #vlog.ajouter_message("Fichiers traités", chemin_csv_session, style=["vert"])
 
             # On concatène, on sauve et on ferme le fe de tous les CSV de la formation
             if instance._chemins_csv_traites :
@@ -778,173 +786,174 @@ class EvalStat:
         #timer.debut("Import du CSV et traitement du DataFrame")
         df_csv_stagiaires = pd.read_csv(self._chemin_csv_evaluations_stagiaires, sep=';', encoding=codage_csv)  # Ouverture du CSV et mise dans un DataFrame
         
-        # Prise en compte qu'on a plusieurs formats de CSV : on doit traiter des colonnes en + ou - en conséquences
-        if "Date de fin" in df_csv_stagiaires.columns:
-            # Cas 1 (nouveau format de csv) : supprimer "Date de fin" → Test : r"P:\FORMATIONS_C\54C\P07-bilan-sessions-et-bilan-formation\rapports-sessions-evaluations\2023-06-S14317 UEM\S-14317-FC23-54C-VTE-LRA-Stagiaires.csv"
-            df_csv_stagiaires = df_csv_stagiaires.drop(columns=["Date de fin"])
-        else:
-            # Cas 2 (ancien format de csv) : supprimer la 2e et 3e colonne (indices 1 et 2) → Test : r"P:\FORMATIONS_C\22B\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-17606 - 22B - 06-2025\S-17606-FC25-22B-VTE-CAR-Stagiaires.csv"
-            df_csv_stagiaires = df_csv_stagiaires.drop(df_csv_stagiaires.columns[[1, 2]], axis=1)
-        
-        # On rajoute le chemin du CSV en première colonne
-        df_csv_stagiaires.insert(0, "Chemin fichier CSV", str(self._chemin_csv_evaluations_stagiaires))
-
-        # Définition self._codeIRIS. Sinon Non existant, on récupère le numéro IRIS depuis le CSV (c'est la plus sur)
-        if self._codeIRIS is None:
-            match = re.search(r"\b\d{5}\b", str(self._chemin_csv_evaluations_stagiaires))
-            if match:
-                self._codeIRIS = match.group(0)
+        if (not df_csv_stagiaires.empty):
+            # Prise en compte qu'on a plusieurs formats de CSV : on doit traiter des colonnes en + ou - en conséquences
+            if "Date de fin" in df_csv_stagiaires.columns:
+                # Cas 1 (nouveau format de csv) : supprimer "Date de fin" → Test : r"P:\FORMATIONS_C\54C\P07-bilan-sessions-et-bilan-formation\rapports-sessions-evaluations\2023-06-S14317 UEM\S-14317-FC23-54C-VTE-LRA-Stagiaires.csv"
+                df_csv_stagiaires = df_csv_stagiaires.drop(columns=["Date de fin"])
             else:
-                self._demander_code("Code IRIS")
+                # Cas 2 (ancien format de csv) : supprimer la 2e et 3e colonne (indices 1 et 2) → Test : r"P:\FORMATIONS_C\22B\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-17606 - 22B - 06-2025\S-17606-FC25-22B-VTE-CAR-Stagiaires.csv"
+                df_csv_stagiaires = df_csv_stagiaires.drop(df_csv_stagiaires.columns[[1, 2]], axis=1)
+            
+            # On rajoute le chemin du CSV en première colonne
+            df_csv_stagiaires.insert(0, "Chemin fichier CSV", str(self._chemin_csv_evaluations_stagiaires))
 
-        # Met à jour ou crée la colonne "Code session" avec self._codeIRIS
-        df_csv_stagiaires["Code session"] = self._codeIRIS
+            # Définition self._codeIRIS. Sinon Non existant, on récupère le numéro IRIS depuis le CSV (c'est la plus sur)
+            if self._codeIRIS is None:
+                match = re.search(r"\b\d{5}\b", str(self._chemin_csv_evaluations_stagiaires))
+                if match:
+                    self._codeIRIS = match.group(0)
+                else:
+                    self._demander_code("Code IRIS")
 
-        # Mise au format jj/mm/aaaa de la colonne "Date" (si elle existe)
-        if "Date" in df_csv_stagiaires.columns:
-            try:
-                df_csv_stagiaires["Date"] = pd.to_datetime(df_csv_stagiaires["Date"], dayfirst=True, errors="coerce").dt.strftime("%d/%m/%Y")  # dayfirst=True indique que le premier nombre correspond au jour (format jj/mm/aaaa)
-            except Exception as e:
-                print(f"Erreur de conversion de la colonne Date : {e}")
+            # Met à jour ou crée la colonne "Code session" avec self._codeIRIS
+            df_csv_stagiaires["Code session"] = self._codeIRIS
 
-        # A cause des espaces à la con qui trainent dans les noms des colonnes des CSV, je vais reload le dataframe depuis l'excel que je viens de créer car les colonnes du modèle sont bien nommées
-        # Ainsi on sauve ici plutôt qu'à la fin et on reload le DataFrame
-        self._fe_evaluations_stagiaires = FichierExcel.depuis_modele(chemin_modele=self._chemin_modele_excel_evaluations_stagiaires, chemin_fichier_sauv=self._chemin_excel_evaluations_stagiaires)
-        if remplace_df:
-            self._fe_evaluations_stagiaires._tableaux["CSV_stagiaires"].remplace_df(df_csv_stagiaires)
-        self._fe_evaluations_stagiaires._tableaux["CSV_stagiaires"].ecrit_dataFrame_dans_tableauStructure(df_csv_stagiaires, supprimeDonneesEtRemplace=True)
-        self._fe_evaluations_stagiaires.save(self._chemin_excel_evaluations_stagiaires)
-        self._fe_evaluations_stagiaires.close()
-        self._fe_evaluations_stagiaires = FichierExcel.depuis_fichier(self._chemin_excel_evaluations_stagiaires)
-        self._fe_evaluations_stagiaires._tableaux["CSV_stagiaires"].charge_df()
-        df_csv_stagiaires = self._fe_evaluations_stagiaires._tableaux["CSV_stagiaires"]._df
-        
-        ######
-        # === On crée la seconde partie du DataFrame qui sera dans l'onglet "Stagiaire" ===
-        # On va découper le dataframe du CSV selon les différents critères et mettre dans un dataframe qu'on pourra exploiter par un TCD
-        ######
-        # Nouveau DataFrame à remplir
-        df_long = []
+            # Mise au format jj/mm/aaaa de la colonne "Date" (si elle existe)
+            if "Date" in df_csv_stagiaires.columns:
+                try:
+                    df_csv_stagiaires["Date"] = pd.to_datetime(df_csv_stagiaires["Date"], dayfirst=True, errors="coerce").dt.strftime("%d/%m/%Y")  # dayfirst=True indique que le premier nombre correspond au jour (format jj/mm/aaaa)
+                except Exception as e:
+                    print(f"Erreur de conversion de la colonne Date : {e}")
 
-        # Parcours des lignes
-        for _, row in df_csv_stagiaires.iterrows():
-            #print("Ligne en cours : ")
-            #print(row)
-            base = {col: row[col] for col in self._colonnes_csv_fixes}  # Création des colonnes qui seront répétées à chaque fois
-            base["NOM Prénom"] = f"{str(row['Nom']).upper()} {row['Prénom']}".strip()  # Création du champ "NOM Prénom"
+            # A cause des espaces à la con qui trainent dans les noms des colonnes des CSV, je vais reload le dataframe depuis l'excel que je viens de créer car les colonnes du modèle sont bien nommées
+            # Ainsi on sauve ici plutôt qu'à la fin et on reload le DataFrame
+            self._fe_evaluations_stagiaires = FichierExcel.depuis_modele(chemin_modele=self._chemin_modele_excel_evaluations_stagiaires, chemin_fichier_sauv=self._chemin_excel_evaluations_stagiaires)
+            if remplace_df:
+                self._fe_evaluations_stagiaires._tableaux["CSV_stagiaires"].remplace_df(df_csv_stagiaires)
+            self._fe_evaluations_stagiaires._tableaux["CSV_stagiaires"].ecrit_dataFrame_dans_tableauStructure(df_csv_stagiaires, supprimeDonneesEtRemplace=True)
+            self._fe_evaluations_stagiaires.save(self._chemin_excel_evaluations_stagiaires)
+            self._fe_evaluations_stagiaires.close()
+            self._fe_evaluations_stagiaires = FichierExcel.depuis_fichier(self._chemin_excel_evaluations_stagiaires)
+            self._fe_evaluations_stagiaires._tableaux["CSV_stagiaires"].charge_df()
+            df_csv_stagiaires = self._fe_evaluations_stagiaires._tableaux["CSV_stagiaires"]._df
+            
+            ######
+            # === On crée la seconde partie du DataFrame qui sera dans l'onglet "Stagiaire" ===
+            # On va découper le dataframe du CSV selon les différents critères et mettre dans un dataframe qu'on pourra exploiter par un TCD
+            ######
+            # Nouveau DataFrame à remplir
+            df_long = []
 
-            # Cas 1 : colonnes avec note + commentaire associé
-            for critere in self._colonnes_csv_avec_commentaires:
-                if critere in row:
-                    #print(f"'{critere}'")
-                    if(critere == "Avez-vous d'autres besoins de formation ?"):  # Il faut changer le booléen en 0 ou 5
-                        val = str(row[critere]).strip().lower()
-                        row[critere] = 5 if val == "oui" else (0 if val == "non" else None)
-                    commentaire_col = row.index[row.index.get_loc(critere) + 1]
-                    if(pd.notna(row[critere]) or pd.notna(row.get(commentaire_col, None))) :
-                        df_long.append({
-                            **base,
-                            "Critère": critere,
-                            "Note": row[critere],
-                            "Commentaires": row.get(commentaire_col, None)
-                        })
+            # Parcours des lignes
+            for _, row in df_csv_stagiaires.iterrows():
+                #print("Ligne en cours : ")
+                #print(row)
+                base = {col: row[col] for col in self._colonnes_csv_fixes}  # Création des colonnes qui seront répétées à chaque fois
+                base["NOM Prénom"] = f"{str(row['Nom']).upper()} {row['Prénom']}".strip()  # Création du champ "NOM Prénom"
 
-            # Cas 2 : colonnes texte seules
-            for critere in self._colonnes_csv_commentaires_seuls:
-                if critere in row:
-                    if(pd.notna(row[critere])) :
-                        df_long.append({
-                            **base,
-                            "Critère": critere,
-                            "Note": None,
-                            "Commentaires": row[critere]
-                        })
+                # Cas 1 : colonnes avec note + commentaire associé
+                for critere in self._colonnes_csv_avec_commentaires:
+                    if critere in row:
+                        #print(f"'{critere}'")
+                        if(critere == "Avez-vous d'autres besoins de formation ?"):  # Il faut changer le booléen en 0 ou 5
+                            val = str(row[critere]).strip().lower()
+                            row[critere] = 5 if val == "oui" else (0 if val == "non" else None)
+                        commentaire_col = row.index[row.index.get_loc(critere) + 1]
+                        if(pd.notna(row[critere]) or pd.notna(row.get(commentaire_col, None))) :
+                            df_long.append({
+                                **base,
+                                "Critère": critere,
+                                "Note": row[critere],
+                                "Commentaires": row.get(commentaire_col, None)
+                            })
 
-            # Cas 3 : Note seule + booléens convertis
-            for critere in self._colonnes_csv_bool:
-                if critere in row:
-                    if(pd.notna(row[critere])) :
-                        val = str(row[critere]).strip().lower()
-                        note = 5 if val == "oui" else (0 if val == "non" else None)
-                        df_long.append({
-                            **base,
-                            "Critère": critere,
-                            "Note": note,
-                            "Commentaires": None
-                        })
+                # Cas 2 : colonnes texte seules
+                for critere in self._colonnes_csv_commentaires_seuls:
+                    if critere in row:
+                        if(pd.notna(row[critere])) :
+                            df_long.append({
+                                **base,
+                                "Critère": critere,
+                                "Note": None,
+                                "Commentaires": row[critere]
+                            })
 
-        # Construction du DataFrame final
-        df_stagiaires = pd.DataFrame(df_long)
+                # Cas 3 : Note seule + booléens convertis
+                for critere in self._colonnes_csv_bool:
+                    if critere in row:
+                        if(pd.notna(row[critere])) :
+                            val = str(row[critere]).strip().lower()
+                            note = 5 if val == "oui" else (0 if val == "non" else None)
+                            df_long.append({
+                                **base,
+                                "Critère": critere,
+                                "Note": note,
+                                "Commentaires": None
+                            })
 
-        # Réorganise les colonnes pour placer "NOM Prénom" juste après "Nom"
-        colonnes = list(df_stagiaires.columns)
-        if "NOM Prénom" in colonnes and "Nom" in colonnes:
-            colonnes.remove("NOM Prénom")
-            index_nom = colonnes.index("Nom")
-            colonnes.insert(index_nom + 1, "NOM Prénom")
-            df_stagiaires = df_stagiaires[colonnes]
+            # Construction du DataFrame final
+            df_stagiaires = pd.DataFrame(df_long)
 
-        # Supprime les colonnes "Prénom" et "Nom" devenues inutiles
-        df_stagiaires.drop(columns=["Prénom", "Nom"], inplace=True)
+            # Réorganise les colonnes pour placer "NOM Prénom" juste après "Nom"
+            colonnes = list(df_stagiaires.columns)
+            if "NOM Prénom" in colonnes and "Nom" in colonnes:
+                colonnes.remove("NOM Prénom")
+                index_nom = colonnes.index("Nom")
+                colonnes.insert(index_nom + 1, "NOM Prénom")
+                df_stagiaires = df_stagiaires[colonnes]
 
-
-        ######
-        # === On fait le left join entre df_stagiaires et les données qui proviennent de l'extract IRIS Sessions ===
-        ######
-        # On récupère les données de Sessions
-        if fe_IRIS_sessions is None:
-            timer.debut("Lecture fichier session")
-            self._fe_IRIS_sessions = FichierExcel.depuis_fichier(self._chemin_excel_IRIS_sessions)
-            self._fe_IRIS_sessions._tableaux["Sessions"]._df["Code IRIS"] = self._fe_IRIS_sessions._tableaux["Sessions"]._df["Code IRIS"].astype(str)
-        else:
-            self._fe_IRIS_sessions = fe_IRIS_sessions
-
-
-        # Pour faire le merge, il faut que les colonnes soient de même type (là "Code session" est de type int64 et "Code IRIS" est de type object (souvent des chaînes de caractères)).
-        # Comme je ne peux être sûr que tous les "Code IRIS" issu des CSV soient bien convertibles en int (c’est-à-dire pas de chaînes vides, NaN, ou autres caractères non numériques), alors je passe par des strings
-        df_stagiaires["Code session"] = df_stagiaires["Code session"].astype(str)
-        #self._fe_IRIS_sessions._tableaux["Sessions"]._df["Code IRIS"] = self._fe_IRIS_sessions._tableaux["Sessions"]._df["Code IRIS"].astype(str)
-        
-        # On récupère uniquement les colonnes souhaitées dans une vue pour faciliter le codage (c'est un alias)
-        df_sessions_filtre = self._fe_IRIS_sessions._tableaux["Sessions"]._df[self._colonnes_sessions]
-        
-        # On fait la jointure entre df_stagiaires et df_sessions_filtre
-        #timer.debut("Création du DataFrame Stagiaires (jointure)")
-        df_stagiaires = df_stagiaires.merge(
-            df_sessions_filtre,
-            left_on="Code session",
-            right_on="Code IRIS",
-            how="left"
-        )
-
-        # On réorganise les colonnes : d'abord celles de df_sessions puis celles de df_stagiaires
-        colonnes_resultat = (
-            df_sessions_filtre.columns.tolist() +  # colonnes de _df_sessions
-            [col for col in df_stagiaires.columns if col not in df_sessions_filtre.columns]  # le reste (i.e. celles de df_stagiaires)
-        )
-        df_stagiaires = df_stagiaires[colonnes_resultat]
-        #print(_df_stagiaires)
-        
-        # On vire "Code session" qui est redondante avec "Code IRIS"
-        df_stagiaires.drop(columns=["Code session"], inplace=True)
-        
-        # On renomme les colonnes
-        #df_sessions_filtre.rename(columns={"Date début ses.": "Date"}, inplace=True)
-        #df_sessions_filtre.rename(columns={"Année début ses.": "Année"}, inplace=True)
-
-        # On remplace le DataFrame existant par le nouveau
-        if remplace_df:
-            self._fe_evaluations_stagiaires._tableaux["Stagiaires"].remplace_df(df_stagiaires)
-        
-        # On écrit et on sauve
-        #timer.debut("On écrit le DataFrame, on met à jour les TCD et on sauve")
-        self._fe_evaluations_stagiaires._tableaux["Stagiaires"].ecrit_dataFrame_dans_tableauStructure(df_stagiaires, supprimeDonneesEtRemplace=True)
-        self._fe_evaluations_stagiaires.save()
+            # Supprime les colonnes "Prénom" et "Nom" devenues inutiles
+            df_stagiaires.drop(columns=["Prénom", "Nom"], inplace=True)
 
 
-        # Màj des TCD
-        self._fe_evaluations_stagiaires.actualiser_TCD()
-        #timer.fin()
+            ######
+            # === On fait le left join entre df_stagiaires et les données qui proviennent de l'extract IRIS Sessions ===
+            ######
+            # On récupère les données de Sessions
+            if fe_IRIS_sessions is None:
+                timer.debut("Lecture fichier session")
+                self._fe_IRIS_sessions = FichierExcel.depuis_fichier(self._chemin_excel_IRIS_sessions)
+                self._fe_IRIS_sessions._tableaux["Sessions"]._df["Code IRIS"] = self._fe_IRIS_sessions._tableaux["Sessions"]._df["Code IRIS"].astype(str)
+            else:
+                self._fe_IRIS_sessions = fe_IRIS_sessions
+
+
+            # Pour faire le merge, il faut que les colonnes soient de même type (là "Code session" est de type int64 et "Code IRIS" est de type object (souvent des chaînes de caractères)).
+            # Comme je ne peux être sûr que tous les "Code IRIS" issu des CSV soient bien convertibles en int (c’est-à-dire pas de chaînes vides, NaN, ou autres caractères non numériques), alors je passe par des strings
+            df_stagiaires["Code session"] = df_stagiaires["Code session"].astype(str)
+            #self._fe_IRIS_sessions._tableaux["Sessions"]._df["Code IRIS"] = self._fe_IRIS_sessions._tableaux["Sessions"]._df["Code IRIS"].astype(str)
+            
+            # On récupère uniquement les colonnes souhaitées dans une vue pour faciliter le codage (c'est un alias)
+            df_sessions_filtre = self._fe_IRIS_sessions._tableaux["Sessions"]._df[self._colonnes_sessions]
+            
+            # On fait la jointure entre df_stagiaires et df_sessions_filtre
+            #timer.debut("Création du DataFrame Stagiaires (jointure)")
+            df_stagiaires = df_stagiaires.merge(
+                df_sessions_filtre,
+                left_on="Code session",
+                right_on="Code IRIS",
+                how="left"
+            )
+
+            # On réorganise les colonnes : d'abord celles de df_sessions puis celles de df_stagiaires
+            colonnes_resultat = (
+                df_sessions_filtre.columns.tolist() +  # colonnes de _df_sessions
+                [col for col in df_stagiaires.columns if col not in df_sessions_filtre.columns]  # le reste (i.e. celles de df_stagiaires)
+            )
+            df_stagiaires = df_stagiaires[colonnes_resultat]
+            #print(_df_stagiaires)
+            
+            # On vire "Code session" qui est redondante avec "Code IRIS"
+            df_stagiaires.drop(columns=["Code session"], inplace=True)
+            
+            # On renomme les colonnes
+            #df_sessions_filtre.rename(columns={"Date début ses.": "Date"}, inplace=True)
+            #df_sessions_filtre.rename(columns={"Année début ses.": "Année"}, inplace=True)
+
+            # On remplace le DataFrame existant par le nouveau
+            if remplace_df:
+                self._fe_evaluations_stagiaires._tableaux["Stagiaires"].remplace_df(df_stagiaires)
+            
+            # On écrit et on sauve
+            #timer.debut("On écrit le DataFrame, on met à jour les TCD et on sauve")
+            self._fe_evaluations_stagiaires._tableaux["Stagiaires"].ecrit_dataFrame_dans_tableauStructure(df_stagiaires, supprimeDonneesEtRemplace=True)
+            self._fe_evaluations_stagiaires.save()
+
+
+            # Màj des TCD
+            self._fe_evaluations_stagiaires.actualiser_TCD()
+            #timer.fin()
 
     def _ouvrir_ou_creer_evaluationsFormation(self) -> Tuple[FichierExcel, pd.DataFrame, bool] :
         """
@@ -1457,6 +1466,7 @@ class BilanSession:
         timer.debut("Lecture du fichier Excel global des évaluations des stagiaires")
         self._es = EvalStat.depuis_fe_evaluations_formation(self._codeFormation)
         self._df_stagiaires = self._es._fe_evaluations_formation._tableaux["Stagiaires"]._df  # Création d'un alias pour faciliter le code
+        
         # Retype "Trigramme formation" et "Code IRIS"
         self._df_stagiaires["Trigramme formation"] = self._df_stagiaires["Trigramme formation"].astype(str)
         self._df_stagiaires["Code IRIS"] = (
@@ -1537,7 +1547,7 @@ class BilanSession:
                 vlog.print("Problème traitement CSV", f"   ❌ Chemins exclus lors du traitement : " + "".join(f"\n      • {i_csv}" for i_csv in self._es._chemins_csv_exclus))
                 
         else:
-            vlog.print("OK", f"✅ Tous les CSV sont bien déjà importés dans {os.path.basename(self._es._fe_evaluations_formation.chemin_fichier)}")
+            vlog.print("OK", f"✅ Tous les CSV sont bien déjà importés dans {self._es._fe_evaluations_formation.chemin_fichier.name}")
 
 
 
