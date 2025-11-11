@@ -523,8 +523,6 @@ class EvalStat:
 
     # === VARIABLES DE CLASSE ===
     # --- Paramètres d'environnement
-    #_chemin_excel_evaluation = config.CHEMIN_EXCEL_EVALUATIONS_FORMATION
-    #_chemin_excel_IRIS_sessions:str = r"C:\Users\vt238770\Documents\_CEA\_Formations\Extracts IRIS - Faits\Extracts complets\R04110_Sessions-COMPLET-2025.08.24.xlsx"
 
     # === Colonnes du CSV selon traitement à avoir ===
     # Colonnes descriptives à recopier
@@ -577,17 +575,21 @@ class EvalStat:
     def __init__(self) -> None:
         # --- Autres variables de la classe
 
+        # Extract IRIS Sessions (R04110)
         self._chemin_excel_IRIS_sessions:Optional[Path] = None  # Extract IRIS des sessions R04110
         self._fe_IRIS_sessions:Optional[FichierExcel] = None  # Fichier Excel qui contient les extracts IRIS Sessions (ou a minima celles de la période en cours)
 
-        self._trigramme_formation:Optional[str] = None
-        self._codeIRIS:Optional[str] = None
-
-        self._chemin_modele_excel_evaluations_stagiaires:Path = config.CHEMIN_MODELE_EXCEL_EVALUATIONS_STAGIAIRES # Modèle Excel à employer pour y coller les évaluations CSV stagiaires
-
+        # Variables pour le fichier Excel évaluation de la formation
         self._chemin_excel_evaluations_formation:Optional[Path] = None # config.CHEMIN_EXCEL_EVALUATIONS_FORMATION  mais pas encore utile car il me manque le trigramme→ Je ferai l'import plus tard au bon moment # Chemin du fichier Excel qui contient tous les CSV d'évaluation d'une formation
         self._fe_evaluations_formation:Optional[FichierExcel] = None # Fichier Excel qui contient tous les CSV d'évaluation d'une formation
         self._df_evaluations_formation:Optional[pd.DataFrame] = None # DataFrame de self._fe_evaluations_formation (Alias)
+
+        # Modèle Excel évaluation stagiaire
+        self._chemin_modele_excel_evaluations_stagiaires:Path = config.CHEMIN_MODELE_EXCEL_EVALUATIONS_STAGIAIRES # Modèle Excel à employer pour y coller les évaluations CSV stagiaires
+
+        # Variables pour un EvalStat individuel
+        self._trigramme_formation:Optional[str] = None
+        self._codeIRIS:Optional[str] = None
 
         self._chemin_csv_evaluations_stagiaires:Optional[Path] = None  # Fichier csv EvalStat stagiaire individuel
         self._chemin_excel_evaluations_stagiaires:Optional[Path] = None  # Fichier xlsx EvalStat stagiaire individuel qu'on va créer à partir du CSV
