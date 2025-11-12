@@ -518,39 +518,58 @@ class IRIS:
             f"  df_tableau :\n{aff_df}"
             )
 
+
+
 class ContexteFormation:
     """
     Gère le fichier d'évaluation global d'une formation donnée.
     Utilisable comme contexte : ouvre au début, sauvegarde et ferme à la fin.
     """
+
+    # Modèle Excel évaluations stagiaires
+    _CHEMIN_MODELE_EXCEL_EVALUATIONS_STAGIAIRES:Path = config.CHEMIN_MODELE_EXCEL_EVALUATIONS_STAGIAIRES # Modèle Excel à employer pour y coller les évaluations CSV stagiaires
+    
     def __init__(self, trigramme_formation: str):
+    
         self.trigramme_formation = trigramme_formation
-        self.fe_evaluations_formation: Optional[FichierExcel] = None
-        self.df_evaluations_formation: Optional[pd.DataFrame] = None
-        self.supprimeDonneesEtRemplace_evaluations_formation:Optional[bool] = None
+        self.fe_evaluations: Optional[FichierExcel] = None
+        self.df_evaluations: Optional[pd.DataFrame] = None
+
+        self.supprimeDonneesEtRemplace:Optional[bool] = None
 
     def __enter__(self):
-        print(f"🔹 Ouverture du fichier global pour {self.trigramme_formation}")
+        vlog.print("Info", f"🔹 Ouverture du fichier global pour {self.trigramme_formation}")
 
         # On ouvre ou on créée (si inexistant) le fichier Excel qui concatène toutes les sessions d'une formation
-        #instance._fe_evaluations_formation, instance._df_evaluations_formation,
-        self.supprimeDonneesEtRemplace_evaluations_formation = self._ouvrir_ou_creer_evaluationsFormation()
-
-        self.fe_evaluations_formation = FichierExcel(depuis_formation=self.trigramme_formation)
-        self.df_evaluations_formation = self.fe_evaluations_formation.tableau_principal
+        #instance.fe_evaluations, instance.df_evaluations,
+        self.supprimeDonneesEtRemplace = self._ouvrir_ou_creer_evaluationsFormation()
         EvalStat._contexte_formation = self  # ← toutes les instances peuvent y accéder
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.fe_evaluations_formation:
-            print(f"💾 Sauvegarde et fermeture du fichier global pour {self.trigramme_formation}")
-            self.fe_evaluations_formation.sauvegarder()
-            self.fe_evaluations_formation.fermer()
+        if self.fe_evaluations:
+            vlog.print("Info", f"\n\n{Style.BRIGHT}{Fore.RED}Écriture du fichier global des évaluations de la formation {self.trigramme_formation}")
+            # On concatène, on sauve et on ferme le fe de tous les CSV de la formation
+
+            timer.debut("Écriture, sauvegarde et fermeture")
+            self.fe_evaluations._tableaux["CSV_stagiaires"].ecrit_dataFrame_dans_tableauStructure(df_formation_csv, supprimeDonneesEtRemplace = self.supprimeDonneesEtRemplace)
+            self.fe_evaluations._tableaux["Stagiaires"].ecrit_dataFrame_dans_tableauStructure(df_formation_stagiaires, supprimeDonneesEtRemplace = self.supprimeDonneesEtRemplace)
+            self.fe_evaluations._tableaux["CSV_stagiaires"].charge_df()
+            self.fe_evaluations._tableaux["Stagiaires"].charge_df()
+
+            self.df_evaluations = self.fe_evaluations._tableaux["Stagiaires"]._df  # Alias
+
+            self.fe_evaluations.save()
+            self.fe_evaluations.close()
+            timer.fin()
+            
+            # Actualisation des TCD
+            self.fe_evaluations.actualiser_TCD()
+
         EvalStat._contexte_formation = None  # Nettoyage
 
 
-    @classmethod
-    def _ouvrir_ou_creer_evaluationsFormation(cls, trigramme_formation:str) -> bool: #-> Tuple[FichierExcel, pd.DataFrame, bool] :
+    def _ouvrir_ou_creer_evaluationsFormation(self):
         """
         Ouvre ou crée le fichier Excel d'évaluations globales pour une formation donnée.
 
@@ -567,7 +586,7 @@ class ContexteFormation:
                 (`True` si nouveau fichier créé, `False` sinon).
         """ 
         # On définit le chemin vers les évaluations de la formation (le fichier qui va concaténer toutes les évaluation d'une formation)
-        chemin_excel_evaluations_formation = config.format_path(config.CHEMIN_EXCEL_EVALUATIONS_FORMATION, trigramme_formation=trigramme_formation)
+        chemin_excel_evaluations_formation = config.format_path(config.CHEMIN_EXCEL_EVALUATIONS_FORMATION, trigramme_formation=self.trigramme_formation)
 
         # On vérifie que le répertoire dédié existe sinon on le créée : \\instnt\partage\FORMATIONS_C\###\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\AAAA
         chemin_excel_evaluations_formation.parent.mkdir(parents=True, exist_ok=True)
@@ -576,9 +595,9 @@ class ContexteFormation:
         if chemin_excel_evaluations_formation.is_file():
             # Alors on l'ouvre
 
-            cls._fe_evaluations_formation = FichierExcel.depuis_fichier(chemin_fichier=chemin_excel_evaluations_formation)
-            #self._fe_evaluations_formation._tableaux["CSV_stagiaires"].charge_df()
-            #self._fe_evaluations_formation._tableaux["Stagiaires"]._df['Trigramme formation'] = self._fe_evaluations_formation._tableaux["Stagiaires"]._df['Trigramme formation'].astype(str)
+            self.fe_evaluations = FichierExcel.depuis_fichier(chemin_fichier=chemin_excel_evaluations_formation)
+            #self.fe_evaluations._tableaux["CSV_stagiaires"].charge_df()
+            self.fe_evaluations._tableaux["Stagiaires"]._df['Trigramme formation'] = self.fe_evaluations._tableaux["Stagiaires"]._df['Trigramme formation'].astype(str)
 
             
             # On récupère la liste des sessions déjà intégrées (liste des codes et des chemins) → Ce sera pour écrire dans le tkinter
@@ -590,26 +609,24 @@ class ContexteFormation:
             #    )        
 
             # Il ne faudra pas supprimer les anciennes données de fe_evaluations_formation
-            supprimeDonneesEtRemplace = False
+            self.supprimeDonneesEtRemplace = False
 
-            vlog.ajouter_message("Ouverture EvalStat Global formation", cls._fe_evaluations_formation.chemin_fichier, style=["vert"])
+            vlog.ajouter_message("Ouverture EvalStat Global formation", self.fe_evaluations.chemin_fichier, style=["vert"])
         else :
             # On créée le fichier excel à partir du modèle
-            cls._fe_evaluations_formation = FichierExcel.depuis_modele(
-                chemin_modele = cls._CHEMIN_MODELE_EXCEL_EVALUATIONS_STAGIAIRES, 
+            self.fe_evaluations = FichierExcel.depuis_modele(
+                chemin_modele = self._CHEMIN_MODELE_EXCEL_EVALUATIONS_STAGIAIRES, 
                 chemin_fichier_sauv = chemin_excel_evaluations_formation
                 )
             
             # Il faudra supprimer les anciennes données de fe_evaluations_formation
-            supprimeDonneesEtRemplace = True
+            self.supprimeDonneesEtRemplace = True
 
-            vlog.ajouter_message("Création EvalStat Global formation", self._fe_evaluations_formation.chemin_fichier, style=["vert"])
+            vlog.ajouter_message("Création EvalStat Global formation", self.fe_evaluations.chemin_fichier, style=["vert"])
 
         # On crée un alias pour le dataframe des évaluations de la formation
-        self._df_evaluations_formation = self._fe_evaluations_formation._tableaux["Stagiaires"]._df  # Alias
+        self.df_evaluations = self.fe_evaluations._tableaux["Stagiaires"]._df  # Alias
 
-        #return self._fe_evaluations_formation, self._df_evaluations_formation, supprimeDonneesEtRemplace
-        return supprimeDonneesEtRemplace
 
 
 
@@ -621,10 +638,6 @@ class EvalStat:
     # Extract IRIS Sessions (R04110)
     _fe_IRIS_sessions:Optional[FichierExcel] = None  # Fichier Excel qui contient les extracts IRIS Sessions (ou a minima celles de la période en cours)
 
-    # Fichier Excel évaluation de la formation (peut être commun à plusieurs instances si même trigramme formation) → Sera mis à jour
-    _trigramme_formation:Optional[str] = None
-    _fe_evaluations_formation:Optional[FichierExcel] = None # Fichier Excel qui contient tous les CSV d'évaluation d'une formation
-    _df_evaluations_formation:Optional[pd.DataFrame] = None # DataFrame de self._fe_evaluations_formation (Alias)
        
 
     #_statuts_csv: dict[Path, str] = {}  # ex: {Path("...csv"): "traite" | "exclu" | "probleme"}
@@ -692,21 +705,6 @@ class EvalStat:
         self._statut_csv: str | None = None  # ex: "traite", "exclu", "probleme", "CSV vide"
 
     # === CONSTRUCTEURS ALTERNATIFS ===    
-    @classmethod
-    def ouvrir_ou_creer_evaluationsFormation(cls, trigramme_formation:str) -> EvalStat:
-        """
-        A partir d'un trigramme de foramtion, on ouvre et on charge le fichier excel qui concatène tous les CSV d'une formation 
-        """
-        # On crée l'instance et on complète les infos avec les valeurs facultatives
-        instance = EvalStat()
-
-        instance._trigramme_formation = trigramme_formation
-
-        #instance._ouvrir_fe_evaluations_formation()
-        instance._ouvrir_ou_creer_evaluationsFormation()
-
-        return instance
-
     @classmethod
     def depuis_chemin_csv_evaluations_stagiaires(cls, chemin_csv_stagiaires:Path|str, ouvrirDossier:bool=False, remplace_df:bool=False) -> EvalStat:
         # On convertit le Path si nécessaire
@@ -815,23 +813,7 @@ class EvalStat:
                             #vlog.ajouter_message("Fichiers traités", chemin_csv_session, style=["vert"])
                 pass
 
-            # On concatène, on sauve et on ferme le fe de tous les CSV de la formation
-            if instance._chemins_csv_traites :
-                print(f"\n\n{Style.BRIGHT}{Fore.RED}Écriture du fichier global des évaluations de la formation {trigramme_formation}")
-                timer.debut("Écriture, sauvegarde et fermeture")
-                instance._fe_evaluations_formation._tableaux["CSV_stagiaires"].ecrit_dataFrame_dans_tableauStructure(df_formation_csv, supprimeDonneesEtRemplace = supprimeDonneesEtRemplace_evaluations_formation)
-                instance._fe_evaluations_formation._tableaux["Stagiaires"].ecrit_dataFrame_dans_tableauStructure(df_formation_stagiaires, supprimeDonneesEtRemplace = supprimeDonneesEtRemplace_evaluations_formation)
-                instance._fe_evaluations_formation._tableaux["CSV_stagiaires"].charge_df()
-                instance._fe_evaluations_formation._tableaux["Stagiaires"].charge_df()
 
-                instance._df_evaluations_formation = instance._fe_evaluations_formation._tableaux["Stagiaires"]._df  # Alias
-
-                instance._fe_evaluations_formation.save()
-                instance._fe_evaluations_formation.close()
-                timer.fin()
-            
-                # Actualisation des TCD
-                instance._fe_evaluations_formation.actualiser_TCD()
 
         return instance
 
