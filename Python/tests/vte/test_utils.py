@@ -23,3 +23,20 @@ def test_optimiseCheminRepertoire():
     result = optimiseCheminRepertoire(chemin)
     print(result)
     assert r"C:\Windows\System32\drivers\etc" == result
+
+
+# ============================================================
+# === TESTS MANUELS (rendu graphique, interaction, etc.) ===
+# ============================================================
+
+# Lancer avec python -m pytest -m manual
+# python -m pytest -k test_choisir_fichier_manuel
+
+@pytest.mark.manual
+def test_choisir_fichier_manuel():
+    """
+    Test manuel : permet de vérifier visuellement la fenêtre de sélection
+    et les boutons de dialogue.
+    """
+
+    choisir_fichier(titre="Test manuel - Sélection de fichier")

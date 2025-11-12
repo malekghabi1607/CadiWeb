@@ -1,7 +1,8 @@
 from vte.utils import *
 
-test_path = Path(r"R:\_Echanges\VTE\Prog\Modèles")
-test_str = r"R:\_Echanges\VTE\Prog\Modèles"
-
-print(chemin_vers_unc(test_path))
-print(chemin_vers_unc(test_str))
+choisir_fichier(titre="Sélectionner un fichier CSV",
+                types_fichiers=[("Fichiers CSV", "*.csv")],
+                dossier_initial=Path(r"P:\FORMATIONS_C\RH3\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\2024"),
+                obligatoire=False,
+                texte_bouton_aucun="Fichier CSV inexistant"
+                )

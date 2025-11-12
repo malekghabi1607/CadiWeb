@@ -324,14 +324,14 @@ def log_erreur(message: str, continuer:bool = False) -> None:
     """
     Permet de print un log avec la location du message (fonction d'appel) avec option de continuer (warning) ou d'arrêter le code (erreur)
     """
-    # Récupérer le frame d’appel (un cran au-dessus dans la stack)
+    # Récupérer le frame d'appel (un cran au-dessus dans la stack)
     stack = inspect.stack()
     frame = stack[1].frame
 
     # Nom de la fonction ou méthode appelante
     nom_fonction = stack[1].function
 
-    # Essayer d’obtenir la classe via le premier argument (souvent self)
+    # Essayer d'obtenir la classe via le premier argument (souvent self)
     cls_name = None
     if 'self' in frame.f_locals:
         cls_name = type(frame.f_locals['self']).__name__
@@ -657,7 +657,7 @@ def remplacer_champs(
 
     Args:
         str_in (str): 
-            Le texte d’entrée contenant des champs à remplacer.
+            Le texte d'entrée contenant des champs à remplacer.
         liste_remplacements (list[list[str]] | list[str]): 
             - Soit une liste de paires [nom_champ, valeur_remplacement].
               Exemple : [["nom", "Dupont"], ["formation", "Python avancé"]]
@@ -665,7 +665,7 @@ def remplacer_champs(
               Exemple : ["nom", "Dupont"]
         format_champ (str, optionnel): 
             Format des champs à rechercher. 
-            Doit contenir "%s" à l’emplacement du nom du champ.
+            Doit contenir "%s" à l'emplacement du nom du champ.
             Par défaut "{%s}" correspond à "{champ}".
             Exemples valides :
                 - "{%s}" → {champ}
@@ -764,7 +764,7 @@ def charger_config() -> Tuple[ModuleType, Optional[ModuleType]]:
             print("⚙️ Configuration globale config_extractsIRIS.py importée depuis vte.config")
         except ModuleNotFoundError:
             config_extractsIRIS = None
-            print("ℹ️ Impossible de trouver config_extractsIRIS.py ni dans le dossier local ni dans vte/ — ce n’est pas bloquant.")
+            print("ℹ️ Impossible de trouver config_extractsIRIS.py ni dans le dossier local ni dans vte/ — ce n'est pas bloquant.")
 
 
     # --- user_config.py (optionnel) ---
@@ -774,7 +774,7 @@ def charger_config() -> Tuple[ModuleType, Optional[ModuleType]]:
         print(f"✅ Configuration utilisateur chargée depuis {user_config_path}")
     else:
         user_config = None
-        print("ℹ️ Aucun fichier user_config.py trouvé — ce n’est pas bloquant.")
+        print("ℹ️ Aucun fichier user_config.py trouvé — ce n'est pas bloquant.")
 
     return config, config_extractsIRIS, user_config
 
@@ -840,7 +840,7 @@ def chargement_config_demander_verif_utilisateur(
 
         # === Étape 4 : Gérer le choix ===
         if saisie == "":
-            print("\n→ Exécution de l’action...\n")
+            print("\n→ Exécution de l'action...\n")
             fonction_execution(valeur)
             return True
 
@@ -871,7 +871,7 @@ def charger_config_user_BAK(nom_fichier: str = "user_config.py") -> Optional[Mod
     Retour
     ------
     types.ModuleType | None
-        Le module importé s’il existe, sinon None.
+        Le module importé s'il existe, sinon None.
 
     Exemple
     -------
@@ -880,7 +880,7 @@ def charger_config_user_BAK(nom_fichier: str = "user_config.py") -> Optional[Mod
     ...     print(conf.liste_codes_IRIS)
     ...     print(conf.liste_periodes)
     """
-    # 1️⃣ - Chemin du fichier selon le mode d’exécution
+    # 1️⃣ - Chemin du fichier selon le mode d'exécution
     if getattr(sys, 'frozen', False):  # Cas EXE (PyInstaller)
         base_dir = os.path.dirname(sys.executable)
     else:  # Cas développement (VSCode, script Python classique)
@@ -1144,6 +1144,219 @@ def choisirFichiers_filedialog_excel(initialdir: Optional[Path] = None) -> Path:
 
     return chemin_fichier
 
+
+def choisir_fichier(
+    titre: str = "Sélectionner un fichier",
+    types_fichiers: List[Tuple[str, str]] = [("Tous les fichiers", "*.*")],
+    dossier_initial: Optional[Path] = None,
+    obligatoire: bool = True,
+    multi_fichiers: bool = False,
+    texte_bouton_choisir: str = "Choisir à nouveau",
+    texte_bouton_aucun: str = "Pas de fichier à sélectionner",
+    texte_bouton_quitter: str = "Quitter l'application",
+) -> Optional[Union[Path, List[Path]]]:
+    """
+    Ouvre une boîte de dialogue pour sélectionner un ou plusieurs fichiers, avec gestion
+    élégante du cas où aucun fichier n'est sélectionné.
+
+    Parameters
+    ----------
+    titre : str, optional
+        Titre de la fenêtre de sélection de fichier (par défaut "Sélectionner un fichier").
+    types_fichiers : list[tuple[str, str]], optional
+        Liste des types de fichiers acceptés (ex: [("Fichiers Excel", "*.xlsx")]).
+    dossier_initial : Path, optional
+        Dossier dans lequel ouvrir la boîte de dialogue (par défaut : répertoire courant).
+    obligatoire : bool, optional
+        Si True (défaut), force l'utilisateur à choisir un fichier ou quitter.
+        Si False, l'utilisateur peut ignorer la sélection.
+    multi_fichiers : bool, optional
+        Si True, permet la sélection multiple (retourne une liste de chemins).
+        Si False (défaut), ne permet qu'un seul fichier.
+    texte_bouton_choisir : str, optional
+        Libellé du bouton pour relancer la sélection.
+    texte_bouton_aucun : str, optional
+        Libellé du bouton "aucun fichier", affiché seulement si `obligatoire=False`.
+    texte_bouton_quitter : str, optional
+        Libellé du bouton pour quitter le programme.
+
+    Returns
+    -------
+    Path | list[Path] | None
+        - Chemin unique (Path) si `multi_fichiers=False`.
+        - Liste de chemins (List[Path]) si `multi_fichiers=True`.
+        - None si aucun fichier n'est sélectionné et `obligatoire=False`.
+
+    Raises
+    ------
+    SystemExit
+        Si l'utilisateur clique sur “Quitter l'application”.
+
+    Examples
+    --------
+    >>> # Sélection d'un seul fichier Excel
+    >>> fichier = choisir_fichier(
+    ...     titre="Choisir un fichier Excel",
+    ...     types_fichiers=[("Fichiers Excel", "*.xlsx")],
+    ... )
+    >>> print(fichier)
+    Path('data/suivi_formations.xlsx')
+
+    >>> # Sélection de plusieurs fichiers CSV (facultatif)
+    >>> fichiers = choisir_fichier(
+    ...     titre="Sélectionner des fichiers CSV",
+    ...     types_fichiers=[("Fichiers CSV", "*.csv")],
+    ...     multi_fichiers=True,
+    ...     obligatoire=False
+    ... )
+    >>> print(fichiers)
+    [Path('data/iris1.csv'), Path('data/iris2.csv')]
+    """
+
+    # === Fonctions internes ===
+    def centrer_fenetre(fenetre: tk.Toplevel, largeur: int = 400, hauteur: int = 250):
+        """Centre la fenêtre sur l'écran."""
+        fenetre.update_idletasks()
+        x = (fenetre.winfo_screenwidth() // 2) - (largeur // 2)
+        y = (fenetre.winfo_screenheight() // 2) - (hauteur // 2)
+        fenetre.geometry(f"{largeur}x{hauteur}+{x}+{y}")
+
+    def popup_aucun_fichier() -> str:
+        """Boîte de dialogue si aucun fichier n'a été sélectionné."""
+        choix = {}
+
+        def choisir_nouveau():
+            choix["reponse"] = "choisir"
+            fenetre.quit()
+            fenetre.destroy()
+
+        def aucun():
+            choix["reponse"] = "aucun"
+            fenetre.quit()
+            fenetre.destroy()
+
+        def quitter():
+            choix["reponse"] = "quitter"
+            fenetre.quit()
+            fenetre.destroy()
+
+        fenetre = tk.Toplevel()
+        fenetre.title("Aucun fichier sélectionné")
+        centrer_fenetre(fenetre, 420, 240)
+        fenetre.resizable(False, False)
+        fenetre.attributes('-topmost', True)
+        fenetre.grab_set()
+        fenetre.focus_force()
+
+        # Texte explicatif
+        label = tk.Label(
+            fenetre,
+            text="Aucun fichier n'a été sélectionné.\nQue souhaitez-vous faire ?",
+            pady=20,
+            font=("Segoe UI", 11),
+        )
+        label.pack()
+
+        # Cadre pour les boutons
+        cadre_boutons = tk.Frame(fenetre)
+        cadre_boutons.pack(pady=10)
+
+        # Bouton "Choisir à nouveau" (vert)
+        bouton_choisir = tk.Button(
+            cadre_boutons,
+            text=texte_bouton_choisir,
+            width=25,
+            bg="#4CAF50", fg="white",
+            font=("Segoe UI", 10, "bold"),
+            command=choisir_nouveau
+        )
+        bouton_choisir.grid(row=0, column=0, padx=5, pady=5)
+
+        # Bouton "Aucun fichier" (optionnel)
+        if not obligatoire:
+            bouton_aucun = tk.Button(
+                cadre_boutons,
+                text=texte_bouton_aucun,
+                width=25,
+                bg="#DDDDDD",
+                font=("Segoe UI", 10),
+                command=aucun
+            )
+            bouton_aucun.grid(row=1, column=0, padx=5, pady=5)
+
+        # Bouton "Quitter" (rouge)
+        bouton_quitter = tk.Button(
+            cadre_boutons,
+            text=texte_bouton_quitter,
+            width=25,
+            bg="#E74C3C", fg="white",
+            font=("Segoe UI", 10, "bold"),
+            command=quitter
+        )
+        bouton_quitter.grid(row=2 if not obligatoire else 1, column=0, padx=5, pady=5)
+
+        fenetre.wait_window()
+        return choix.get("reponse")
+
+    # === Fenêtre racine invisible ===
+    root = tk.Tk()
+    root.withdraw()
+
+    if dossier_initial is not None:
+        dossier_initial = optimiseCheminRepertoire(dossier_initial)
+    else:
+        dossier_initial = Path.cwd()
+
+    # === Boucle principale ===
+    while True:
+        root.attributes('-topmost', True)
+        root.update()
+
+        if multi_fichiers:
+            chemins = filedialog.askopenfilenames(
+                parent=root,
+                title=titre,
+                filetypes=types_fichiers,
+                initialdir=dossier_initial
+            )
+        else:
+            chemins = filedialog.askopenfilename(
+                parent=root,
+                title=titre,
+                filetypes=types_fichiers,
+                initialdir=dossier_initial
+            )
+
+        root.attributes('-topmost', False)
+
+        # --- Si un ou plusieurs fichiers sont choisis
+        if chemins:
+            root.destroy()
+            if multi_fichiers:
+                return [Path(c) for c in chemins]
+            else:
+                return Path(chemins)
+
+        # --- Aucun fichier sélectionné → boîte modale
+        reponse = popup_aucun_fichier()
+
+        if reponse == "choisir":
+            continue
+        elif reponse == "aucun":
+            print(f"⚠️  Pas de fichier sélectionné.")
+            root.destroy()
+            return None
+        elif reponse == "quitter":
+            print("❌ Application quittée par l'utilisateur.")
+            root.destroy()
+            sys.exit()
+        else:
+            print("⚠️ Réponse inattendue. Fermeture.")
+            root.destroy()
+            sys.exit()
+
+
+
 def arranger_fenetres(word_app, excel_app):
     """
     Place Word à gauche et Excel à droite sur l'écran principal,
@@ -1399,7 +1612,7 @@ def concatene_ongletsExcels_openpyxl(nom_ws, nom_ws_imports = "", rep_defaut = "
 def writeDataFrameInStructuredRef_openpyxl_xlwings(df, wb, chemin_wb, nom_ws, nom_table = "", supprimeDonneesEtRemplace = False) -> None:
     """
     Ecrit un DataFrame dans un tableau structuré existant d'une feuille de calcul  
-    Utilise openpyxl pour l’écriture des données, puis xlwings pour copier rapidement le format.
+    Utilise openpyxl pour l'écriture des données, puis xlwings pour copier rapidement le format.
 
     :param df: DataFrame à integrer dans le tableau structure
     :type df: DataFrame
