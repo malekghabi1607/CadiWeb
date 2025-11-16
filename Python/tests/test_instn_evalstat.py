@@ -5,6 +5,40 @@ from vte.instn import *
 ### --------------------------------------------------------------------
 
 
+# === Créer un EvalStat d'une session
+#es = EvalStat.depuis_chemin_csv_evaluations_stagiaires(r"\\instnt\partage\FORMATIONS_C\22B\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-17606 - 22B - 06-2025\S-17606-FC25-22B-VTE-CAR-Stagiaires.csv")
+#es = EvalStat.depuis_chemin_csv_evaluations_stagiaires(r"\\INSTNT\partage\FORMATIONS_C\948\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\2022-11-S-12995 UEM\S-12995-FC22-948-VTE-SNA-Stagiaires.csv")
+
+# Cas 1 — Si fichier EvalStat inexistant & excel eval formation inexistant
+chemin_csv = Path(r"\\INSTNT\partage\FORMATIONS_C\948\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\2022-11-S-12995 UEM\S-12995-FC22-948-VTE-SNA-Stagiaires.csv")
+chemin_global = Path(r"\\INSTNT\partage\FORMATIONS_C\948\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\Evaluation-Stagiaires-Global-948.xlsx")
+chemin_excel_stagiaire = chemin_csv.with_suffix(".xlsx")
+
+chemin_excel_stagiaire.unlink(missing_ok=True)
+chemin_global.unlink(missing_ok=True)
+es = EvalStat.depuis_chemin_csv_evaluations_stagiaires(chemin_csv)
+
+# Cas 2 — Si fichier EvalStat existant & excel eval formation inexistant
+
+
+# TODO : ce n'est pas rajouté au CSV global
+
+
+# === Depuis Tuple stagiaires ===
+# TODO
+
+# === Popup ===
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -31,13 +65,3 @@ tuple_csv_stagiaires = (
 
 # Cas où on crée un nouveau
 # TODO
-
-# === Créer un EvalStat d'une session
-es = EvalStat.depuis_chemin_csv_evaluations_stagiaires(r"\\instnt\partage\FORMATIONS_C\22B\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-17606 - 22B - 06-2025\S-17606-FC25-22B-VTE-CAR-Stagiaires.csv")
-# TODO : ce n'est pas rajouté au CSV global
-
-
-# === Depuis Tuple stagiaires ===
-# TODO
-
-# === Popup ===

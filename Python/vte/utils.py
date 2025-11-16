@@ -739,15 +739,17 @@ def charger_config() -> Tuple[ModuleType, Optional[ModuleType]]:
     """
     app_dir = _get_app_dir()
 
+    print(f"\n{Style.BRIGHT}{Fore.YELLOW}Chargement des fichiers de configuration")
+
     # --- config.py (global) ---
     config_path_local = os.path.join(app_dir, "config.py")
     if os.path.exists(config_path_local):
         config = _charger_module_depuis_chemin(config_path_local, "config")
-        print(f"✅ Configuration globale config.py chargée depuis {config_path_local}")
+        print(f"✅  Configuration globale config.py chargée depuis {config_path_local}")
     else:
         try:
             import vte.config as config
-            print("⚙️ Configuration globale config.py importée depuis vte.config")
+            print("⚙️  Configuration globale config.py importée depuis vte.config")
         except ModuleNotFoundError:
             raise FileNotFoundError(
                 "Impossible de trouver config.py ni dans le dossier local ni dans vte/"
@@ -757,11 +759,11 @@ def charger_config() -> Tuple[ModuleType, Optional[ModuleType]]:
     config_path_local = os.path.join(app_dir, "config_extractsIRIS.py")
     if os.path.exists(config_path_local):
         config_extractsIRIS = _charger_module_depuis_chemin(config_path_local, "config_extractsIRIS")
-        print(f"✅ Configuration globale config_extractsIRIS.py chargée depuis {config_path_local}")
+        print(f"✅  Configuration globale config_extractsIRIS.py chargée depuis {config_path_local}")
     else:
         try:
             import vte.config_extractsIRIS as config_extractsIRIS
-            print("⚙️ Configuration globale config_extractsIRIS.py importée depuis vte.config")
+            print("⚙️  Configuration globale config_extractsIRIS.py importée depuis vte.config")
         except ModuleNotFoundError:
             config_extractsIRIS = None
             print("ℹ️ Impossible de trouver config_extractsIRIS.py ni dans le dossier local ni dans vte/ — ce n'est pas bloquant.")
@@ -771,10 +773,12 @@ def charger_config() -> Tuple[ModuleType, Optional[ModuleType]]:
     user_config_path = os.path.join(app_dir, "user_config.py")
     if os.path.exists(user_config_path):
         user_config = _charger_module_depuis_chemin(user_config_path, "user_config")
-        print(f"✅ Configuration utilisateur chargée depuis {user_config_path}")
+        print(f"✅  Configuration utilisateur chargée depuis {user_config_path}")
     else:
         user_config = None
-        print("ℹ️ Aucun fichier user_config.py trouvé — ce n'est pas bloquant.")
+        print("ℹ️  Aucun fichier user_config.py trouvé — Ce n'est pas bloquant.")
+
+    print("\n")
 
     return config, config_extractsIRIS, user_config
 
@@ -1242,13 +1246,24 @@ def choisir_fichier(
 
         fenetre = tk.Toplevel()
         fenetre.title("Aucun fichier sélectionné")
-        centrer_fenetre(fenetre, 420, 240)
         fenetre.resizable(False, False)
         fenetre.attributes('-topmost', True)
         fenetre.grab_set()
         fenetre.focus_force()
 
-        # Texte explicatif
+        # === Calcul dynamique de la largeur des boutons ===
+        # On mesure la largeur réelle (en pixels) du texte le plus long
+        police_bouton = tk.Font(family="Segoe UI", size=10, weight="bold")
+        textes_boutons = [texte_bouton_choisir, texte_bouton_quitter]
+        if not obligatoire:
+            textes_boutons.append(texte_bouton_aucun)
+
+        largeur_max_px = max(police_bouton.measure(t) for t in textes_boutons)
+        marge_px = 40  # marges internes du bouton
+        largeur_bouton_px = largeur_max_px + marge_px
+        largeur_bouton_car = max(20, largeur_bouton_px // 8)  # conversion approximative pour paramètre "width" de tk.Button
+
+        # === Texte explicatif ===
         label = tk.Label(
             fenetre,
             text="Aucun fichier n'a été sélectionné.\nQue souhaitez-vous faire ?",
@@ -1257,7 +1272,7 @@ def choisir_fichier(
         )
         label.pack()
 
-        # Cadre pour les boutons
+        # === Cadre pour les boutons ===
         cadre_boutons = tk.Frame(fenetre)
         cadre_boutons.pack(pady=10)
 
@@ -1265,7 +1280,7 @@ def choisir_fichier(
         bouton_choisir = tk.Button(
             cadre_boutons,
             text=texte_bouton_choisir,
-            width=25,
+            width=largeur_bouton_car,
             bg="#4CAF50", fg="white",
             font=("Segoe UI", 10, "bold"),
             command=choisir_nouveau
@@ -1277,7 +1292,7 @@ def choisir_fichier(
             bouton_aucun = tk.Button(
                 cadre_boutons,
                 text=texte_bouton_aucun,
-                width=25,
+                width=largeur_bouton_car,
                 bg="#DDDDDD",
                 font=("Segoe UI", 10),
                 command=aucun
@@ -1288,12 +1303,18 @@ def choisir_fichier(
         bouton_quitter = tk.Button(
             cadre_boutons,
             text=texte_bouton_quitter,
-            width=25,
+            width=largeur_bouton_car,
             bg="#E74C3C", fg="white",
             font=("Segoe UI", 10, "bold"),
             command=quitter
         )
         bouton_quitter.grid(row=2 if not obligatoire else 1, column=0, padx=5, pady=5)
+
+        # === Adapter automatiquement la largeur de la fenêtre ===
+        fenetre.update_idletasks()
+        largeur_fenetre = max(420, largeur_bouton_px + 120)
+        hauteur_fenetre = 240
+        centrer_fenetre(fenetre, largeur_fenetre, hauteur_fenetre)
 
         fenetre.wait_window()
         return choix.get("reponse")
@@ -1303,7 +1324,7 @@ def choisir_fichier(
     root.withdraw()
 
     if dossier_initial is not None:
-        dossier_initial = optimiseCheminRepertoire(dossier_initial)
+        dossier_initial = Path(dossier_initial)
     else:
         dossier_initial = Path.cwd()
 
@@ -1351,6 +1372,7 @@ def choisir_fichier(
             root.destroy()
             sys.exit()
         else:
+            continue
             print("⚠️ Réponse inattendue. Fermeture.")
             root.destroy()
             sys.exit()

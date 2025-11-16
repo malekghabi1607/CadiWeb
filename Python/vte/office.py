@@ -306,14 +306,14 @@ class FichierExcel:
 
         # === Méthodes publiques : écriture dans Excel ===
         def ecrit_dataFrame_dans_tableauStructure(self,
-                                                 df: DataFrame,
+                                                 df: Optional[pd.DataFrame] = None,
                                                  supprimeDonneesEtRemplace: bool = False,
                                                  remplace_df_par_nouveau: bool = False,
                                                  copie_formules: bool = False) -> None:
             """
             Écrit un DataFrame dans un tableau structuré d'une feuille de calcul.
 
-            :param df: DataFrame à intégrer.
+            :param df: DataFrame à intégrer. Si non renseigné, on prend le dataframe _df de la classe
             :param supprimeDonneesEtRemplace: True pour supprimer les anciennes données et les remplacer.
             :param remplace_df_par_nouveau: True pour remplacer l'attribut _df interne par df.
             :Example:
@@ -327,8 +327,12 @@ class FichierExcel:
             .. note:: Pour rajouter des lignes, on le fait à la suite de la feuille (worksheet) . Il en résulte qu'on gruge un peu : 1) on vire le tableau structuré, 2) on colle toutes les nouvelles lignes, 3) on supprime la ligne 1 du tableau, 4) on redéfinit les dimensions du tableau structuré (car l'ajout de nouvbelles lignes ne l'étend pas automatiquement)
             .. todo:: Rien du tout.
             """
-            if remplace_df_par_nouveau:
-                self.remplace_df(df)
+            
+            if df is None:
+                df = self.df
+            else:
+                if remplace_df_par_nouveau:
+                    self.remplace_df(df)
 
             # On écrit toutes les autres lignes une par une (on garde les lignes initiales pour garder le format qu'on copiera)
             with tqdm(total=len(df), unit=' ligne', desc=Fore.CYAN + f"Écriture des lignes dans l'output {self.nom_tableau}" + Style.RESET_ALL) as pbar:
