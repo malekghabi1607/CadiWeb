@@ -18,7 +18,6 @@ chemin_excel_formation = Path(r"\\INSTNT\partage\FORMATIONS_C\948\P07-bilan-sess
 
 ### Cas 1 — Si fichier session inexistant & excel eval formation inexistant
 def test_cas1() :
-    ma_fonction()
     chemin_excel_session.unlink(missing_ok=True)  # Suppression excel session
     chemin_excel_formation.unlink(missing_ok=True)  # Suppression excel formation
     EvalStat.depuis_chemin_csv_evaluations_stagiaires(chemin_csv_session)
@@ -26,7 +25,6 @@ def test_cas1() :
 
 ### Cas 2 — Si fichier session existant & excel eval formation inexistant
 def test_cas2() :
-    ma_fonction()
     #test_cas1()
     chemin_excel_formation.unlink(missing_ok=True)  # Suppression excel formation
     EvalStat.depuis_chemin_csv_evaluations_stagiaires(chemin_csv_session)
@@ -35,7 +33,6 @@ def test_cas2() :
 
 ### Cas 3 — Si fichier session existant & excel eval formation existant
 def test_cas3() :
-    ma_fonction()
     #test_cas1()
     EvalStat.depuis_chemin_csv_evaluations_stagiaires(chemin_csv_session)
 
@@ -47,12 +44,8 @@ def test_cas3() :
 
 # === Popup ===
 
-
-def ma_fonction():
-    print(inspect.currentframe().f_code.co_name)
-
 if __name__ == "__main__":
-    test_cas1()
+    test_cas3()
 
 
 

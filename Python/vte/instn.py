@@ -1182,8 +1182,13 @@ class EvalStat:
             df_formation_stagiaires = self._fe_evaluations_stagiaires._tableaux["Stagiaires"]._df.copy()
             
         else:
-            df_formation_csv = pd.concat([df_formation_csv, self._fe_evaluations_stagiaires._tableaux["CSV_stagiaires"]._df], ignore_index=True)
-            df_formation_stagiaires = pd.concat([df_formation_stagiaires, self._fe_evaluations_stagiaires._tableaux["Stagiaires"]._df], ignore_index=True)
+            df = self._fe_evaluations_stagiaires._tableaux["CSV_stagiaires"]._df # Alias
+            if not df.empty: # Evite un future wanring de concaténer avec un df vide
+                df_formation_csv = pd.concat([df_formation_csv, df], ignore_index=True)
+            
+            df = self._fe_evaluations_stagiaires._tableaux["Stagiaires"]._df # Alias
+            if not df.empty: # Evite un future wanring de concaténer avec un df vide
+                df_formation_stagiaires = pd.concat([df_formation_stagiaires, df], ignore_index=True)
 
         self._fe_evaluations_formation._tableaux["CSV_stagiaires"]._df = df_formation_csv
         self._fe_evaluations_formation._tableaux["Stagiaires"]._df = df_formation_stagiaires
