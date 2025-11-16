@@ -904,8 +904,8 @@ class EvalStat:
             return
 
         # Étape 3 — Générer l'excel des évaluations des stagiaire (_fe_evaluations_stagiaires : 2 onglets + TCD)
-        df_csv_stagiaires = self._traiter_onglet_csv_stagiaires(df_csv_stagiaires, remplace_df)  # Traitement onglet CSV_stagiaires (import "direct" du CSV avec quelques traitements mineurs)
-        df_stagiaires = self._traiter_onglet_stagiaires(df_csv_stagiaires, remplace_df)  # Traitement seconde partie du dataframe du CSV
+        df_csv_stagiaires = self._traiter_onglet_csv_stagiaires(df_csv_stagiaires, remplace_df=True)  # Traitement onglet CSV_stagiaires (import "direct" du CSV avec quelques traitements mineurs)
+        df_stagiaires = self._traiter_onglet_stagiaires(df_csv_stagiaires, remplace_df=True)  # Traitement seconde partie du dataframe du CSV
         self._fe_evaluations_stagiaires.actualiser_TCD()  # Mise à jour TCD
         self._statut_csv = "traite"
 
