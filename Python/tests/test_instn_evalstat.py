@@ -38,8 +38,6 @@ def test_cas3() :
     ma_fonction()
     #test_cas1()
     EvalStat.depuis_chemin_csv_evaluations_stagiaires(chemin_csv_session)
-    # TODO écrit quand même dans formation
-    # TODO lire excel avant de demander fichier IRIS car peut-être inutile
 
 
 

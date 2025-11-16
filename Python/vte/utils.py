@@ -39,6 +39,8 @@ import pygetwindow as gw
 
 import importlib.util
 
+import hashlib
+
 ### --------------------------------------------------------------------
 #  Tests (log et timer)
 ### --------------------------------------------------------------------
@@ -600,6 +602,7 @@ def chemin_vers_unc(path:Path|str, retour_type:Type[Path]|Type[str]=Path) -> Pat
     else:
         print(f"Conversion UNC échouée (code erreur : {result}). Chemin renvoyé tel quel.")
         return retour_type(path)
+
 ### --------------------------------------------------------------------
 #  Divers
 ### --------------------------------------------------------------------
@@ -704,7 +707,19 @@ def remplacer_champs(
         str_out = str_out.replace(champ_formate, str(valeur))
     return str_out
 
+def hash_df(df: pd.DataFrame) -> str:
+    """
+    Retourne une signature unique du DataFrame.
+    S’utilise pour détecter les modifications.
+    """
+    if df is None:
+        return "NONE"
 
+    # On convertit en octets de manière stable
+    data = pd.util.hash_pandas_object(df, index=True).values
+
+    # On hash le résultat
+    return hashlib.md5(data).hexdigest()
 
 ### --------------------------------------------------------------------
 #  Chargement config

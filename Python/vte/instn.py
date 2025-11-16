@@ -575,6 +575,7 @@ class Contexte_formation(AbstractContextManager):
         # Ouverture ou création du fichier Excel de la formation
         self._fe_evaluations_formation, self._supprimeDonneesEtRemplace_evaluations_formation = self._ouvrir_ou_creer_evaluations_formation(self._trigramme_formation)
         self._df_evaluations_formation = self._fe_evaluations_formation._tableaux["Stagiaires"].df  # Alias
+        self._df_initial_hash = hash_df(self._fe_evaluations_formation._tableaux["Stagiaires"]._df)
         timer.fin()
 
         # Propagation dans EvalStat pour partage entre instances
@@ -594,7 +595,18 @@ class Contexte_formation(AbstractContextManager):
         Ce bloc est exécuté même en cas d'erreur dans le traitement des sessions.
         """
         if self._fe_evaluations_formation is not None:
-            EvalStat._sauver_excel_evaluations_formation()
+
+            df_final_hash = hash_df(self._fe_evaluations_formation._tableaux["Stagiaires"]._df)
+
+            if df_final_hash != self._df_initial_hash:
+                # Le DataFrame a changé → on sauvegarde
+                EvalStat._sauver_excel_evaluations_formation()
+            else:
+                vlog.ajouter_message(
+                    "Aucune modification détectée → pas de sauvegarde",
+                    self._fe_evaluations_formation.chemin_fichier,
+                    style=["jaune"]
+                )
 
         # Nettoyage des références dans EvalStat
         EvalStat._CHEMIN_MODELE_EXCEL_EVALUATIONS_STAGIAIRES = None
@@ -784,17 +796,10 @@ class EvalStat:
             )
         
         # On créée l'instance
-        instance = cls()        
+        instance = cls()
 
-        # On récupère IRIS sessions, seulement si nécessaire (je le fais ici car si besoin action utilisateur ça évite de couper le traitement de la boucle)
-        instance._charge_IRIS_sessions()
-
-        # == Travaux sur les variables de l'instance
-        # On convertit en Path si nécessaire
-        if isinstance(chemin_csv_stagiaires, str):
-            chemin_csv_stagiaires = Path(chemin_csv_stagiaires)
         # si le chemin est avec un raccourci réseau alors on récupère le chemin en entier
-        instance._chemin_csv_evaluations_stagiaires = chemin_vers_unc(chemin_csv_stagiaires)
+        instance._chemin_csv_evaluations_stagiaires = chemin_vers_unc(Path(chemin_csv_stagiaires))   
 
         # On génère le fichier Excel du CSV à partir du modèle
         instance.traiter(ouvrirDossier=ouvrirDossier)
@@ -802,7 +807,7 @@ class EvalStat:
         return instance
 
     @classmethod
-    def depuis_tuple_csv_stagiaires(cls, dico_chemins_csv_session: dict[str, list[Path]]) -> None:
+    def depuis_tuple_csv_stagiaires(cls, dico_chemins_csv_session: dict[str, list[Path]], ouvrirDossier:bool=False) -> None:
         """
         Traite un ensemble de fichiers CSV groupés par formation.
 
@@ -819,7 +824,10 @@ class EvalStat:
         for trigramme_formation, chemins_csv in dico_chemins_csv_session.items():
             with Contexte_formation(trigramme_formation):
                 for chemin_csv in chemins_csv:
-                    cls.depuis_chemin_csv_evaluations_stagiaires(chemin_csv)
+                    #cls.depuis_chemin_csv_evaluations_stagiaires(chemin_csv)
+                    EvalStat.depuis_chemin_csv_evaluations_stagiaires_avec_contexte(chemin_csv_stagiaires=Path(chemin_csv),
+                                                                            ouvrirDossier=ouvrirDossier
+                                                                            )
 
     # ==================================================================================
     # MÉTHODES DE CLASSE - CHARGEMENT DES FICHIERS COMMUNS
@@ -880,13 +888,16 @@ class EvalStat:
             raise ValueError("Aucun chemin CSV fourni pour le traitement.")
 
         #timer.debut(f"Traitement du fichier CSV : {self._chemin_csv_evaluations_stagiaires.name}")
-        timer.debut(f"\n{Style.BRIGHT}{Fore.YELLOW}Gestion du CSV {self._chemin_csv_evaluations_stagiaires.name}")
+        timer.debut(f"\n{Style.BRIGHT}{Fore.YELLOW}Gestion du CSV {self._chemin_csv_evaluations_stagiaires.name}") 
 
         # On vérifie que chemin_csv_session n'est pas déjà dans le fichier évaluations des formations pour savoir si on l'exclue du traitement
         if str(self._chemin_csv_evaluations_stagiaires) in self._df_evaluations_formation["Chemin fichier CSV"].drop_duplicates().tolist():  
             print(f"⚠️  Exclusion car csv déjà dans le fichier global : {self._chemin_csv_evaluations_stagiaires}")
             self._statut_csv = "Exclu - CSV déjà dans fichier global"
             return
+
+        # On récupère IRIS sessions, seulement si nécessaire (je le fais ici car si besoin action utilisateur ça évite de couper le traitement de la boucle)
+        self._charge_IRIS_sessions()
 
         # Définition self._codeIRIS. Sinon Non existant, on récupère le numéro IRIS depuis le CSV (c'est le plus sur), sinon popup pour demander
         if self._codeIRIS is None:
