@@ -763,10 +763,11 @@ class EvalStat:
 
         with Contexte_formation(trigramme_formation):
             EvalStat.depuis_chemin_csv_evaluations_stagiaires_avec_contexte(chemin_csv_stagiaires=Path(chemin_csv_stagiaires),
-                                                              ouvrirDossier=ouvrirDossier)
+                                                                            ouvrirDossier=ouvrirDossier
+                                                                            )
     
     @classmethod
-    def depuis_chemin_csv_evaluations_stagiaires_avec_contexte(cls, chemin_csv_stagiaires:Path|str, ouvrirDossier:bool=False, remplace_df:bool=False) -> EvalStat:
+    def depuis_chemin_csv_evaluations_stagiaires_avec_contexte(cls, chemin_csv_stagiaires:Path|str, ouvrirDossier:bool=False) -> EvalStat:
         """
         Crée et traite une instance d'EvalStat à partir d'un fichier CSV.
 
@@ -796,7 +797,7 @@ class EvalStat:
         instance._chemin_csv_evaluations_stagiaires = chemin_vers_unc(chemin_csv_stagiaires)
 
         # On génère le fichier Excel du CSV à partir du modèle
-        instance.traiter(ouvrirDossier=ouvrirDossier, remplace_df=remplace_df)
+        instance.traiter(ouvrirDossier=ouvrirDossier)
         
         return instance
 
@@ -870,7 +871,7 @@ class EvalStat:
     # ==================================================================================
     # MÉTHODES D’INSTANCE - TRAITEMENT INDIVIDUEL
     # ==================================================================================
-    def traiter(self, ouvrirDossier:bool=False, remplace_df:bool=False) -> None:
+    def traiter(self, ouvrirDossier:bool=False) -> None:
         """
         Traitement principal du CSV EvalStat stagiaire individuel.
         Inclut la mise à jour du fichier Excel de la formation courante.

@@ -1,27 +1,47 @@
 from vte.instn import *
 
+
 ### --------------------------------------------------------------------
 #  EvalStat
 ### --------------------------------------------------------------------
 
+chemin_csv_session = Path(r"\\INSTNT\partage\FORMATIONS_C\948\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\2022-11-S-12995 UEM\S-12995-FC22-948-VTE-SNA-Stagiaires.csv")
+chemin_excel_session = chemin_csv_session.with_suffix(".xlsx")
 
+chemin_excel_formation = Path(r"\\INSTNT\partage\FORMATIONS_C\948\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\Evaluation-Stagiaires-Global-948.xlsx")
+
+
+
+#####
 # === Créer un EvalStat d'une session
-#es = EvalStat.depuis_chemin_csv_evaluations_stagiaires(r"\\instnt\partage\FORMATIONS_C\22B\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-17606 - 22B - 06-2025\S-17606-FC25-22B-VTE-CAR-Stagiaires.csv")
-#es = EvalStat.depuis_chemin_csv_evaluations_stagiaires(r"\\INSTNT\partage\FORMATIONS_C\948\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\2022-11-S-12995 UEM\S-12995-FC22-948-VTE-SNA-Stagiaires.csv")
+#####
 
-# Cas 1 — Si fichier EvalStat inexistant & excel eval formation inexistant
-chemin_csv = Path(r"\\INSTNT\partage\FORMATIONS_C\948\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\2022-11-S-12995 UEM\S-12995-FC22-948-VTE-SNA-Stagiaires.csv")
-chemin_global = Path(r"\\INSTNT\partage\FORMATIONS_C\948\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\Evaluation-Stagiaires-Global-948.xlsx")
-chemin_excel_stagiaire = chemin_csv.with_suffix(".xlsx")
+### Cas 1 — Si fichier session inexistant & excel eval formation inexistant
+def test_cas1() :
+    ma_fonction()
+    chemin_excel_session.unlink(missing_ok=True)  # Suppression excel session
+    chemin_excel_formation.unlink(missing_ok=True)  # Suppression excel formation
+    EvalStat.depuis_chemin_csv_evaluations_stagiaires(chemin_csv_session)
+    # OK
 
-chemin_excel_stagiaire.unlink(missing_ok=True)
-chemin_global.unlink(missing_ok=True)
-es = EvalStat.depuis_chemin_csv_evaluations_stagiaires(chemin_csv)
+### Cas 2 — Si fichier session existant & excel eval formation inexistant
+def test_cas2() :
+    ma_fonction()
+    #test_cas1()
+    chemin_excel_formation.unlink(missing_ok=True)  # Suppression excel formation
+    EvalStat.depuis_chemin_csv_evaluations_stagiaires(chemin_csv_session)
+    # OK
 
-# Cas 2 — Si fichier EvalStat existant & excel eval formation inexistant
+
+### Cas 3 — Si fichier session existant & excel eval formation existant
+def test_cas3() :
+    ma_fonction()
+    #test_cas1()
+    EvalStat.depuis_chemin_csv_evaluations_stagiaires(chemin_csv_session)
+    # TODO écrit quand même dans formation
+    # TODO lire excel avant de demander fichier IRIS car peut-être inutile
 
 
-# TODO : ce n'est pas rajouté au CSV global
 
 
 # === Depuis Tuple stagiaires ===
@@ -30,8 +50,11 @@ es = EvalStat.depuis_chemin_csv_evaluations_stagiaires(chemin_csv)
 # === Popup ===
 
 
+def ma_fonction():
+    print(inspect.currentframe().f_code.co_name)
 
-
+if __name__ == "__main__":
+    test_cas1()
 
 
 
@@ -65,3 +88,10 @@ tuple_csv_stagiaires = (
 
 # Cas où on crée un nouveau
 # TODO
+
+
+
+
+
+
+
