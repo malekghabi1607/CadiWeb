@@ -46,6 +46,76 @@ import hashlib
 ### --------------------------------------------------------------------
 
 class Timer:
+    stack = []        # Pile des timers imbriqués
+    indent = "   "
+    last_from_timer = False   # True si la dernière ligne imprimée est un ⏳ du timer
+
+    def __init__(self, description=""):
+        self.description = description
+        self.start = None
+        self.depth = 0
+        self.line_length = 0
+        self.active = False    # Timer encore "ouvert"
+
+    def debut(self, description=""):
+        self.description = description
+        self.start = time.time()
+        self.depth = len(Timer.stack)
+        Timer.stack.append(self)
+        self.active = True
+
+        indent = Timer.indent * self.depth
+        msg = f"{indent}⏳ {self.description}..."
+
+        # Si la dernière ligne venait d’un timer → on remplace
+        if Timer.last_from_timer:
+            sys.stdout.write("\r" + " " * self.line_length + "\r")
+        else:
+            # Sinon, on passe à une nouvelle ligne
+            sys.stdout.write("\n")
+
+        sys.stdout.write(msg)
+        sys.stdout.flush()
+
+        self.line_length = len(msg)
+        Timer.last_from_timer = True
+
+    def fin(self):
+        if not self.active:
+            return  # Déjà terminé
+
+        end = time.time()
+        minutes, seconds = divmod(int(end - self.start), 60)
+        indent = Timer.indent * self.depth
+
+        final = f"{indent}✅ {self.description} terminé en {minutes} min {seconds} s."
+
+        # Supprime ce timer de la pile
+        Timer.stack.remove(self)
+        self.active = False
+
+        # Si la dernière ligne venait du timer → on remplace le ⏳
+        if Timer.last_from_timer:
+            sys.stdout.write("\r" + " " * self.line_length + "\r")
+        else:
+            sys.stdout.write("\n")
+
+        sys.stdout.write(final)
+        sys.stdout.flush()
+
+        # Maintenant la dernière ligne appartient au Timer
+        Timer.last_from_timer = True
+
+
+def timer_safe_print(*args, **kwargs):
+    """
+    Permet d'imprimer du texte sans casser les timers.
+    À utiliser si tu veux un print "compatible Timer".
+    """
+    Timer.last_from_timer = False
+    print(*args, **kwargs)
+
+class Timer_V1:
     stack = []   # pile des timers ouverts
     indent = "   "
 
