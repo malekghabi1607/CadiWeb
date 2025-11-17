@@ -1195,8 +1195,8 @@ class EvalStat:
             print("⚠️  Aucun DataFrame de formation ouvert, impossible de mettre à jour.")
             return
         
-        print("\n")
-        timer.debut(f"{Style.BRIGHT}{Fore.RED}Mise à jour de {self._fe_evaluations_formation.chemin_fichier.name}")
+        #print("\n")
+        #timer.debut(f"{Style.BRIGHT}{Fore.RED}Mise à jour de {self._fe_evaluations_formation.chemin_fichier.name}")
 
         # Nota : le fichier est déjà ouvert / créé à l'initialisation du contexte.
 
@@ -1204,23 +1204,23 @@ class EvalStat:
         df_formation_stagiaires = self._fe_evaluations_formation._tableaux["Stagiaires"]._df  # Alias
 
         # Si df_formation_csv est vide, il faut l'initialiser avec le premier df sinon on concatène
-        if df_formation_csv is None:
+        if (df_formation_csv is None) or (df_formation_csv.empty):
             df_formation_csv = self._fe_evaluations_stagiaires._tableaux["CSV_stagiaires"]._df.copy()
             df_formation_stagiaires = self._fe_evaluations_stagiaires._tableaux["Stagiaires"]._df.copy()
             
         else:
             df = self._fe_evaluations_stagiaires._tableaux["CSV_stagiaires"]._df # Alias
-            if not df.empty: # Evite un future wanring de concaténer avec un df vide
+            if (not df.empty) and (df is not None): # Evite un future wanring de concaténer avec un df vide
                 df_formation_csv = pd.concat([df_formation_csv, df], ignore_index=True)
             
             df = self._fe_evaluations_stagiaires._tableaux["Stagiaires"]._df # Alias
-            if not df.empty: # Evite un future wanring de concaténer avec un df vide
+            if (not df.empty) and (df is not None): # Evite un future wanring de concaténer avec un df vide
                 df_formation_stagiaires = pd.concat([df_formation_stagiaires, df], ignore_index=True)
 
         self._fe_evaluations_formation._tableaux["CSV_stagiaires"]._df = df_formation_csv
         self._fe_evaluations_formation._tableaux["Stagiaires"]._df = df_formation_stagiaires
 
-        timer.fin()
+        #timer.fin()
 
 
     def _NON_EMPLOYE_extraire_code_IRIS_depuis_csv(self, df_csv:pd.DataFrame) -> str:
