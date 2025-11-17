@@ -46,6 +46,54 @@ import hashlib
 ### --------------------------------------------------------------------
 
 class Timer:
+    stack = []   # pile des timers ouverts
+    indent = "   "
+
+    def __init__(self, description=""):
+        self.description = description
+        self.start = None
+        self.depth = 0
+        self.line_length = 0
+
+    def debut(self, description=""):
+        self.description = description
+        self.start = time_module.time()
+        self.depth = len(Timer.stack)
+        Timer.stack.append(self)
+
+        indent = Timer.indent * self.depth
+        msg = f"{indent}⏳ {self.description}..."
+
+        # Timer courant → affiché sur la dernière ligne → remplaçable
+        sys.stdout.write(msg + "\n")
+        sys.stdout.flush()
+
+        self.line_length = len(msg)
+
+    def fin(self):
+        if self not in Timer.stack:
+            return
+
+        end = time_module.time()
+        minutes, seconds = divmod(int(end - self.start), 60)
+        indent = Timer.indent * self.depth
+
+        # Ligne finale à afficher
+        final = f"{indent}✅ {self.description} terminé en {minutes} min {seconds} s."
+
+        # Retire cet élément de la pile
+        Timer.stack.remove(self)
+
+        # Efface la dernière ligne (le ⏳)
+        # → on remplace uniquement le timer courant
+        sys.stdout.write("\r" + " " * self.line_length + "\r")
+        sys.stdout.flush()
+
+        # On réécrit correctement la ligne finale
+        print(final)
+        sys.stdout.flush()
+
+class Timer_V0:
     """
     Classe Timer simple pour mesurer et afficher la durée de traitements dans un script.
 

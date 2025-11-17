@@ -846,7 +846,7 @@ class FichierExcel:
         instance = cls.depuis_repertoire(chemin_fichier.parent)
         instance._chemin_fichier = chemin_fichier
 
-        timer.debut(f"Lecture de {instance._chemin_fichier}")
+        #timer.debut(f"Lecture de {instance._chemin_fichier}")
 
         if avec_ouverture_wb:
             instance.charger_wb()
@@ -858,7 +858,7 @@ class FichierExcel:
                 instance.charger_tableaux(charger_df=charger_df)
 
         vlog.ajouter_message("OK", f"✅ Lecture de {instance._chemin_fichier}")
-        timer.fin()
+        #timer.fin()
 
         return instance
 

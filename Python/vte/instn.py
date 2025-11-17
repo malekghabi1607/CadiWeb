@@ -807,11 +807,34 @@ class EvalStat:
         return instance
 
     @classmethod
-    def depuis_tuple_csv_stagiaires(cls, dico_chemins_csv_session: dict[str, list[Path]], ouvrirDossier:bool=False) -> None:
+    def depuis_tuple_csv_stagiaires(cls, tuple_csv_stagiaires:Tuple[Path], ouvrirDossier:bool=False) -> None:
+        """
+        A partir d'un tuple de chemins de CSV stagiaire (il peut il y avoir plusieurs trigrammes de formations différents)
+        Permet de générer :
+           - le fichier excel stagiaires de chaque session (via le CSV)
+           - le fichier excel stagiaires de chaque formation (celui qui concatène tous les CSV d'une session) [Il est créé ou on l'append avec les nouvelles valeurs]
+        
+        On exclue du traitement les chemin_csv_session qui sont déjà dans le FE formation (on considère que le CSV a déjà été traité)
+        """
+
+        # On convertit le tuple de strings en dictionnaire avec les trigrammes formation en clef
+        dico_chemins_csv_session = defaultdict(list)  #Dictionnaire spécial : lorsqu’on accède à une clé qui n’existe pas encore, il va automatiquement créer une nouvelle entrée avec une valeur par défaut, ici une liste vide (list())
+        for chemin in tuple_csv_stagiaires:
+            chemin = Path(chemin)
+            trigramme_formation = recupere_trig_formation_depuis_chemin(chemin)
+            dico_chemins_csv_session[trigramme_formation].append(chemin)
+        dico_chemins_csv_session = dict(dico_chemins_csv_session)  # Optionnel : conversion en dict normal
+        
+        EvalStat.depuis_dico_csv_stagiaires(dico_chemins_csv_session=dico_chemins_csv_session, ouvrirDossier=ouvrir_dossier)
+
+
+
+    @classmethod
+    def depuis_dico_csv_stagiaires(cls, dico_chemins_csv_session: dict[str, list[Path]], ouvrirDossier:bool=False) -> None:
         """
         Traite un ensemble de fichiers CSV groupés par formation.
 
-        Args:
+        Args :
             dico_chemins_csv_session (dict[str, list[Path]]):
                 Dictionnaire {trigramme_formation: [liste_de_csv]}.
 
@@ -822,12 +845,14 @@ class EvalStat:
             })
         """
         for trigramme_formation, chemins_csv in dico_chemins_csv_session.items():
+            print(f"\n\n{Style.BRIGHT}{Fore.RED}Gestion des formations {trigramme_formation}")
             with Contexte_formation(trigramme_formation):
                 for chemin_csv in chemins_csv:
                     #cls.depuis_chemin_csv_evaluations_stagiaires(chemin_csv)
-                    EvalStat.depuis_chemin_csv_evaluations_stagiaires_avec_contexte(chemin_csv_stagiaires=Path(chemin_csv),
+                    es = EvalStat.depuis_chemin_csv_evaluations_stagiaires_avec_contexte(chemin_csv_stagiaires=Path(chemin_csv),
                                                                             ouvrirDossier=ouvrirDossier
                                                                             )
+                    print(f"Fin traitement : {es._codeIRIS}\t{chemin_csv.name}\t{es._statut_csv}")
 
     # ==================================================================================
     # MÉTHODES DE CLASSE - CHARGEMENT DES FICHIERS COMMUNS
@@ -888,7 +913,8 @@ class EvalStat:
             raise ValueError("Aucun chemin CSV fourni pour le traitement.")
 
         #timer.debut(f"Traitement du fichier CSV : {self._chemin_csv_evaluations_stagiaires.name}")
-        timer.debut(f"\n{Style.BRIGHT}{Fore.YELLOW}Gestion du CSV {self._chemin_csv_evaluations_stagiaires.name}") 
+        print("\n")
+        timer.debut(f"{Style.BRIGHT}{Fore.YELLOW}Gestion du CSV {self._chemin_csv_evaluations_stagiaires.name}") 
 
         # On vérifie que chemin_csv_session n'est pas déjà dans le fichier évaluations des formations pour savoir si on l'exclue du traitement
         if str(self._chemin_csv_evaluations_stagiaires) in self._df_evaluations_formation["Chemin fichier CSV"].drop_duplicates().tolist():  
@@ -1169,7 +1195,8 @@ class EvalStat:
             print("⚠️  Aucun DataFrame de formation ouvert, impossible de mettre à jour.")
             return
         
-        timer.debut(f"\n{Style.BRIGHT}{Fore.YELLOW}Mise à jour du l'Excel EvalStat de toutes les sessions {self._fe_evaluations_formation.chemin_fichier.name}")
+        print("\n")
+        timer.debut(f"{Style.BRIGHT}{Fore.RED}Mise à jour de {self._fe_evaluations_formation.chemin_fichier.name}")
 
         # Nota : le fichier est déjà ouvert / créé à l'initialisation du contexte.
 
