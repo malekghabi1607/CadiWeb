@@ -23,7 +23,6 @@ import ctypes
 from ctypes import wintypes
 from pathlib import Path
 
-import time as time_module
 from datetime import date, datetime, time, timedelta
 
 from tqdm import tqdm
@@ -59,7 +58,7 @@ class Timer:
 
     def debut(self, description=""):
         self.description = description
-        self.start = time.time()
+        self.start = time_module.time()
         self.depth = len(Timer.stack)
         Timer.stack.append(self)
         self.active = True
@@ -84,7 +83,7 @@ class Timer:
         if not self.active:
             return  # Déjà terminé
 
-        end = time.time()
+        end = time_module.time()
         minutes, seconds = divmod(int(end - self.start), 60)
         indent = Timer.indent * self.depth
 
@@ -1252,7 +1251,7 @@ def minuscule_premiere_lettre(s: str) -> str:
     return s[:1].lower() + s[1:] if s else s
 
 ### --------------------------------------------------------------------
-#  Fenêtres
+#  Fenêtres / Popup
 ### --------------------------------------------------------------------
 def choisirFichiers_filedialog_excel(initialdir: Optional[Path] = None) -> Path:
     """

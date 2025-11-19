@@ -825,9 +825,7 @@ class EvalStat:
             dico_chemins_csv_session[trigramme_formation].append(chemin)
         dico_chemins_csv_session = dict(dico_chemins_csv_session)  # Optionnel : conversion en dict normal
         
-        EvalStat.depuis_dico_csv_stagiaires(dico_chemins_csv_session=dico_chemins_csv_session, ouvrirDossier=ouvrir_dossier)
-
-
+        EvalStat.depuis_dico_csv_stagiaires(dico_chemins_csv_session=dico_chemins_csv_session, ouvrirDossier=ouvrirDossier)
 
     @classmethod
     def depuis_dico_csv_stagiaires(cls, dico_chemins_csv_session: dict[str, list[Path]], ouvrirDossier:bool=False) -> None:
@@ -853,6 +851,46 @@ class EvalStat:
                                                                             ouvrirDossier=ouvrirDossier
                                                                             )
                     print(f"Fin traitement : {es._codeIRIS}\t{chemin_csv.name}\t{es._statut_csv}")
+
+    @classmethod
+    def depuis_liste_codes_IRIS(cls, liste_codes_IRIS:list[int], ouvrirDossier:bool=False) -> None:
+        """
+        A partir d'une liste de codes IRIS (il peut il y avoir plusieurs trigrammes de formations différents)
+        Permet de générer :
+           - le fichier excel stagiaires de chaque session (via le CSV)
+           - le fichier excel stagiaires de chaque formation (celui qui concatène tous les CSV d'une session) [Il est créé ou on l'append avec les nouvelles valeurs]
+        
+        On exclue du traitement les chemin_csv_session qui sont déjà dans le FE formation (on considère que le CSV a déjà été traité)
+        """
+
+        # On lit le fichier extract IRIS
+        cls._charge_IRIS_sessions()
+
+        # On crée le dictionnaire des csv stagiaires
+        dico_chemins_csv_session = defaultdict(list)  #Dictionnaire spécial : lorsqu’on accède à une clé qui n’existe pas encore, il va automatiquement créer une nouvelle entrée avec une valeur par défaut, ici une liste vide (list())
+        for code_IRIS in liste_codes_IRIS:
+            vlog.print("Info", f"Recherche infos code IRIS {code_IRIS}")
+
+            # On récupère le trigramme formation depuis le code IRIS (extract IRIS sessions)
+            res = cls._df_IRIS_sessions.loc[cls._df_IRIS_sessions["Code IRIS"] == str(code_IRIS), "Trigramme formation"]
+            trigramme_formation = res.iloc[0] if not res.empty else demander_code(typeCode="Trigramme formation", info=code_IRIS)
+
+            # On récupère le CSV depuis le fichier Excel global de la formation
+            with Contexte_formation(trigramme_formation):
+                res = cls._df_evaluations_formation.loc[cls._df_evaluations_formation["Code IRIS"] == str(code_IRIS), "Chemin fichier CSV"]
+                if not res.empty:
+                    chemin_csv = res.iloc[0]
+                else:
+                    # Il faut que l'utilisateur pointe le CSV de la session correspondante
+                    chemin_csv = cls._filedialog_csv(code_IRIS=code_IRIS, trigramme_formation=trigramme_formation)
+            
+            chemin_csv = Path(chemin_csv)
+            dico_chemins_csv_session[trigramme_formation].append(chemin_csv)
+        dico_chemins_csv_session = dict(dico_chemins_csv_session)  # Optionnel : conversion en dict normal
+
+        # On lance le traitement des EvalStat 
+        EvalStat.depuis_dico_csv_stagiaires(dico_chemins_csv_session=dico_chemins_csv_session, ouvrirDossier=ouvrirDossier)
+    
 
     # ==================================================================================
     # MÉTHODES DE CLASSE - CHARGEMENT DES FICHIERS COMMUNS
@@ -1255,17 +1293,18 @@ class EvalStat:
     # ==================================================================================
     # POPUP
     # ==================================================================================
-    def _filedialog_csv(self, code_IRIS: int, trigramme_formation: Optional[str] = None) -> str | None:
+    @classmethod
+    def _filedialog_csv(cls, code_IRIS: int, trigramme_formation: Optional[str] = None) -> str | None:
         """
         Ouvre un filedialog pour demander à l'utilisateur de sélectionner un CSV.
         On pointe au mieux sur le répertoire des CSV de cette formation pour la boîte de dialogue.
         """
         
-        if (trigramme_formation is None) and (self._fe_evaluations_formation.chemin_fichier is not None):
-            trigramme_formation = recupere_trig_formation_depuis_chemin(self._fe_evaluations_formation.chemin_fichier)
+        if (trigramme_formation is None) and (cls._fe_evaluations_formation.chemin_fichier is not None):
+            trigramme_formation = recupere_trig_formation_depuis_chemin(cls._fe_evaluations_formation.chemin_fichier)
 
         if trigramme_formation:
-            chemin_repertoire_csv = optimiseCheminRepertoire(self._fe_evaluations_formation.chemin_fichier.parent)
+            chemin_repertoire_csv = optimiseCheminRepertoire(cls._fe_evaluations_formation.chemin_fichier.parent)
         else:
             chemin_repertoire_csv = Path.cwd()
 
@@ -1309,6 +1348,8 @@ class BilanSession:
 
         self._stats_stagiaires: Optional[dict] = None  # Dictionnaire des stats des CSV
         self._es: Optional[EvalStat] = None  # EvalStat global des évaluations stagiaires de la formation
+
+        self._code_IRIS:str = None
         
         self._codes_IRIS_communs: list[str] = []  # Codes IRIS en commun entre le fichier Excel des sessions et le fichier Excel global des évaluations stagiaires de la formation
         self._codes_IRIS_absents_fin: list[str] = []  # Disparités restantes après traitement des CSV manquants entre le fichier Excel des sessions et le fichier Excel global des évaluations stagiaires de la formation
@@ -1618,6 +1659,15 @@ class BilanSession:
         self._exploitationBilan["Exploités pour les stats générales"] = self._df_sessions_filtre["N° Session"].tolist()
 
     def _maj_evalstat_formation(self) -> None:
+        """
+        Met à jour l'Excel evalstat de la formation si des sessions demandées par l'utilisateur ne s'y trouvent pas
+        (on regarde les CSV qui ne sont pas dans le fichier Excel global à partir de la liste df_sessions_filtre['Code IRIS'])
+
+        """
+        EvalStat.depuis_chemin_csv_evaluations_stagiaires(chemin_csv_session)
+
+
+    def _maj_evalstat_formation_BAK(self) -> None:
         """
         Met à jour l'Excel evalstat de la formation si des sessions demandées par l'utilisateur ne s'y trouvent pas
         (on regarde les CSV qui ne sont pas dans le fichier Excel global à partir de la liste df_sessions_filtre['Code IRIS'])
@@ -3515,7 +3565,14 @@ def recupere_trig_formation_depuis_chemin(chemin:Optional[Path] = None) -> str:
 
     return trigramme_formation
 
-def demander_code(typeCode:str, chemin:Path) -> int|str:
+def demander_code(typeCode:str, info:Optional[Path] = None) -> int|str:
+    """
+    Permet de demander un code à l'utilisateur : soit code IRIS, soit un trigramme formation
+
+    :Exemples:
+       demander_code(typeCode="Code IRIS")
+       demander_code(typeCode="Trigramme formation")
+    """
     # Initialisation en fonction du type de code
     
     match typeCode:
@@ -3571,14 +3628,15 @@ def demander_code(typeCode:str, chemin:Path) -> int|str:
     )
     label_warning.pack(pady=(10, 5))
 
-    label_chemin = tk.Label(
-        fenetre,
-        text=f"Chemin du fichier source :\n  *{chemin}*",
-        font=("Segoe UI", 9),
-        justify="left",
-        wraplength=480
-    )
-    label_chemin.pack(pady=(0, 10))
+    if info:
+        label_chemin = tk.Label(
+            fenetre,
+            text=f"Donnée :\n  * {info} *",
+            font=("Segoe UI", 9),
+            justify="left",
+            wraplength=480
+        )
+        label_chemin.pack(pady=(0, 10))
 
     frame_saisie = tk.Frame(fenetre)
     frame_saisie.pack()
