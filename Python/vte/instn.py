@@ -1340,7 +1340,7 @@ class BilanSession:
         # Variables d’instance → propres à chaque bilan
         self._chemin_word_bilan_session_output: Optional[Path] = None  # Bilan de session
 
-        self._codeFormation: Optional[str] = None
+        self._codeFormation: Optional[str] = None  # Trigramme formation
         self._annee: Optional[int] = None
         self._periode: Optional[str] = None
 

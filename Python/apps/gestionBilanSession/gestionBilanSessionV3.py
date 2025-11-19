@@ -8,19 +8,19 @@ init(autoreset=True)
 MODE = "console"
 
 MENUS = {
-    "Traiter à partir de codes IRIS (une seule session par bilan)": {
-        "Code IRIS unique (manuel)": {
+    "Traiter bilans pour des sessions uniques (une seule session par bilan)": {
+        "Un seul bilan à traiter par code IRIS (manuel)": {
             "action": BilanSession.bilanUnique_parCodeIRIS,
             "kwargs": {},
             "demander": []
         },
-        "Plusieurs codes IRIS (manuel)": {
+        "Plusieurs bilans à traiter par codes IRIS (manuel)": {
             "action": BilanSession.plusieursBilans_parCodeIRIS,
             "kwargs": {},
             "demander": [],
             "indications":"Entrez les codes IRIS séparés par des virgules (ex. : 16411, 17343)"
         },
-        "Plusieurs codes IRIS (depuis user_config.py)": {
+        "Plusieurs bilans à traiter par codes IRIS (depuis user_config.py)": {
             "action": chargement_config_demander_verif_utilisateur,
             "kwargs": {"nom_variable": "liste_codes_IRIS", 'fonction_execution':BilanSession.plusieursBilans_parCodeIRIS_fichierConfig},
             "demander": [],
