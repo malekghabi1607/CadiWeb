@@ -108,7 +108,7 @@ def test_cas7():
 # === Popup ===
 
 if __name__ == "__main__":
-    test_cas6()
+    test_cas7()
 
 
 
