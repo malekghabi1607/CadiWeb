@@ -22,14 +22,169 @@ if TYPE_CHECKING:
     import config as ConfigType  # pour que Pylance ait une base d’autocomplétion
 
 config, config_extractsIRIS, user_config = charger_config()
-
 config:ConfigType  # type hint explicite
 
-### --------------------------------------------------------------------
-#  Définitions classes et fonctions spécifiques INSTN
-### --------------------------------------------------------------------
+
+# ======================================================================================
+# CLASSE CONTEXTE FORMATION
+# ======================================================================================
+class Contexte_formation(AbstractContextManager):
+    """
+    Gestionnaire de contexte pour une formation donnée.
+
+    Ce contexte permet :
+    - d'ouvrir ou créer une fois pour toutes le fichier Excel des évaluations d'une formation
+      (commune à plusieurs sessions ou stagiaires) ;
+    - de garantir sa sauvegarde et sa fermeture automatique à la fin du traitement,
+      que celui-ci concerne un ou plusieurs fichiers CSV.
+
+    Utilisation typique :
+        with Contexte_formation("ABC"):
+            EvalStat.depuis_chemin_csv_evaluations_stagiaires(chemin_csv)
+
+    ou bien, pour un traitement multiple :
+        with Contexte_formation("ABC"):
+            for chemin_csv in liste_csv:
+                EvalStat.depuis_chemin_csv_evaluations_stagiaires(chemin_csv)
+    """
+
+    # === VARIABLES DE CLASSE COMMUNES À TOUS LES CONTEXTES ===
+
+    # Modèle Excel évaluations stagiaires (commun à toutes les formations)
+    _CHEMIN_MODELE_EXCEL_EVALUATIONS_STAGIAIRES: Path = config.CHEMIN_MODELE_EXCEL_EVALUATIONS_STAGIAIRES
+
+    # === CONSTRUCTEUR ===
+    def __init__(self, trigramme_formation: str):
+        """
+        Initialise le contexte pour une formation spécifique.
+
+        Args:
+            trigramme_formation (str): Trigramme identifiant la formation.
+        """
+        self._trigramme_formation:str = trigramme_formation
+        self._fe_evaluations_formation: Optional[FichierExcel] = None
+        self._df_evaluations_formation: Optional[pd.DataFrame] = None
+        self._supprimeDonneesEtRemplace_evaluations_formation: Optional[bool] = None
+
+    # === ENTRÉE DANS LE CONTEXTE ===
+    def __enter__(self):
+        """
+        Ouvre ou crée le fichier Excel des évaluations de la formation.
+
+        Le fichier est partagé entre toutes les instances de `EvalStat`
+        créées pendant ce contexte.
+        """
+        timer.debut(f"[Contexte_formation] Ouverture ou création du fichier Excel de la formation {self._trigramme_formation}")
+
+        # Ouverture ou création du fichier Excel de la formation
+        self._fe_evaluations_formation, self._supprimeDonneesEtRemplace_evaluations_formation = self._ouvrir_ou_creer_evaluations_formation(self._trigramme_formation)
+        self._df_evaluations_formation = self._fe_evaluations_formation._tableaux["Stagiaires"].df  # Alias
+        self._df_initial_hash = hash_df(self._fe_evaluations_formation._tableaux["Stagiaires"]._df)
+        timer.fin()
+
+        # Propagation dans EvalStat pour partage entre instances
+        EvalStat._CHEMIN_MODELE_EXCEL_EVALUATIONS_STAGIAIRES = self._CHEMIN_MODELE_EXCEL_EVALUATIONS_STAGIAIRES
+        EvalStat._trigramme_formation = self._trigramme_formation
+        EvalStat._fe_evaluations_formation = self._fe_evaluations_formation
+        EvalStat._df_evaluations_formation = self._df_evaluations_formation
+        EvalStat._supprimeDonneesEtRemplace_evaluations_formation = self._supprimeDonneesEtRemplace_evaluations_formation
+
+        return self
+
+    # === SORTIE DU CONTEXTE ===
+    def __exit__(self, exc_type, exc_value, traceback):
+        """
+        Sauvegarde et fermeture du fichier Excel de la formation à la sortie du contexte.
+
+        Ce bloc est exécuté même en cas d'erreur dans le traitement des sessions.
+        """
+        if self._fe_evaluations_formation is not None:
+
+            df_final_hash = hash_df(self._fe_evaluations_formation._tableaux["Stagiaires"]._df)
+
+            if df_final_hash != self._df_initial_hash:
+                # Le DataFrame a changé → on sauvegarde
+                EvalStat._sauver_excel_evaluations_formation()
+            else:
+                vlog.ajouter_message(
+                    "Aucune modification détectée → pas de sauvegarde",
+                    self._fe_evaluations_formation.chemin_fichier,
+                    style=["jaune"]
+                )
+
+        # Nettoyage des références dans EvalStat
+        EvalStat._CHEMIN_MODELE_EXCEL_EVALUATIONS_STAGIAIRES = None
+        EvalStat._trigramme_formation = None
+        EvalStat._fe_evaluations_formation = None
+        EvalStat._df_evaluations_formation = None
+        EvalStat._supprimeDonneesEtRemplace_evaluations_formation = None
+
+        return False  # Ne supprime pas d’éventuelles exceptions
+
+    # === MÉTHODE INTERNE ===
+    @staticmethod
+    def _ouvrir_ou_creer_evaluations_formation(trigramme_formation: str) -> Tuple[FichierExcel, bool]:
+        """
+        Ouvre ou crée le fichier Excel d'évaluations d'une formation.
+
+        Cette méthode construit le chemin vers le fichier d'évaluations correspondant au 
+        trigramme de la formation. Si ce fichier existe, il est ouvert et les données 
+        des stagiaires sont chargées dans un DataFrame. Sinon, un nouveau fichier est 
+        créé à partir d'un modèle, et les données seront à initialiser.
+        
+        Args:
+            trigramme_formation (str): Trigramme de la formation.
+        Returns:
+            - FichierExcel: Objet FichierExcel ouvert.
+            - Un booléen indiquant si les anciennes données doivent être supprimées et remplacées 
+                (`True` si nouveau fichier créé, `False` sinon).
+        """
+        # Exemple d'implémentation (à adapter à ta classe FichierExcel réelle)
+        chemin_excel_evaluations_formation = config.format_path(config.CHEMIN_EXCEL_EVALUATIONS_FORMATION, trigramme_formation=trigramme_formation)
+
+        # On vérifie que le répertoire dédié existe sinon on le créée : \\instnt\partage\FORMATIONS_C\###\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\AAAA
+        chemin_excel_evaluations_formation.parent.mkdir(parents=True, exist_ok=True)
+        
+        # On regarde si Evaluation-Stagiaires-Global-XXX.xlsx existe
+        if chemin_excel_evaluations_formation.is_file():
+            # Alors on l'ouvre
+            fe = FichierExcel.depuis_fichier(chemin_fichier=chemin_excel_evaluations_formation)
+            #self._fe_evaluations_formation._tableaux["CSV_stagiaires"].charge_df()
+            #self._fe_evaluations_formation._tableaux["Stagiaires"]._df['Trigramme formation'] = self._fe_evaluations_formation._tableaux["Stagiaires"]._df['Trigramme formation'].astype(str)
+
+            
+            # On récupère la liste des sessions déjà intégrées (liste des codes et des chemins) → Ce sera pour écrire dans le tkinter
+            #dico_sessionsDejaTraitees = dict(
+            #df_formation_stagiaires[df_formation_stagiaires["Trigramme formation"] == trigramme]     # 1. filtre sur le trigramme
+            #.drop_duplicates(subset=["Code IRIS", "Chemin fichier CSV"])  # 2. élimine les doublons
+            #[["Code IRIS", "Chemin fichier CSV"]]            # 3. sélection des colonnes
+            #.values                               # 4. valeurs du DF
+            #    )        
+
+            # Il ne faudra pas supprimer les anciennes données de fe_evaluations_formation
+            supprimeDonneesEtRemplace = False
+
+            vlog.ajouter_message("Ouverture EvalStat Global formation", fe.chemin_fichier, style=["vert"])
+        else:
+            # On créée le fichier excel à partir du modèle
+            fe = FichierExcel.depuis_modele(
+                chemin_modele = Contexte_formation._CHEMIN_MODELE_EXCEL_EVALUATIONS_STAGIAIRES, 
+                chemin_fichier_sauv = chemin_excel_evaluations_formation
+                )
+            
+            # Il faudra supprimer les anciennes données de fe_evaluations_formation
+            supprimeDonneesEtRemplace = True
+
+            vlog.ajouter_message("Création EvalStat Global formation", fe.chemin_fichier, style=["vert"])
+
+        #return self._fe_evaluations_formation, self._df_evaluations_formation, supprimeDonneesEtRemplace
+        return fe, supprimeDonneesEtRemplace
 
 
+
+# ======================================================================================
+# CLASSES LIÉES À IRIS
+# ======================================================================================
 @dataclass
 class InfosExportsIRIS:
     repertoire:Optional[Path]
@@ -106,8 +261,6 @@ class PropExportIRIS:
             f"{afficher_infos('Modèle', self._modele)}\n"
             f"{afficher_infos('Output', self._output)}"
         )
-
-
 
 class IRIS:
     "C'est la classe qui contient l'environnement pour bosser sur des fichiers Exports IRIS"
@@ -214,82 +367,6 @@ class IRIS:
         return instance
  
 
-    # === Méthodes statiques
-    @staticmethod
-    def mettreAJourTousLesExportsIRIS_auto(tuple_types:Tuple[str]) -> None:
-        """
-        Permet de créer un seul fichier Excel à partir de plusieurs exports d'IRIS.
-        Les fichiers à traités sont initialisés par la fonction initialisationListeFichiersExportsIRIS() qui permet à l'utilisateur de tout lister à la main (ça peut être plus pratique dans certains cas afin d'éviter de passer par une sélection manuelle)
-        
-        Les fichiers output sont des modèles avec les mêmes colonnes que les extracts d'IRIS mais avec de meilleures formes (format, couleurs...) + des colonnes adjointes à la fin pour extraire et séparer les infos du n° de session ou de la référence de la formation (ex. : trigramme formation, trigramme RP, trigramme AF...)
-
-        Les tuples des fichiers Excel à traiter sont enregistrés dans des instances de TravauxFichiersIRIS et on emploie les méthodes de cette classe
-
-        :param tuple_types: tuple de strings avec les noms des extracts 
-        :type donnees: Tuple[str, ...]
-
-        :Example:
-        
-        >>> mettreAJourTousLesExportsIRIS_auto(("Formations", ))
-        >>> mettreAJourTousLesExportsIRIS_auto(("Formations", "Sessions", "Ventes", "Inscriptions"))
-
-
-        .. seealso:: Rien du tout.
-        .. warning:: Si une seule valeur pour tuple_types, bien mettre sous cette forme : ("Formations",) car sans la virgule Python interprête juste comme un string
-        .. note:: Rien du tout.
-        .. todo:: Rien du tout.
-        """
-
-        # On traite à la suite
-        for clef in IRIS._dict_DE_IRIS["CodesExports"].keys():
-            if clef in tuple_types:
-                print(Style.BRIGHT + Fore.YELLOW + "\nTraitement des exports " + clef)
-                fichiers_formates = ["\n\t" + f for f in IRIS._dict_DE_IRIS["Fichiers"][clef]]
-                print("Liste des fichiers traités : " + ", ".join(fichiers_formates))
-                chemins_fichiersInput = tuple((IRIS._dict_DE_IRIS["PropExportIRIS"][clef]._input.repertoire / nom) for nom in IRIS._dict_DE_IRIS["Fichiers"][clef])
-                IRIS.avecEcritureOutputDefaut(IRIS._dict_DE_IRIS["PropExportIRIS"][clef], chemins_fichiersInput=chemins_fichiersInput)
-
-    @staticmethod
-    def mettreAJourTousLesExportsIRIS_fileDialog(tuple_types:Tuple[str, ...]):
-        """
-        Permet de créer un seul fichier Excel à partir de plusieurs exports d'IRIS.
-        Les fichiers à traités sont sélectionnés à la suite par l'utilisateur à travers un filedialog dans l'ordre du doctionnaire d'entrée, puis tous les fichiers sont traités successivement après.
-        
-        Les fichiers output sont des modèles avec les mêmes colonnes que les extracts d'IRIS mais avec de meilleures formes (format, couleurs...) + des colonnes adjointes à la fin pour extraire et séparer les infos du n° de session ou de la référence de la formation (ex. : trigramme formation, trigramme RP, trigramme AF...)
-
-        Les tuples des fichiers Excel à traiter sont enregistrés dans des instances de ExtractIRIS et on emploie les méthodes de cette classe
-
-        :param tuple_types: tuple de strings avec les noms des extracts 
-        :type donnees: Tuple[str, ...]
-
-        :Example:
-        >>> mettreAJourTousLesExportsIRIS_fileDialog(("Formations", ))
-        >>> mettreAJourTousLesExportsIRIS_fileDialog(("Formations", "Sessions", "Ventes", "Inscriptions"))
-
-
-        .. seealso:: Rien du tout.
-        .. warning:: Si une seule valeur pour tuple_types, bien mettre sous cette forme : ("Formations",) car sans la virgule Python interprête juste comme un string
-        .. note:: Rien du tout.
-        .. todo:: Rien du tout.
-        """
-        # On fait choisir les fichiers à l'utilisateur
-        dict_traitements = {}
-        for clef, codeIRIS in IRIS._dict_DE_IRIS["CodesExports"].items():
-            if clef in tuple_types:
-                traitement = IRIS(IRIS._dict_DE_IRIS["PropExportIRIS"][clef])
-                dict_traitements[clef] = traitement
-
-        # On traite à la suite
-        for clef in dict_traitements.keys():
-            print(Style.BRIGHT + Fore.YELLOW + "\nTraitement des exports " + clef)
-            fichiers_formates = ["\n\t" + f for f in dict_traitements[clef]._chemins_fichiersInput]
-            print("Liste des fichiers traités : " + ", ".join(fichiers_formates))
-            #print("Liste des fichiers traités : " + ", ".join(dictEI[clef].nomsFichiers_exportIRIS))
-            #dict_traitements[clef].lire_extractIRIS()
-            #dict_traitements[clef].ecrit_dataFrame_dans_tableauStructure(df=instance._df_chemins, supprimeDonneesEtRemplace=True)
-            IRIS.avecEcritureOutputDefaut(IRIS._dict_DE_IRIS["PropExportIRIS"][clef], chemins_fichiersInput=dict_traitements[clef]._chemins_fichiersInput)
-
-
 
     # === Méthodes internes ===
     def _choisirFichiers_filedialog(self):
@@ -301,7 +378,6 @@ class IRIS:
         
         self._chemins_fichiersInput = tuple(Path(p) for p in cheminsExcel_str)
         
-
     def _lire_extractIRIS(self):
         """
         Crée le DataFrame pour l'export IRIS. On le stocke dans self._df_tableau
@@ -495,6 +571,221 @@ class IRIS:
         })
    
 
+
+    # === Méthodes externes ===
+    # = Mise à jours de tous les exports
+    @staticmethod
+    def mettreAJourTousLesExportsIRIS_auto(tuple_types:Tuple[str]) -> None:
+        """
+        Permet de créer un seul fichier Excel à partir de plusieurs exports d'IRIS.
+        Les fichiers à traités sont initialisés par la fonction initialisationListeFichiersExportsIRIS() qui permet à l'utilisateur de tout lister à la main (ça peut être plus pratique dans certains cas afin d'éviter de passer par une sélection manuelle)
+        
+        Les fichiers output sont des modèles avec les mêmes colonnes que les extracts d'IRIS mais avec de meilleures formes (format, couleurs...) + des colonnes adjointes à la fin pour extraire et séparer les infos du n° de session ou de la référence de la formation (ex. : trigramme formation, trigramme RP, trigramme AF...)
+
+        Les tuples des fichiers Excel à traiter sont enregistrés dans des instances de TravauxFichiersIRIS et on emploie les méthodes de cette classe
+
+        :param tuple_types: tuple de strings avec les noms des extracts 
+        :type donnees: Tuple[str, ...]
+
+        :Example:
+        
+        >>> mettreAJourTousLesExportsIRIS_auto(("Formations", ))
+        >>> mettreAJourTousLesExportsIRIS_auto(("Formations", "Sessions", "Ventes", "Inscriptions"))
+
+
+        .. seealso:: Rien du tout.
+        .. warning:: Si une seule valeur pour tuple_types, bien mettre sous cette forme : ("Formations",) car sans la virgule Python interprête juste comme un string
+        .. note:: Rien du tout.
+        .. todo:: Rien du tout.
+        """
+
+        # On traite à la suite
+        for clef in IRIS._dict_DE_IRIS["CodesExports"].keys():
+            if clef in tuple_types:
+                print(Style.BRIGHT + Fore.YELLOW + "\nTraitement des exports " + clef)
+                fichiers_formates = ["\n\t" + f for f in IRIS._dict_DE_IRIS["Fichiers"][clef]]
+                print("Liste des fichiers traités : " + ", ".join(fichiers_formates))
+                chemins_fichiersInput = tuple((IRIS._dict_DE_IRIS["PropExportIRIS"][clef]._input.repertoire / nom) for nom in IRIS._dict_DE_IRIS["Fichiers"][clef])
+                IRIS.avecEcritureOutputDefaut(IRIS._dict_DE_IRIS["PropExportIRIS"][clef], chemins_fichiersInput=chemins_fichiersInput)
+
+    @staticmethod
+    def mettreAJourTousLesExportsIRIS_fileDialog(tuple_types:Tuple[str, ...]):
+        """
+        Permet de créer un seul fichier Excel à partir de plusieurs exports d'IRIS.
+        Les fichiers à traités sont sélectionnés à la suite par l'utilisateur à travers un filedialog dans l'ordre du doctionnaire d'entrée, puis tous les fichiers sont traités successivement après.
+        
+        Les fichiers output sont des modèles avec les mêmes colonnes que les extracts d'IRIS mais avec de meilleures formes (format, couleurs...) + des colonnes adjointes à la fin pour extraire et séparer les infos du n° de session ou de la référence de la formation (ex. : trigramme formation, trigramme RP, trigramme AF...)
+
+        Les tuples des fichiers Excel à traiter sont enregistrés dans des instances de ExtractIRIS et on emploie les méthodes de cette classe
+
+        :param tuple_types: tuple de strings avec les noms des extracts 
+        :type donnees: Tuple[str, ...]
+
+        :Example:
+        >>> mettreAJourTousLesExportsIRIS_fileDialog(("Formations", ))
+        >>> mettreAJourTousLesExportsIRIS_fileDialog(("Formations", "Sessions", "Ventes", "Inscriptions"))
+
+
+        .. seealso:: Rien du tout.
+        .. warning:: Si une seule valeur pour tuple_types, bien mettre sous cette forme : ("Formations",) car sans la virgule Python interprête juste comme un string
+        .. note:: Rien du tout.
+        .. todo:: Rien du tout.
+        """
+        # On fait choisir les fichiers à l'utilisateur
+        dict_traitements = {}
+        for clef, codeIRIS in IRIS._dict_DE_IRIS["CodesExports"].items():
+            if clef in tuple_types:
+                traitement = IRIS(IRIS._dict_DE_IRIS["PropExportIRIS"][clef])
+                dict_traitements[clef] = traitement
+
+        # On traite à la suite
+        for clef in dict_traitements.keys():
+            print(Style.BRIGHT + Fore.YELLOW + "\nTraitement des exports " + clef)
+            fichiers_formates = ["\n\t" + f for f in dict_traitements[clef]._chemins_fichiersInput]
+            print("Liste des fichiers traités : " + ", ".join(fichiers_formates))
+            #print("Liste des fichiers traités : " + ", ".join(dictEI[clef].nomsFichiers_exportIRIS))
+            #dict_traitements[clef].lire_extractIRIS()
+            #dict_traitements[clef].ecrit_dataFrame_dans_tableauStructure(df=instance._df_chemins, supprimeDonneesEtRemplace=True)
+            IRIS.avecEcritureOutputDefaut(IRIS._dict_DE_IRIS["PropExportIRIS"][clef], chemins_fichiersInput=dict_traitements[clef]._chemins_fichiersInput)
+
+
+
+
+    # = Outils
+    @staticmethod
+    def choisir_fichier_iris_sessions() -> Path | None:
+        """
+        Ouvre un filedialog pour demander à l'utilisateur de sélectionner un extract IRIS sessions.
+        On pointe au mieux sur le répertoire des extracts IRIS pour la boîte de dialogue.
+        """
+
+        return choisir_fichier(titre=f"Sélectionner l'extract IRIS session {config.IRIS_SESSIONS._codeExport} à employer.",
+                        types_fichiers=[("Fichiers Excel", "*.xlsx")],
+                        dossier_initial=config.IRIS_SESSIONS._output.repertoire, # Pour aller vers mes ficheirs concaténés, sinon pour les originaux il faut pointer vers input
+                        texte_bouton_choisir=f"Choisir extract IRIS session {config.IRIS_SESSIONS._codeExport} à nouveau"
+                        )
+    
+    @staticmethod
+    def charger_excel_IRIS_sessions(fe_IRIS_sessions:Optional[FichierExcel]=None) -> FichierExcel:
+        """
+        Retourne l’extract IRIS sessions s'il n'existe pas déjà.
+        """
+        if fe_IRIS_sessions is None:
+            timer.debut("Lecture fichier IRIS sessions")
+            chemin_iris_sessions = IRIS.choisir_fichier_iris_sessions()
+            fe_IRIS_sessions = FichierExcel.depuis_fichier(chemin_fichier=chemin_iris_sessions)
+            timer.fin()
+
+        return fe_IRIS_sessions
+
+    @staticmethod
+    def verifier_code_iris(valeur: Any, type_sortie: Type = str) -> Tuple[bool, Any]:
+        """
+        Vérifie si une valeur correspond à un entier à 5 chiffres (code IRIS).
+
+        Args:
+            valeur (Any):
+                La valeur à tester. Peut être de n'importe quel type (int, float, str, etc.).
+            type_sortie (Type, optionnel):
+                Le type dans lequel renvoyer la valeur si elle est valide.
+                Par défaut : str.
+                Autres valeurs possibles : int, float, etc.
+
+        Returns:
+            Tuple[bool, Any]:
+                - Le premier élément est un booléen indiquant si la valeur est un entier à 5 chiffres.
+                - Le second élément est la valeur convertie dans le type demandé (ou None si invalide).
+
+        Exemple:
+            >>> verifier_code_iris(12345)
+            (True, '12345')
+
+            >>> verifier_code_iris("01234")
+            (True, '01234')
+
+            >>> verifier_code_iris("9999")
+            (False, None)
+
+            >>> verifier_code_iris("12345.0")
+            (True, '12345')
+
+            >>> verifier_code_iris("abcde")
+            (False, None)
+
+            >>> verifier_code_iris("67890", int)
+            (True, 67890)
+
+        Remarques:
+            - Les zéros initiaux sont conservés si le type de sortie est `str`.
+            - Les valeurs numériques flottantes représentant un entier à 5 chiffres (ex: "12345.0") sont acceptées.
+            - Si la valeur ne correspond pas à 5 chiffres, la fonction renvoie (False, None).
+        """
+        # Conversion en chaîne pour analyse initiale
+        if isinstance(valeur, str):
+            str_val = valeur.strip()
+        else:
+            try:
+                # On convertit float -> int -> str pour éviter les ".0"
+                str_val = str(int(float(valeur)))
+            except (ValueError, TypeError):
+                return False, None
+
+        # Vérifie qu'on a bien 5 chiffres
+        if str_val.isdigit() and len(str_val) == 5:
+            try:
+                valeur_convertie = type_sortie(str_val)
+            except Exception:
+                return False, None
+            return True, valeur_convertie
+
+        return False, None
+
+    @staticmethod
+    def extraire_code_iris_depuis_chemin(chemin:Path|str) -> str:
+        """
+        Récupère le numéro IRIS depuis un chemin (a priori chemin CSV) si pas possible on demande le code à l'utilisateur
+        """
+        match = re.search(r"\b\d{5}\b", str(chemin))
+        if match:
+            codeIRIS = match.group(0)
+        else:
+            codeIRIS = str(demander_code(typeCode="Code IRIS", chemin=chemin))
+
+        return codeIRIS
+
+    @staticmethod
+    def demander_liste_codes_iris(message="Pour exclure des sessions : entrez un ou plusieurs code IRIS (numéro à 5 chiffres) séparés par des espaces (ou rien pour passer) : ") -> list[str]:
+        while True:
+            entree = input(message).strip()
+            if not entree:
+                # Pas de saisie => retourner liste vide
+                return []
+
+            # On met mes codes IRIS dans une liste de str
+            #valeurs = [v.strip() for v in entree.replace(',', ' ').split()]
+
+            # Vérifier que toutes les valeurs sont des entiers
+            #try:
+            #    entiers = [int(v) for v in valeurs]
+            #    return entiers
+            #except ValueError:
+            #    print("Erreur : veuillez entrer uniquement des nombres entiers, séparés par des espaces ou des virgules.")
+
+            # On met mes codes IRIS dans une liste de str en vrifiant que toutes les valeurs sont des entiers
+            try:
+                # On teste le typage en int
+                l_entiers = [int(v.strip()) for v in entree.replace(',', ' ').split()]
+                # On reconvertit en str avant sortie méthode
+                l_str = [str(v) for v in l_entiers]
+                return l_str
+
+            except ValueError:
+                print("Erreur : veuillez entrer uniquement des nombres entiers, séparés par des espaces ou des virgules.")
+                IRIS.demander_liste_codes_iris()
+    
+    
+    
+    
     # === Affichage ===
     def __str__(self):
         if self._chemins_fichiersInput:
@@ -520,161 +811,6 @@ class IRIS:
             f"  df_tableau :\n{aff_df}"
             )
 
-
-# ======================================================================================
-# CLASSE CONTEXTE FORMATION
-# ======================================================================================
-class Contexte_formation(AbstractContextManager):
-    """
-    Gestionnaire de contexte pour une formation donnée.
-
-    Ce contexte permet :
-    - d'ouvrir ou créer une fois pour toutes le fichier Excel des évaluations d'une formation
-      (commune à plusieurs sessions ou stagiaires) ;
-    - de garantir sa sauvegarde et sa fermeture automatique à la fin du traitement,
-      que celui-ci concerne un ou plusieurs fichiers CSV.
-
-    Utilisation typique :
-        with Contexte_formation("ABC"):
-            EvalStat.depuis_chemin_csv_evaluations_stagiaires(chemin_csv)
-
-    ou bien, pour un traitement multiple :
-        with Contexte_formation("ABC"):
-            for chemin_csv in liste_csv:
-                EvalStat.depuis_chemin_csv_evaluations_stagiaires(chemin_csv)
-    """
-
-    # === VARIABLES DE CLASSE COMMUNES À TOUS LES CONTEXTES ===
-
-    # Modèle Excel évaluations stagiaires (commun à toutes les formations)
-    _CHEMIN_MODELE_EXCEL_EVALUATIONS_STAGIAIRES: Path = config.CHEMIN_MODELE_EXCEL_EVALUATIONS_STAGIAIRES
-
-    # === CONSTRUCTEUR ===
-    def __init__(self, trigramme_formation: str):
-        """
-        Initialise le contexte pour une formation spécifique.
-
-        Args:
-            trigramme_formation (str): Trigramme identifiant la formation.
-        """
-        self._trigramme_formation:str = trigramme_formation
-        self._fe_evaluations_formation: Optional[FichierExcel] = None
-        self._df_evaluations_formation: Optional[pd.DataFrame] = None
-        self._supprimeDonneesEtRemplace_evaluations_formation: Optional[bool] = None
-
-    # === ENTRÉE DANS LE CONTEXTE ===
-    def __enter__(self):
-        """
-        Ouvre ou crée le fichier Excel des évaluations de la formation.
-
-        Le fichier est partagé entre toutes les instances de `EvalStat`
-        créées pendant ce contexte.
-        """
-        timer.debut(f"[Contexte_formation] Ouverture ou création du fichier Excel de la formation {self._trigramme_formation}")
-
-        # Ouverture ou création du fichier Excel de la formation
-        self._fe_evaluations_formation, self._supprimeDonneesEtRemplace_evaluations_formation = self._ouvrir_ou_creer_evaluations_formation(self._trigramme_formation)
-        self._df_evaluations_formation = self._fe_evaluations_formation._tableaux["Stagiaires"].df  # Alias
-        self._df_initial_hash = hash_df(self._fe_evaluations_formation._tableaux["Stagiaires"]._df)
-        timer.fin()
-
-        # Propagation dans EvalStat pour partage entre instances
-        EvalStat._CHEMIN_MODELE_EXCEL_EVALUATIONS_STAGIAIRES = self._CHEMIN_MODELE_EXCEL_EVALUATIONS_STAGIAIRES
-        EvalStat._trigramme_formation = self._trigramme_formation
-        EvalStat._fe_evaluations_formation = self._fe_evaluations_formation
-        EvalStat._df_evaluations_formation = self._df_evaluations_formation
-        EvalStat._supprimeDonneesEtRemplace_evaluations_formation = self._supprimeDonneesEtRemplace_evaluations_formation
-
-        return self
-
-    # === SORTIE DU CONTEXTE ===
-    def __exit__(self, exc_type, exc_value, traceback):
-        """
-        Sauvegarde et fermeture du fichier Excel de la formation à la sortie du contexte.
-
-        Ce bloc est exécuté même en cas d'erreur dans le traitement des sessions.
-        """
-        if self._fe_evaluations_formation is not None:
-
-            df_final_hash = hash_df(self._fe_evaluations_formation._tableaux["Stagiaires"]._df)
-
-            if df_final_hash != self._df_initial_hash:
-                # Le DataFrame a changé → on sauvegarde
-                EvalStat._sauver_excel_evaluations_formation()
-            else:
-                vlog.ajouter_message(
-                    "Aucune modification détectée → pas de sauvegarde",
-                    self._fe_evaluations_formation.chemin_fichier,
-                    style=["jaune"]
-                )
-
-        # Nettoyage des références dans EvalStat
-        EvalStat._CHEMIN_MODELE_EXCEL_EVALUATIONS_STAGIAIRES = None
-        EvalStat._trigramme_formation = None
-        EvalStat._fe_evaluations_formation = None
-        EvalStat._df_evaluations_formation = None
-        EvalStat._supprimeDonneesEtRemplace_evaluations_formation = None
-
-        return False  # Ne supprime pas d’éventuelles exceptions
-
-    # === MÉTHODE INTERNE ===
-    @staticmethod
-    def _ouvrir_ou_creer_evaluations_formation(trigramme_formation: str) -> Tuple[FichierExcel, bool]:
-        """
-        Ouvre ou crée le fichier Excel d'évaluations d'une formation.
-
-        Cette méthode construit le chemin vers le fichier d'évaluations correspondant au 
-        trigramme de la formation. Si ce fichier existe, il est ouvert et les données 
-        des stagiaires sont chargées dans un DataFrame. Sinon, un nouveau fichier est 
-        créé à partir d'un modèle, et les données seront à initialiser.
-        
-        Args:
-            trigramme_formation (str): Trigramme de la formation.
-        Returns:
-            - FichierExcel: Objet FichierExcel ouvert.
-            - Un booléen indiquant si les anciennes données doivent être supprimées et remplacées 
-                (`True` si nouveau fichier créé, `False` sinon).
-        """
-        # Exemple d'implémentation (à adapter à ta classe FichierExcel réelle)
-        chemin_excel_evaluations_formation = config.format_path(config.CHEMIN_EXCEL_EVALUATIONS_FORMATION, trigramme_formation=trigramme_formation)
-
-        # On vérifie que le répertoire dédié existe sinon on le créée : \\instnt\partage\FORMATIONS_C\###\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\AAAA
-        chemin_excel_evaluations_formation.parent.mkdir(parents=True, exist_ok=True)
-        
-        # On regarde si Evaluation-Stagiaires-Global-XXX.xlsx existe
-        if chemin_excel_evaluations_formation.is_file():
-            # Alors on l'ouvre
-            fe = FichierExcel.depuis_fichier(chemin_fichier=chemin_excel_evaluations_formation)
-            #self._fe_evaluations_formation._tableaux["CSV_stagiaires"].charge_df()
-            #self._fe_evaluations_formation._tableaux["Stagiaires"]._df['Trigramme formation'] = self._fe_evaluations_formation._tableaux["Stagiaires"]._df['Trigramme formation'].astype(str)
-
-            
-            # On récupère la liste des sessions déjà intégrées (liste des codes et des chemins) → Ce sera pour écrire dans le tkinter
-            #dico_sessionsDejaTraitees = dict(
-            #df_formation_stagiaires[df_formation_stagiaires["Trigramme formation"] == trigramme]     # 1. filtre sur le trigramme
-            #.drop_duplicates(subset=["Code IRIS", "Chemin fichier CSV"])  # 2. élimine les doublons
-            #[["Code IRIS", "Chemin fichier CSV"]]            # 3. sélection des colonnes
-            #.values                               # 4. valeurs du DF
-            #    )        
-
-            # Il ne faudra pas supprimer les anciennes données de fe_evaluations_formation
-            supprimeDonneesEtRemplace = False
-
-            vlog.ajouter_message("Ouverture EvalStat Global formation", fe.chemin_fichier, style=["vert"])
-        else:
-            # On créée le fichier excel à partir du modèle
-            fe = FichierExcel.depuis_modele(
-                chemin_modele = Contexte_formation._CHEMIN_MODELE_EXCEL_EVALUATIONS_STAGIAIRES, 
-                chemin_fichier_sauv = chemin_excel_evaluations_formation
-                )
-            
-            # Il faudra supprimer les anciennes données de fe_evaluations_formation
-            supprimeDonneesEtRemplace = True
-
-            vlog.ajouter_message("Création EvalStat Global formation", fe.chemin_fichier, style=["vert"])
-
-        #return self._fe_evaluations_formation, self._df_evaluations_formation, supprimeDonneesEtRemplace
-        return fe, supprimeDonneesEtRemplace
 
 
 # ======================================================================================
@@ -759,7 +895,7 @@ class EvalStat:
         self._fe_evaluations_stagiaires: Optional[FichierExcel] = None  # Objet Excel contenant les données EvalStat stagiaire individuel
 
         # === Résultat du traitement ===
-        self._statut_csv: Optional[str] = None  # ex: "traite", "exclu", "probleme", "CSV vide"
+        self._statut_csv: Optional[str] = None  # ex: "Traité", "Exclu - CSV déjà dans fichier global", "Exclu - Code IRIS pas dans Extract IRIS sessions", "Exclu - Problème lecture CSV", "Exclu - CSV vide / Aucun retour"
 
     # ==================================================================================
     # CONSTRUCTEURS ALTERNATIFS
@@ -828,7 +964,7 @@ class EvalStat:
         EvalStat.depuis_dico_csv_stagiaires(dico_chemins_csv_session=dico_chemins_csv_session, ouvrirDossier=ouvrirDossier)
 
     @classmethod
-    def depuis_dico_csv_stagiaires(cls, dico_chemins_csv_session: dict[str, list[Path]], ouvrirDossier:bool=False) -> None:
+    def depuis_dico_csv_stagiaires(cls, dico_chemins_csv_session: dict[str, list[Path]], ouvrirDossier:bool=False) -> dict[str, dict[str, str]]:
         """
         Traite un ensemble de fichiers CSV groupés par formation.
 
@@ -836,12 +972,22 @@ class EvalStat:
             dico_chemins_csv_session (dict[str, list[Path]]):
                 Dictionnaire {trigramme_formation: [liste_de_csv]}.
 
+        Return :
+            Une liste de dictionnaires {
+                es._codeIRIS,
+                    {
+                    "fichier": chemin_csv.name,
+                    "statut": es._statut_csv
+                    }      
+                }
+            Je pourrai accéder à la valeur par nom_dico[codeIRIS]["statut"]  
         Exemple :
             EvalStat.depuis_tuple_csv_stagiaires({
                 "ABC": [Path("R04110.csv"), Path("R04112.csv")],
                 "DEF": [Path("R04201.csv")]
             })
         """
+        statuts_csv:dict[str, dict[str, str]] = {}
         for trigramme_formation, chemins_csv in dico_chemins_csv_session.items():
             print(f"\n\n{Style.BRIGHT}{Fore.RED}Gestion des formations {trigramme_formation}")
             with Contexte_formation(trigramme_formation):
@@ -850,10 +996,16 @@ class EvalStat:
                     es = EvalStat.depuis_chemin_csv_evaluations_stagiaires_avec_contexte(chemin_csv_stagiaires=Path(chemin_csv),
                                                                             ouvrirDossier=ouvrirDossier
                                                                             )
+                    statuts_csv[es._codeIRIS] = {
+                        "fichier": chemin_csv.name,
+                        "statut": es._statut_csv
+                        }
                     print(f"Fin traitement : {es._codeIRIS}\t{chemin_csv.name}\t{es._statut_csv}")
 
+        return statuts_csv
+
     @classmethod
-    def depuis_liste_codes_IRIS(cls, liste_codes_IRIS:list[int], ouvrirDossier:bool=False) -> None:
+    def depuis_liste_codes_IRIS(cls, liste_codes_IRIS:list[int]|int, ouvrirDossier:bool=False) -> dict[str, dict[str, str]]:
         """
         A partir d'une liste de codes IRIS (il peut il y avoir plusieurs trigrammes de formations différents)
         Permet de générer :
@@ -861,10 +1013,27 @@ class EvalStat:
            - le fichier excel stagiaires de chaque formation (celui qui concatène tous les CSV d'une session) [Il est créé ou on l'append avec les nouvelles valeurs]
         
         On exclue du traitement les chemin_csv_session qui sont déjà dans le FE formation (on considère que le CSV a déjà été traité)
+
+        
+        Return :
+            Une liste de dictionnaires {
+                es._codeIRIS,
+                    {
+                    "fichier": chemin_csv.name,
+                    "statut": es._statut_csv
+                    }      
+                }
+            Je pourrai accéder à la valeur par nom_dico[codeIRIS]["statut"]  
         """
+        # Dictionnaire de retour
+        statuts_csv:dict[str, dict[str, str]] = {}
+
+        # Si en entrée on a un entier, alors on convertit en liste
+        if isinstance(liste_codes_IRIS, int):
+            liste_codes_IRIS = [liste_codes_IRIS]
 
         # On lit le fichier extract IRIS
-        cls._charge_IRIS_sessions()
+        cls._charger_IRIS_sessions()
 
         # On crée le dictionnaire des csv stagiaires
         dico_chemins_csv_session = defaultdict(list)  #Dictionnaire spécial : lorsqu’on accède à une clé qui n’existe pas encore, il va automatiquement créer une nouvelle entrée avec une valeur par défaut, ici une liste vide (list())
@@ -884,34 +1053,37 @@ class EvalStat:
                     # Il faut que l'utilisateur pointe le CSV de la session correspondante
                     chemin_csv = cls._filedialog_csv(code_IRIS=code_IRIS, trigramme_formation=trigramme_formation)
             
-            chemin_csv = Path(chemin_csv)
-            dico_chemins_csv_session[trigramme_formation].append(chemin_csv)
+            if chemin_csv is not None:
+                chemin_csv = Path(chemin_csv)
+                dico_chemins_csv_session[trigramme_formation].append(chemin_csv)
+            else:
+                statuts_csv[trigramme_formation] = {
+                    "fichier": "Fichier non existant",
+                    "statut": "Exclu - Fichier non existant"
+                    }
         dico_chemins_csv_session = dict(dico_chemins_csv_session)  # Optionnel : conversion en dict normal
 
         # On lance le traitement des EvalStat 
-        EvalStat.depuis_dico_csv_stagiaires(dico_chemins_csv_session=dico_chemins_csv_session, ouvrirDossier=ouvrirDossier)
-    
+        statuts_csv = EvalStat.depuis_dico_csv_stagiaires(dico_chemins_csv_session=dico_chemins_csv_session, ouvrirDossier=ouvrirDossier)
+
+        return statuts_csv
 
     # ==================================================================================
     # MÉTHODES DE CLASSE - CHARGEMENT DES FICHIERS COMMUNS
     # ==================================================================================
     @classmethod
-    def _charge_IRIS_sessions(cls) -> FichierExcel:
+    def _charger_IRIS_sessions(cls) -> None:
         """
         Retourne l’extract IRIS, en le chargeant si nécessaire.
         (Chargé une seule fois, partagé entre toutes les instances.)
         """
-        if cls._fe_IRIS_sessions is None:
-            timer.debut("Lecture fichier IRIS sessions")
-            chemin_iris_sessions = choisir_fichier_iris_sessions()
-            cls._fe_IRIS_sessions = FichierExcel.depuis_fichier(chemin_fichier=chemin_iris_sessions)
-            timer.fin()
+        # Vérifie existance de fe_IRIS sinon on le charge
+        cls._fe_IRIS_sessions = IRIS.charger_excel_IRIS_sessions(fe_IRIS_sessions=cls._fe_IRIS_sessions)
 
-            # Conversion du code IRIS en string pour jointure future
-            cls._df_IRIS_sessions = cls._fe_IRIS_sessions._tableaux["Sessions"]._df
-            cls._df_IRIS_sessions["Code IRIS"] = cls._df_IRIS_sessions["Code IRIS"].astype(str)
+        # Conversion du code IRIS en string pour jointure future
+        cls._df_IRIS_sessions = cls._fe_IRIS_sessions._tableaux["Sessions"]._df
+        cls._df_IRIS_sessions["Code IRIS"] = cls._df_IRIS_sessions["Code IRIS"].astype(str)
 
-        return cls._fe_IRIS_sessions
 
     @classmethod
     def _sauver_excel_evaluations_formation(cls, nouveau_chemin_fichier:Optional[Path] = None, fermer_fichier:Optional[bool]=True) -> None:
@@ -961,11 +1133,11 @@ class EvalStat:
             return
 
         # On récupère IRIS sessions, seulement si nécessaire (je le fais ici car si besoin action utilisateur ça évite de couper le traitement de la boucle)
-        self._charge_IRIS_sessions()
+        self._charger_IRIS_sessions()
 
         # Définition self._codeIRIS. Sinon Non existant, on récupère le numéro IRIS depuis le CSV (c'est le plus sur), sinon popup pour demander
         if self._codeIRIS is None:
-            self._codeIRIS = extraire_code_iris_depuis_chemin(self._chemin_csv_evaluations_stagiaires)
+            self._codeIRIS = IRIS.extraire_code_iris_depuis_chemin(self._chemin_csv_evaluations_stagiaires)
 
     
         # Étape 1 — Charger le CSV
@@ -983,7 +1155,7 @@ class EvalStat:
         df_csv_stagiaires = self._traiter_onglet_csv_stagiaires(df_csv_stagiaires, remplace_df=True)  # Traitement onglet CSV_stagiaires (import "direct" du CSV avec quelques traitements mineurs)
         df_stagiaires = self._traiter_onglet_stagiaires(df_csv_stagiaires, remplace_df=True)  # Traitement seconde partie du dataframe du CSV
         self._fe_evaluations_stagiaires.actualiser_TCD()  # Mise à jour TCD
-        self._statut_csv = "traite"
+        self._statut_csv = "Traité"
 
 
         # Étape 4 — Mettre à jour le DataFrame de formation partagé
@@ -1008,12 +1180,12 @@ class EvalStat:
             df_csv_stagiaires = pd.read_csv(self._chemin_csv_evaluations_stagiaires, sep=';', encoding=codage_csv)  # Ouverture du CSV et mise dans un DataFrame
         except Exception as e:
             print(f"❌ Erreur lors de la lecture du CSV {self._chemin_csv_evaluations_stagiaires} : {e}")
-            self._statut_csv = "Problème lecture CSV"
+            self._statut_csv = "Exclu - Problème lecture CSV"
             return None
 
         if df_csv_stagiaires.empty:
             print("⚠️  CSV vide → fichier ignoré.")
-            self._statut_csv = "CSV vide"
+            self._statut_csv = "Exclu - CSV vide / Aucun retour"
             return None
         
         return df_csv_stagiaires
@@ -1328,7 +1500,7 @@ class BilanSession:
     #            r"^R04110_Sessions.*"
     #        )  # Chemin vers le fichier Excel qui contient les extracts IRIS Sessions (ou a minima celles de la période en cours)
     _fe_IRIS_sessions:Optional[FichierExcel] = None  # Fichier Excel qui contient les extracts IRIS Sessions (ou a minima celles de la période en cours)
-    _df_sessions:Optional[pd.DataFrame] = None  # DataFrame de _fe_IRIS_sessions (self._fe_IRIS_sessions._tableaux["Sessions"]._df)
+    _df_IRIS_sessions:Optional[pd.DataFrame] = None  # DataFrame de _fe_IRIS_sessions (self._fe_IRIS_sessions._tableaux["Sessions"]._df)
 
 
     _CRITERES_A_ENLEVER:list[str] = [  # Critères à ne pas retenir pour le calcul des moyennes < 3
@@ -1349,17 +1521,19 @@ class BilanSession:
         self._stats_stagiaires: Optional[dict] = None  # Dictionnaire des stats des CSV
         self._es: Optional[EvalStat] = None  # EvalStat global des évaluations stagiaires de la formation
 
-        self._code_IRIS:str = None
+        self._codes_IRIS:Optional[List[str]] = []
         
-        self._codes_IRIS_communs: list[str] = []  # Codes IRIS en commun entre le fichier Excel des sessions et le fichier Excel global des évaluations stagiaires de la formation
-        self._codes_IRIS_absents_fin: list[str] = []  # Disparités restantes après traitement des CSV manquants entre le fichier Excel des sessions et le fichier Excel global des évaluations stagiaires de la formation
+        #self._codes_IRIS_communs: list[str] = []  # Codes IRIS en commun entre le fichier Excel des sessions et le fichier Excel global des évaluations stagiaires de la formation
+        #self._codes_IRIS_absents_fin: list[str] = []  # Disparités restantes après traitement des CSV manquants entre le fichier Excel des sessions et le fichier Excel global des évaluations stagiaires de la formation
 
         self._exploitationBilan:dict[list] = {
             "Exploités pour les stats générales" : [],  # Exploités pour stats initiales → Dans _demande_sessions_a_exclure
             "Exploités pour les évaluations (CSV présents)" : [],  # Exploités pour les stats stagiaires → Dans _maj_evalstat_formation
             "Exclus des évaluations (CSV manquants)" : [],   # Exclus des évaluations car CSV stagiaires manquants → Dans _maj_evalstat_formation
             "Exclus des évaluations (problème traitement CSV)" : [],   # Exclus des évaluations car problème au traitement des CSV → Dans _maj_evalstat_formation
-            "Exclus entièrement du bilan" : [],  # Exclus entièrement du bilan car sessions non réalisées ou mauvais RP (exclus par l'utilisateur) → Dans _demande_sessions_a_exclure
+            "Exclus des évaluations (CSV vide / aucun retour)" : [],   # Exclus des évaluations car le CSV est vide (i.e. aucun retour d'utilisateur)
+            "Exclus entièrement du bilan (exclus par utilisateur)" : [],  # Exclus entièrement du bilan car sessions non réalisées ou mauvais RP (exclus par l'utilisateur) → Dans _demande_sessions_a_exclure
+            "Exclus entièrement du bilan (non présent dans IRIS / mauvais code)" : [],  # Exclus entièrement du bilan car sessions non réalisées ou mauvais RP (exclus par l'utilisateur) → Dans _maj_evalstat_formation
         }
 
         # Liste des champs de fusion du Word (pour la fonction .mergefields, il faut des str)
@@ -1391,13 +1565,14 @@ class BilanSession:
         instance = cls()
 
         # Vérifier que code_iris est bien un entier à 5 chiffres, on le convertit en str
-        est_code_IRIS_valide, instance._code_IRIS = verifier_code_iris(code_IRIS)
+        est_code_IRIS_valide, instance._code_IRIS = IRIS.verifier_code_iris(code_IRIS)
 
         if not est_code_IRIS_valide:
-            vlog.log_erreur(f"Code IRIS en entrée non valide : {instance._code_IRIS}")
+            vlog.log_erreur(f"Code IRIS en entrée non valide : {instance._code_IRIS} non traité", continuer=True)
+            return
     
-        # Ouverture / création du dataframe de l'extract IRIS sessions de la formation
-        instance._creer_df_extractIRIS_sessions_codeIRIS()
+        # Ouverture / création du dataframe de l'extract IRIS sessions filtré selon le code IRIS en cours
+        instance._charger_df_sessions_filtre_selon_codeIRIS()
 
         # Initialisation données
         instance._codeFormation = instance._df_sessions_filtre["Trigramme formation"].iloc[0]
@@ -1408,8 +1583,7 @@ class BilanSession:
         instance._periodeSessionsEvaluees = f"{numSession}"
 
 
-
-        # On met à jour l'Excel evalstat de la formation si des sessions demandées par l'utilisateur ne s'y trouvent pas
+        # On met à jour l'Excel evalstat de la formation si la session demandée par l'utilisateur ne s'y trouve pas
         instance._maj_evalstat_formation()
 
         # On calcule les stats
@@ -1455,10 +1629,13 @@ class BilanSession:
         instance._periodeSessionsEvaluees = f"{instance._periode} {instance._annee}"
 
 
-        # Ouverture / création du dataframe de l'extract IRIS sessions de la formation
-        instance._creer_df_extractIRIS_sessions_periode()
+        # Ouverture / création du dataframe de l'extract IRIS sessions filtré selon la période demandée
+        instance._charger_df_sessions_filtre_selon_periode()
 
         # On met à jour df_sessions_filtre selon les sessions que souhaite garder / exclure l'utilisateur
+        # TODO j'en suis là
+        # TODO il faudra adapter instance._demande_sessions_a_exclure() pour récupérer les codes iris depuis session_filtre directement (yc le bilanunique ; checker le type donnée str ou int)
+        # TODO il faudra adapter le retour du traitement ou non des evalstat pour savoir ce qui est dans le bilan en cas de pb
         instance._demande_sessions_a_exclure()
         #print("\nÉtat de Excel sessions filtré sur période et trigramme :")
         #pprint(instance._df_sessions_filtre)
@@ -1493,59 +1670,24 @@ class BilanSession:
         for codeFormation, annee, periode in liste_periodes:
             cls.bilanUnique_parPeriode(codeFormation, annee, periode)
 
-    # === MÉTHODES ===
+    # === MÉTHODES INTERNES ===
     @classmethod
-    def _charger_fe_IRIS_sessions(cls) -> None:
+    def _charger_IRIS_sessions(cls) -> None:
         """
         Charge le fichier Excel IRIS Sessions si ce n'est pas déjà fait.
         Cette méthode met à jour _fe_IRIS_sessions et _df_sessions.
         """
-        if cls._fe_IRIS_sessions is None:
 
-            # Lecture de l'Excel
-            cls._fe_IRIS_sessions = FichierExcel.depuis_fichier(repertoire_recherche_ini=config.IRIS_SESSIONS._output.repertoire)
+        # Vérifie existance de fe_IRIS sinon on le charge
+        cls._fe_IRIS_sessions = IRIS.charger_excel_IRIS_sessions(fe_IRIS_sessions=cls._fe_IRIS_sessions)
 
-            # Copie du tableau structuré "Sessions"
-            cls._df_sessions = cls._fe_IRIS_sessions._tableaux["Sessions"]._df.copy()
+        # Traitement du DataFrame
+        cls._df_IRIS_sessions = cls._fe_IRIS_sessions._tableaux["Sessions"]._df  # Alias
+        cls._df_IRIS_sessions = cls._df_IRIS_sessions.sort_values(by="Date début ses.")  # Trie par "Date début ses."
+        cls._df_IRIS_sessions["Trigramme formation"] = cls._df_IRIS_sessions["Trigramme formation"].astype(str)  # Retype "Trigramme formation"
+        cls._df_IRIS_sessions["Code IRIS"] = cls._df_IRIS_sessions["Code IRIS"].astype(str)  # Retype "Code IRIS"
 
-            # Trie par "Date début ses."
-            cls._df_sessions = cls._df_sessions.sort_values(by="Date début ses.")
-
-            # Retype "Trigramme formation" et "Code IRIS"
-            cls._df_sessions["Trigramme formation"] = cls._df_sessions["Trigramme formation"].astype(str)
-            cls._df_sessions["Code IRIS"] = cls._df_sessions["Code IRIS"].astype(str)
-
-    @staticmethod
-    def _demander_entiers(message="Pour exclure des sessions : entrez un ou plusieurs code IRIS (numéro à 5 chiffres) séparés par des espaces (ou rien pour passer) : ") -> list[str]:
-        while True:
-            entree = input(message).strip()
-            if not entree:
-                # Pas de saisie => retourner liste vide
-                return []
-
-            # On met mes codes IRIS dans une liste de str
-            #valeurs = [v.strip() for v in entree.replace(',', ' ').split()]
-
-            # Vérifier que toutes les valeurs sont des entiers
-            #try:
-            #    entiers = [int(v) for v in valeurs]
-            #    return entiers
-            #except ValueError:
-            #    print("Erreur : veuillez entrer uniquement des nombres entiers, séparés par des espaces ou des virgules.")
-
-            # On met mes codes IRIS dans une liste de str en vrifiant que toutes les valeurs sont des entiers
-            try:
-                # On teste le typage en int
-                l_entiers = [int(v.strip()) for v in entree.replace(',', ' ').split()]
-                # On reconvertit en str avant sortie méthode
-                l_str = [str(v) for v in l_entiers]
-                return l_str
-
-            except ValueError:
-                print("Erreur : veuillez entrer uniquement des nombres entiers, séparés par des espaces ou des virgules.")
-                BilanSession._demander_entiers()
-
-    def _creer_df_extractIRIS_sessions_codeIRIS(self) -> None:
+    def _charger_df_sessions_filtre_selon_codeIRIS(self) -> None:
         """
         Méthode pour créer df_sessions_filtre
         C'est le dataframe issu de l'extract IRIS session. Il est filtré sur :
@@ -1557,17 +1699,17 @@ class BilanSession:
         On se base sur l'export session de IRIS le plus récent
         """
         # On ouvre et lit l'export sessions IRIS si et seulement si il n'est pas déjà ouvert et lu avant
-        self.__class__._charger_fe_IRIS_sessions()
+        self._charger_IRIS_sessions()
 
         # Application du filtre sur la session
-        self._df_sessions_filtre = self.__class__._df_sessions[self._df_sessions['Code IRIS'] == self._code_IRIS]
+        self._df_sessions_filtre = self._df_IRIS_sessions[self._df_IRIS_sessions['Code IRIS'] == self._code_IRIS]
         #print(self._df_sessions_filtre)
 
         if len(self._df_sessions_filtre) < 1:
             print(self._df_sessions_filtre)
             vlog.log_erreur(f"Le fichier Excel Session ne contient pas ce code IRIS : {self._df_sessions_filtre}")
 
-    def _creer_df_extractIRIS_sessions_periode(self) -> None:
+    def _charger_df_sessions_filtre_selon_periode(self) -> None:
         """
         Méthode pour créer df_sessions_filtre
         C'est le dataframe issu de l'extract IRIS session. Il est filtré sur :
@@ -1579,21 +1721,21 @@ class BilanSession:
         On se base sur l'export session de IRIS le plus récent
         """
         # On ouvre et lit l'export sessions IRIS si et seulement si il n'est pas déjà ouvert et lu avant
-        self.__class__._charger_fe_IRIS_sessions()
+        self._charger_IRIS_sessions()
 
 
         ####
-        # Filtration du dataframe
+        # Filtre du dataframe
         ####
 
         # Application du pré-filtre avec les 3 critères trigramme, statut session et période
-        self._df_sessions_filtre = self.__class__._df_sessions[
-            (self._df_sessions['Trigramme formation'] == str(self._codeFormation)) &
-            (self._df_sessions['Année début ses.'] == self._annee) &
-            (self._df_sessions['Statut Session'] != "Annulée") &
-            (self._df_sessions['Nb. Présents'] != 0)
+        self._df_sessions_filtre = self._df_IRIS_sessions[
+            (self._df_IRIS_sessions['Trigramme formation'] == str(self._codeFormation)) &
+            (self._df_IRIS_sessions['Année début ses.'] == self._annee) &
+            (self._df_IRIS_sessions['Statut Session'] != "Annulée") &
+            (self._df_IRIS_sessions['Nb. Présents'] != 0)
         ]
-        #print(self._df_sessions_filtre)
+        #print(self._df_IRIS_sessions_filtre)
 
 
         # Définition date de début et de fin de la période choisie par l'utilisateur
@@ -1634,11 +1776,11 @@ class BilanSession:
         ))
         
         # On demande à l'utilisateur les sessions qu'il veut exclure
-        exclusionSessions = BilanSession._demander_entiers()
+        exclusionSessions = IRIS.demander_liste_codes_iris()
         if exclusionSessions:  # si la liste n'est pas vide
             # On trace l'exclusion des sessions
             for session_exclue in exclusionSessions:
-                self._exploitationBilan["Exclus entièrement du bilan"].append(self._df_sessions_filtre.loc[self._df_sessions_filtre["Code IRIS"] == session_exclue, "N° Session"].iloc[0])
+                self._exploitationBilan["Exclus entièrement du bilan (exclus par utilisateur)"].append(self._df_sessions_filtre.loc[self._df_sessions_filtre["Code IRIS"] == session_exclue, "N° Session"].iloc[0])
 
             # On met à jour _df_sessions_filtre en enlevant les sessions exclues
             self._df_sessions_filtre = self._df_sessions_filtre[~self._df_sessions_filtre['Code IRIS'].isin(exclusionSessions)]
@@ -1658,13 +1800,43 @@ class BilanSession:
         # On met à jour _df_sessions_filtre en enlevant les sessions exclues
         self._exploitationBilan["Exploités pour les stats générales"] = self._df_sessions_filtre["N° Session"].tolist()
 
+        # On renseigne _codes_IRIS
+        self._codes_IRIS = self._df_sessions_filtre["Code IRIS"].tolist()
+
     def _maj_evalstat_formation(self) -> None:
         """
-        Met à jour l'Excel evalstat de la formation si des sessions demandées par l'utilisateur ne s'y trouvent pas
+        Crée les EvalStat de la/les sessions demandées et met à jour le fichier EvalStat de la formation
+        Ne s'applique que si des sessions demandées par l'utilisateur ne s'y trouvent pas
         (on regarde les CSV qui ne sont pas dans le fichier Excel global à partir de la liste df_sessions_filtre['Code IRIS'])
 
         """
-        EvalStat.depuis_chemin_csv_evaluations_stagiaires(chemin_csv_session)
+        statuts_csv = EvalStat.depuis_liste_codes_IRIS(self._codes_IRIS)
+
+        # === Gestion retour du traitement des CSV
+        for code_IRIS, donnees in statuts_csv.items:
+            # "Exclu - CSV vide / Aucun retour"
+            if donnees["statut"] == "Traité"|"Exclu - CSV déjà dans fichier global":
+                self._exploitationBilan["Exploités pour les évaluations (CSV présents)"].append(code_IRIS)
+                #self._exploitationBilan["Exploités pour les stats générales"].append(code_IRIS)  # Déjà dans _demande_sessions_a_exclure
+
+
+            if donnees["statut"] == "Exclu - Problème lecture CSV":
+                self._exploitationBilan["Exclus des évaluations (problème traitement CSV)"].append(code_IRIS)
+                #self._exploitationBilan["Exploités pour les stats générales"].append(code_IRIS)
+
+            if donnees["statut"] == "Exclu - Fichier non existant":
+                self._exploitationBilan["Exclus des évaluations (CSV manquants)"].append(code_IRIS)
+                #self._exploitationBilan["Exploités pour les stats générales"].append(code_IRIS)
+
+            if donnees["statut"] == "Exclu - CSV vide / Aucun retour":
+                self._exploitationBilan["Exclus des évaluations (CSV vide / aucun retour)"].append(code_IRIS)
+                #self._exploitationBilan["Exploités pour les stats générales"].append(code_IRIS)
+            
+
+            if donnees["statut"] == "Exclu - Code IRIS pas dans Extract IRIS sessions":
+                self._exploitationBilan["Exclus entièrement du bilan (non présent dans IRIS / mauvais code)"].append(code_IRIS)
+
+
 
 
     def _maj_evalstat_formation_BAK(self) -> None:
@@ -1845,10 +2017,34 @@ class BilanSession:
                     "Commentaires": commentaires_concat
                 }
         else:
-            vlog.print("Info", f"⚠️ Aucun CSV disponible pour ce bilan : les statistiques des stagiaires ne seront pas évaluées.")
+            vlog.print("Info", f"⚠️  Aucun CSV disponible pour ce bilan : les statistiques des stagiaires ne seront pas évaluées.")
 
         return self._stats_stagiaires
 
+    def _envoyer_mail_chef_unite(self, pj:Optional[list[str]] = None):
+        """
+        Envoie un mail au chef d'unité avec en lien le PDF à signer
+        """       
+        
+
+
+        chemin_pdf_bilan_output = self._chemin_word_bilan_session_output.with_suffix(".pdf")
+        #self._CORPS_MAIL_CHEF_UNITE.replace()
+        corps_html = remplacer_champs(config.CORPS_MAIL_CHEF_UNITE, [
+            ["lien_pdf_bilan", chemin_pdf_bilan_output],
+            ["formation", f"{self._titreFormation} ({self._codeFormation})"],
+            ["periode", minuscule_premiere_lettre(self._periode)],
+        ])
+
+        Mail.creer_mail(
+            destinataires=config.ADRESSE_MAIL_CHEF_UNITE,
+            sujet=f"Signature bilan de session {self._titreFormation} ({self._codeFormation}) : {chemin_pdf_bilan_output.name}",
+            corps_html=corps_html,
+            pieces_jointes=pj,
+            envoyer_mail=False  # envoie directement sans afficher
+        ) 
+
+    # === MÉTHODES POUR LA V3 DU BILAN DE SESSION ===
     def _bilanSessionV3(self) -> None:
         # On construit champs de fusion
         self.__construit_champsFusionV3()
@@ -2005,40 +2201,42 @@ class BilanSession:
         # On écrit le fichier
         document.write(self._chemin_word_bilan_session_output)
 
-    def _envoyer_mail_chef_unite(self, pj:Optional[list[str]] = None):
+    # === PROPRIÉTÉS ===
+    @property
+    def _code_IRIS(self) -> str:
         """
-        Envoie un mail au chef d'unité avec en lien le PDF à signer
-        """       
+        Un code IRIS (en considérant qu'on est sur un bilan contenant un code IRIS unique)
+        """
+        return self._codes_IRIS[0]
+    
+    @_code_IRIS.setter
+    def nom(self, valeur:int|str):
+        """
+        Renseigne un code IRIS (en considérant qu'on est sur un bilan contenant un code IRIS unique)
+        """
+        if not isinstance(valeur, str|int):
+            raise TypeError("La valeur doit être une chaîne ou un entier.")
         
+        if isinstance(valeur, int):
+            valeur = str(valeur)
 
+        if not self._codes_IRIS: # Cas d'une liste vide
+            self._codes_IRIS.append(valeur)
+        else:
+            self._codes_IRIS[0] = valeur
 
-        chemin_pdf_bilan_output = self._chemin_word_bilan_session_output.with_suffix(".pdf")
-        #self._CORPS_MAIL_CHEF_UNITE.replace()
-        corps_html = remplacer_champs(config.CORPS_MAIL_CHEF_UNITE, [
-            ["lien_pdf_bilan", chemin_pdf_bilan_output],
-            ["formation", f"{self._titreFormation} ({self._codeFormation})"],
-            ["periode", minuscule_premiere_lettre(self._periode)],
-        ])
-
-        Mail.creer_mail(
-            destinataires=config.ADRESSE_MAIL_CHEF_UNITE,
-            sujet=f"Signature bilan de session {self._titreFormation} ({self._codeFormation}) : {chemin_pdf_bilan_output.name}",
-            corps_html=corps_html,
-            pieces_jointes=pj,
-            envoyer_mail=False  # envoie directement sans afficher
-        ) 
 
 class BilanFormation:
     """
     C'est la classe qui contient tous les éléments de ma formation pour mon bilan
 
-    # TODO j'en suis là
-    # Todo Word
-    # Dans le modèle Word : gérer le lien vers la GED 
-    # Exploiter EvalStat
-    # Il y a des trous dans la raquette dans le word de sortie (checkboxes)
-    # coller des images depuis Excel
-    # ? Exploiter export formation plutôt que export sessions pour les valeurs par défaut nmin/max...
+    TODO j'en suis là
+    Todo Word
+    Dans le modèle Word : gérer le lien vers la GED 
+    Exploiter EvalStat
+    Il y a des trous dans la raquette dans le word de sortie (checkboxes)
+    coller des images depuis Excel
+    ? Exploiter export formation plutôt que export sessions pour les valeurs par défaut nmin/max...
     """
     def __init__(self, codeFormation:str, annee:int):
         
@@ -2200,7 +2398,81 @@ class BilanFormation:
         document.write(self._chemin_word_bilan_formation_output)
 
 
+    ### --------------------------------------------------------------------
+    #  Méthodes externes
+    ### --------------------------------------------------------------------
+    @staticmethod
+    def fenetreBilanFormation():
+        def valider_champs(*args):
+            trig = entry_trigramme.get().strip()
+            annee = entry_annee.get().strip()
+            bouton_generer.config(
+                state="normal" if len(trig) == 3 and annee.isdigit() and len(annee) == 4 else "disabled"
+            )
 
+        def generer_bilan_formation(event=None):
+            trigrammeFormation = entry_trigramme.get().strip()
+            anneeBilan_str = entry_annee.get().strip()
+            try:
+                anneeBilan = int(anneeBilan_str)
+            except ValueError:
+                messagebox.showerror("Erreur", "L'année doit être un entier à 4 chiffres.")
+                return
+            #BilanFormation(trig, annee)
+            print(f"BilanFormation lancé avec : trigramme={trigrammeFormation}, année={anneeBilan}")
+            bf = BilanFormation(trigrammeFormation, anneeBilan)
+            bf.mergeBilan()
+            fenetre.destroy()
+
+        def annuler():
+            sys.exit()
+
+        # Création de la fenêtre
+        fenetre = tk.Tk()
+        fenetre.title("Création d'un bilan de formation")
+        fenetre.geometry("350x180")
+        fenetre.resizable(False, False)
+
+        # Label + champ pour trigramme
+        ttk.Label(fenetre, text="Trigramme formation (3 lettres) :").pack(pady=(10, 0))
+        entry_trigramme = ttk.Entry(fenetre)
+        entry_trigramme.pack(pady=5)
+
+        # Label + champ pour année
+        annee_defaut = str(datetime.now().year - 1)
+        ttk.Label(fenetre, text="Année du bilan (4 chiffres) :").pack()
+        entry_annee = ttk.Entry(fenetre)
+        entry_annee.insert(0, annee_defaut)
+        entry_annee.pack(pady=5)
+
+        # Boutons
+        frame_boutons = ttk.Frame(fenetre)
+        frame_boutons.pack(pady=10)
+
+        bouton_generer = ttk.Button(frame_boutons, text="Générer bilan", state="disabled", command=generer_bilan_formation)
+        bouton_generer.grid(row=0, column=0, padx=5)
+
+        bouton_annuler = ttk.Button(frame_boutons, text="Annuler", command=annuler)
+        bouton_annuler.grid(row=0, column=1, padx=5)
+
+        # Validation en temps réel
+        entry_trigramme.bind("<KeyRelease>", valider_champs)
+        entry_annee.bind("<KeyRelease>", valider_champs)
+
+        # Entrée = clic sur bouton générer
+        fenetre.bind("<Return>", generer_bilan_formation)
+
+        # Échap = fermeture de la fenêtre
+        fenetre.bind("<Escape>", lambda e: fenetre.destroy())
+
+        # Lancer la fenêtre
+        fenetre.mainloop()
+
+
+
+# ======================================================================================
+# CLASSES LIÉES AUX REE
+# ======================================================================================
 @dataclass
 class TypeIntervenant:
     nom:str
@@ -2646,6 +2918,7 @@ class REE:
                 cc_str = json.dumps(str(cc))
             print(f"    {json.dumps(nom_col)}: {cc_str}{virgule}")
         print("}")
+
 
 class Traiter_contactsApprentis:
     """
@@ -3291,79 +3564,6 @@ def initialiser_PropExportIRIS_de_config() -> None:
     config.IRIS_VENTES = PropExportIRIS(**config.IRIS_VENTES_PARAMS)
     config.IRIS_INSCRIPTIONS = PropExportIRIS(**config.IRIS_INSCRIPTIONS_PARAMS)
 
-def verifier_code_iris(valeur: Any, type_sortie: Type = str) -> Tuple[bool, Any]:
-    """
-    Vérifie si une valeur correspond à un entier à 5 chiffres (code IRIS).
-
-    Args:
-        valeur (Any):
-            La valeur à tester. Peut être de n'importe quel type (int, float, str, etc.).
-        type_sortie (Type, optionnel):
-            Le type dans lequel renvoyer la valeur si elle est valide.
-            Par défaut : str.
-            Autres valeurs possibles : int, float, etc.
-
-    Returns:
-        Tuple[bool, Any]:
-            - Le premier élément est un booléen indiquant si la valeur est un entier à 5 chiffres.
-            - Le second élément est la valeur convertie dans le type demandé (ou None si invalide).
-
-    Exemple:
-        >>> verifier_code_iris(12345)
-        (True, '12345')
-
-        >>> verifier_code_iris("01234")
-        (True, '01234')
-
-        >>> verifier_code_iris("9999")
-        (False, None)
-
-        >>> verifier_code_iris("12345.0")
-        (True, '12345')
-
-        >>> verifier_code_iris("abcde")
-        (False, None)
-
-        >>> verifier_code_iris("67890", int)
-        (True, 67890)
-
-    Remarques:
-        - Les zéros initiaux sont conservés si le type de sortie est `str`.
-        - Les valeurs numériques flottantes représentant un entier à 5 chiffres (ex: "12345.0") sont acceptées.
-        - Si la valeur ne correspond pas à 5 chiffres, la fonction renvoie (False, None).
-    """
-    # Conversion en chaîne pour analyse initiale
-    if isinstance(valeur, str):
-        str_val = valeur.strip()
-    else:
-        try:
-            # On convertit float -> int -> str pour éviter les ".0"
-            str_val = str(int(float(valeur)))
-        except (ValueError, TypeError):
-            return False, None
-
-    # Vérifie qu'on a bien 5 chiffres
-    if str_val.isdigit() and len(str_val) == 5:
-        try:
-            valeur_convertie = type_sortie(str_val)
-        except Exception:
-            return False, None
-        return True, valeur_convertie
-
-    return False, None
-
-def extraire_code_iris_depuis_chemin(chemin:Path|str) -> str:
-    """
-    Récupère le numéro IRIS depuis un chemin (a priori chemin CSV) si pas possible on demande le code à l'utilisateur
-    """
-    match = re.search(r"\b\d{5}\b", str(chemin))
-    if match:
-        codeIRIS = match.group(0)
-    else:
-        codeIRIS = str(demander_code(typeCode="Code IRIS", chemin=chemin))
-
-    return codeIRIS
-
 def lire_fdc(chemin_fdc):
 
     """
@@ -3448,72 +3648,6 @@ def lire_fdc(chemin_fdc):
 
     return df_fdc_infos, df_fdc_couts, prixVenteRetenuParParticipant, dateCreationFormation, dureeJours_fdc, osThematique, nbCible_fcd
 
-
-def fenetreBilanFormation():
-    def valider_champs(*args):
-        trig = entry_trigramme.get().strip()
-        annee = entry_annee.get().strip()
-        bouton_generer.config(
-            state="normal" if len(trig) == 3 and annee.isdigit() and len(annee) == 4 else "disabled"
-        )
-
-    def generer_bilan_formation(event=None):
-        trigrammeFormation = entry_trigramme.get().strip()
-        anneeBilan_str = entry_annee.get().strip()
-        try:
-            anneeBilan = int(anneeBilan_str)
-        except ValueError:
-            messagebox.showerror("Erreur", "L'année doit être un entier à 4 chiffres.")
-            return
-        #BilanFormation(trig, annee)
-        print(f"BilanFormation lancé avec : trigramme={trigrammeFormation}, année={anneeBilan}")
-        bf = BilanFormation(trigrammeFormation, anneeBilan)
-        bf.mergeBilan()
-        fenetre.destroy()
-
-    def annuler():
-        sys.exit()
-
-    # Création de la fenêtre
-    fenetre = tk.Tk()
-    fenetre.title("Création d'un bilan de formation")
-    fenetre.geometry("350x180")
-    fenetre.resizable(False, False)
-
-    # Label + champ pour trigramme
-    ttk.Label(fenetre, text="Trigramme formation (3 lettres) :").pack(pady=(10, 0))
-    entry_trigramme = ttk.Entry(fenetre)
-    entry_trigramme.pack(pady=5)
-
-    # Label + champ pour année
-    annee_defaut = str(datetime.now().year - 1)
-    ttk.Label(fenetre, text="Année du bilan (4 chiffres) :").pack()
-    entry_annee = ttk.Entry(fenetre)
-    entry_annee.insert(0, annee_defaut)
-    entry_annee.pack(pady=5)
-
-    # Boutons
-    frame_boutons = ttk.Frame(fenetre)
-    frame_boutons.pack(pady=10)
-
-    bouton_generer = ttk.Button(frame_boutons, text="Générer bilan", state="disabled", command=generer_bilan_formation)
-    bouton_generer.grid(row=0, column=0, padx=5)
-
-    bouton_annuler = ttk.Button(frame_boutons, text="Annuler", command=annuler)
-    bouton_annuler.grid(row=0, column=1, padx=5)
-
-    # Validation en temps réel
-    entry_trigramme.bind("<KeyRelease>", valider_champs)
-    entry_annee.bind("<KeyRelease>", valider_champs)
-
-    # Entrée = clic sur bouton générer
-    fenetre.bind("<Return>", generer_bilan_formation)
-
-    # Échap = fermeture de la fenêtre
-    fenetre.bind("<Escape>", lambda e: fenetre.destroy())
-
-    # Lancer la fenêtre
-    fenetre.mainloop()
 
 def recupere_trig_formation_depuis_chemin(chemin:Optional[Path] = None) -> str:
     """
@@ -3663,21 +3797,10 @@ def demander_code(typeCode:str, info:Optional[Path] = None) -> int|str:
     code = int(code) if code.isdigit() else str(code)
     return code
 
-def choisir_fichier_iris_sessions() -> Path | None:
-    """
-    Ouvre un filedialog pour demander à l'utilisateur de sélectionner un extract IRIS sessions.
-    On pointe au mieux sur le répertoire des extracts IRIS pour la boîte de dialogue.
-    """
-
-    return choisir_fichier(titre=f"Sélectionner l'extract IRIS session {config.IRIS_SESSIONS._codeExport} à employer.",
-                    types_fichiers=[("Fichiers Excel", "*.xlsx")],
-                    dossier_initial=config.IRIS_SESSIONS._output.repertoire, # Pour aller vers mes ficheirs concaténés, sinon pour les originaux il faut pointer vers input
-                    texte_bouton_choisir=f"Choisir extract IRIS session {config.IRIS_SESSIONS._codeExport} à nouveau"
-                    )
 
 
 
-
+# Versions avec "pointeur"
 def recupere_trig_formation_depuis_chemin_avec_renommage(chemin:Optional[Path] = None, pointeur_chemin:Optional[list[Path]] = None, renommage:Optional[Callable[[Path], None]] = None) -> str:
     """
     Extrait un trigramme (3 lettres/chiffres) depuis un chemin, ou le demande à l'utilisateur si introuvable.
