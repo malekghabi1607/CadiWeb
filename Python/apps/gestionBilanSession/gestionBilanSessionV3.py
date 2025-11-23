@@ -23,8 +23,8 @@ MENUS = {
         "Plusieurs bilans à traiter par codes IRIS (depuis user_config.py)": {
             "action": chargement_config_demander_verif_utilisateur,
             "kwargs": {"nom_variable": "liste_codes_IRIS", 'fonction_execution':BilanSession.plusieursBilans_parCodeIRIS_fichierConfig},
-            "demander": [],
-            "indications":"Entrez les codes IRIS séparés par des virgules (ex. : 16411, 17343)"
+            "demander": []
+            #"indications":"Entrez les codes IRIS séparés par des virgules (ex. : 16411, 17343)"
         },
     },
 

@@ -838,6 +838,28 @@ def hash_df(df: pd.DataFrame) -> str:
     # On hash le résultat
     return hashlib.md5(data).hexdigest()
 
+def rechercheX_dataframe(
+        dataframe:pd.DataFrame, 
+        colonne_recherche:str, 
+        valeur_recherche:Any, 
+        colonne_souhaitee:str, 
+        fallback: Optional[Callable[[], Any]] = None
+    ) -> Any:
+    """
+    Retourne la première valeur trouvée dans colonne_souhaitee 
+    pour laquelle colonne_recherche == valeur_recherche.
+    Si aucune ligne trouvée, appelle fallback() si fourni.
+    """
+    res = dataframe.loc[
+        dataframe[colonne_recherche] == valeur_recherche, 
+        colonne_souhaitee
+        ]
+    
+    if not res.empty:
+        return res.iloc[0]  # renvoie la valeur trouvée
+    
+    # Aucun résultat
+    return fallback() if callable(fallback) else fallback
 ### --------------------------------------------------------------------
 #  Chargement config
 ### --------------------------------------------------------------------
@@ -1178,6 +1200,45 @@ def convertir_tuple_path(input:Path|Tuple[Path]) -> Tuple[Path]:
             return (input,)
         else:
             return input
+
+def convertir_liste_str(x: Any) -> list[str]:
+    """
+    Convertit une valeur ou un ensemble de valeurs en liste de chaînes.
+    - string ou int  → ["valeur"]
+    - list / tuple / set / Series / array → liste de str
+    - None → liste vide
+    """
+
+    if x is None:
+        return []
+
+    # Cas string : éviter que "16411" devienne ["1","6","4","1","1"]
+    if isinstance(x, str):
+        return [x]
+
+    # Cas int ou float unique
+    if isinstance(x, (int, float)):
+        return [str(x)]
+
+    # Pandas Series
+    if isinstance(x, pd.Series):
+        return x.astype(str).tolist()
+
+    # NumPy array
+    #if isinstance(x, np.ndarray):
+    #    return [str(v) for v in x.ravel()]
+
+    # list / tuple / set / dict.values
+    if isinstance(x, (list, tuple, set)):
+        return [str(v) for v in x]
+
+    # dict → liste des valeurs
+    if isinstance(x, dict):
+        return [str(v) for v in x.values()]
+
+    # Dernier fallback : on met dans une liste
+    return [str(x)]
+
 
 ### --------------------------------------------------------------------
 #  Dates

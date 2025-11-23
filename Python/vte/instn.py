@@ -79,6 +79,7 @@ class Contexte_formation(AbstractContextManager):
         # Ouverture ou création du fichier Excel de la formation
         self._fe_evaluations_formation, self._supprimeDonneesEtRemplace_evaluations_formation = self._ouvrir_ou_creer_evaluations_formation(self._trigramme_formation)
         self._df_evaluations_formation = self._fe_evaluations_formation._tableaux["Stagiaires"].df  # Alias
+        self._df_evaluations_formation["Code IRIS"] = self._df_evaluations_formation["Code IRIS"].astype(str)
         self._df_initial_hash = hash_df(self._fe_evaluations_formation._tableaux["Stagiaires"]._df)
         timer.fin()
 
@@ -104,7 +105,7 @@ class Contexte_formation(AbstractContextManager):
 
             if df_final_hash != self._df_initial_hash:
                 # Le DataFrame a changé → on sauvegarde
-                EvalStat._sauver_excel_evaluations_formation()
+                EvalStat._sauver_excel_evaluations_formation(fermer_fichier=False)
             else:
                 vlog.ajouter_message(
                     "Aucune modification détectée → pas de sauvegarde",
@@ -964,7 +965,7 @@ class EvalStat:
         EvalStat.depuis_dico_csv_stagiaires(dico_chemins_csv_session=dico_chemins_csv_session, ouvrirDossier=ouvrirDossier)
 
     @classmethod
-    def depuis_dico_csv_stagiaires(cls, dico_chemins_csv_session: dict[str, list[Path]], ouvrirDossier:bool=False) -> dict[str, dict[str, str]]:
+    def depuis_dico_csv_stagiaires(cls, dico_chemins_csv_session: dict[str, list[Path]], ouvrirDossier:bool=False) -> Tuple[FichierExcel, dict[str, dict[str, str]]]:
         """
         Traite un ensemble de fichiers CSV groupés par formation.
 
@@ -990,7 +991,7 @@ class EvalStat:
         statuts_csv:dict[str, dict[str, str]] = {}
         for trigramme_formation, chemins_csv in dico_chemins_csv_session.items():
             print(f"\n\n{Style.BRIGHT}{Fore.RED}Gestion des formations {trigramme_formation}")
-            with Contexte_formation(trigramme_formation):
+            with Contexte_formation(trigramme_formation) as ctx:
                 for chemin_csv in chemins_csv:
                     #cls.depuis_chemin_csv_evaluations_stagiaires(chemin_csv)
                     es = EvalStat.depuis_chemin_csv_evaluations_stagiaires_avec_contexte(chemin_csv_stagiaires=Path(chemin_csv),
@@ -1002,10 +1003,10 @@ class EvalStat:
                         }
                     print(f"Fin traitement : {es._codeIRIS}\t{chemin_csv.name}\t{es._statut_csv}")
 
-        return statuts_csv
+        return ctx._fe_evaluations_formation, statuts_csv
 
     @classmethod
-    def depuis_liste_codes_IRIS(cls, liste_codes_IRIS:list[int]|int, ouvrirDossier:bool=False) -> dict[str, dict[str, str]]:
+    def depuis_liste_codes_IRIS(cls, liste_codes_IRIS:list[int]|int, fe_IRIS_sessions:FichierExcel=None, ouvrirDossier:bool=False) -> Tuple[FichierExcel, dict[str, dict[str, str]]]:
         """
         A partir d'une liste de codes IRIS (il peut il y avoir plusieurs trigrammes de formations différents)
         Permet de générer :
@@ -1025,6 +1026,12 @@ class EvalStat:
                 }
             Je pourrai accéder à la valeur par nom_dico[codeIRIS]["statut"]  
         """
+        if fe_IRIS_sessions is not None :
+            cls._fe_IRIS_sessions = fe_IRIS_sessions
+            # Conversion du code IRIS en string pour jointure future
+            cls._df_IRIS_sessions = cls._fe_IRIS_sessions._tableaux["Sessions"]._df
+            cls._df_IRIS_sessions["Code IRIS"] = cls._df_IRIS_sessions["Code IRIS"].astype(str)
+        
         # Dictionnaire de retour
         statuts_csv:dict[str, dict[str, str]] = {}
 
@@ -1038,21 +1045,35 @@ class EvalStat:
         # On crée le dictionnaire des csv stagiaires
         dico_chemins_csv_session = defaultdict(list)  #Dictionnaire spécial : lorsqu’on accède à une clé qui n’existe pas encore, il va automatiquement créer une nouvelle entrée avec une valeur par défaut, ici une liste vide (list())
         for code_IRIS in liste_codes_IRIS:
-            vlog.print("Info", f"Recherche infos code IRIS {code_IRIS}")
+            #vlog.print("Info", f"Recherche infos code IRIS {code_IRIS}")
 
             # On récupère le trigramme formation depuis le code IRIS (extract IRIS sessions)
-            res = cls._df_IRIS_sessions.loc[cls._df_IRIS_sessions["Code IRIS"] == str(code_IRIS), "Trigramme formation"]
-            trigramme_formation = res.iloc[0] if not res.empty else demander_code(typeCode="Trigramme formation", info=code_IRIS)
+            #res = cls._df_IRIS_sessions.loc[cls._df_IRIS_sessions["Code IRIS"] == str(code_IRIS), "Trigramme formation"]
+            #trigramme_formation = res.iloc[0] if not res.empty else demander_code(typeCode="Trigramme formation", info=code_IRIS)
+            trigramme_formation = rechercheX_dataframe(
+                dataframe=cls._df_IRIS_sessions, 
+                colonne_recherche="Code IRIS", 
+                valeur_recherche=str(code_IRIS), 
+                colonne_souhaitee="Trigramme formation", 
+                fallback=lambda: demander_code(typeCode="Trigramme formation", info=code_IRIS)
+            )
 
             # On récupère le CSV depuis le fichier Excel global de la formation
             with Contexte_formation(trigramme_formation):
-                res = cls._df_evaluations_formation.loc[cls._df_evaluations_formation["Code IRIS"] == str(code_IRIS), "Chemin fichier CSV"]
-                if not res.empty:
-                    chemin_csv = res.iloc[0]
-                else:
-                    # Il faut que l'utilisateur pointe le CSV de la session correspondante
-                    chemin_csv = cls._filedialog_csv(code_IRIS=code_IRIS, trigramme_formation=trigramme_formation)
-            
+                #res = cls._df_evaluations_formation.loc[cls._df_evaluations_formation["Code IRIS"] == str(code_IRIS), "Chemin fichier CSV"]
+                #if not res.empty:
+                #    chemin_csv = res.iloc[0]
+                #else:
+                #    # Il faut que l'utilisateur pointe le CSV de la session correspondante
+                #    chemin_csv = cls._filedialog_csv(code_IRIS=code_IRIS, trigramme_formation=trigramme_formation)
+                chemin_csv = rechercheX_dataframe(
+                    cls._df_evaluations_formation, 
+                    "Code IRIS", 
+                    str(code_IRIS), 
+                    "Chemin fichier CSV",
+                    fallback=lambda: cls._filedialog_csv(code_IRIS=code_IRIS, trigramme_formation=trigramme_formation)
+                    )
+
             if chemin_csv is not None:
                 chemin_csv = Path(chemin_csv)
                 dico_chemins_csv_session[trigramme_formation].append(chemin_csv)
@@ -1064,9 +1085,9 @@ class EvalStat:
         dico_chemins_csv_session = dict(dico_chemins_csv_session)  # Optionnel : conversion en dict normal
 
         # On lance le traitement des EvalStat 
-        statuts_csv = EvalStat.depuis_dico_csv_stagiaires(dico_chemins_csv_session=dico_chemins_csv_session, ouvrirDossier=ouvrirDossier)
+        fe_evaluations_formation, statuts_csv = EvalStat.depuis_dico_csv_stagiaires(dico_chemins_csv_session=dico_chemins_csv_session, ouvrirDossier=ouvrirDossier)
 
-        return statuts_csv
+        return fe_evaluations_formation, statuts_csv
 
     # ==================================================================================
     # MÉTHODES DE CLASSE - CHARGEMENT DES FICHIERS COMMUNS
@@ -1129,6 +1150,13 @@ class EvalStat:
         # On vérifie que chemin_csv_session n'est pas déjà dans le fichier évaluations des formations pour savoir si on l'exclue du traitement
         if str(self._chemin_csv_evaluations_stagiaires) in self._df_evaluations_formation["Chemin fichier CSV"].drop_duplicates().tolist():  
             print(f"⚠️  Exclusion car csv déjà dans le fichier global : {self._chemin_csv_evaluations_stagiaires}")
+            #pprint(self._df_evaluations_formation["Chemin fichier CSV"])
+            self._codeIRIS = str(rechercheX_dataframe(
+                self._df_evaluations_formation,
+                "Chemin fichier CSV",
+                str(self._chemin_csv_evaluations_stagiaires),
+                "Code IRIS"
+            ))
             self._statut_csv = "Exclu - CSV déjà dans fichier global"
             return
 
@@ -1797,8 +1825,8 @@ class BilanSession:
             showindex=False
         ))
 
-        # On met à jour _df_sessions_filtre en enlevant les sessions exclues
-        self._exploitationBilan["Exploités pour les stats générales"] = self._df_sessions_filtre["N° Session"].tolist()
+        # On met à jour _df_sessions_filtre en enlevant les sessions exclues → Plus besoin : on a ça dans _maj_evalstat_formation
+        #self._exploitationBilan["Exploités pour les stats générales"] = self._df_sessions_filtre["N° Session"].tolist()
 
         # On renseigne _codes_IRIS
         self._codes_IRIS = self._df_sessions_filtre["Code IRIS"].tolist()
@@ -1810,33 +1838,50 @@ class BilanSession:
         (on regarde les CSV qui ne sont pas dans le fichier Excel global à partir de la liste df_sessions_filtre['Code IRIS'])
 
         """
-        statuts_csv = EvalStat.depuis_liste_codes_IRIS(self._codes_IRIS)
+        fe_evaluations_formation, statuts_csv = EvalStat.depuis_liste_codes_IRIS(self._codes_IRIS, fe_IRIS_sessions=self._fe_IRIS_sessions)
 
         # === Gestion retour du traitement des CSV
-        for code_IRIS, donnees in statuts_csv.items:
-            # "Exclu - CSV vide / Aucun retour"
-            if donnees["statut"] == "Traité"|"Exclu - CSV déjà dans fichier global":
+        for code_IRIS, donnees in statuts_csv.items():
+            if donnees["statut"] in ("Traité", "Exclu - CSV déjà dans fichier global"):
                 self._exploitationBilan["Exploités pour les évaluations (CSV présents)"].append(code_IRIS)
-                #self._exploitationBilan["Exploités pour les stats générales"].append(code_IRIS)  # Déjà dans _demande_sessions_a_exclure
+                self._exploitationBilan["Exploités pour les stats générales"].append(code_IRIS)  # Déjà dans _demande_sessions_a_exclure
 
 
             if donnees["statut"] == "Exclu - Problème lecture CSV":
                 self._exploitationBilan["Exclus des évaluations (problème traitement CSV)"].append(code_IRIS)
-                #self._exploitationBilan["Exploités pour les stats générales"].append(code_IRIS)
+                self._exploitationBilan["Exploités pour les stats générales"].append(code_IRIS)
 
             if donnees["statut"] == "Exclu - Fichier non existant":
                 self._exploitationBilan["Exclus des évaluations (CSV manquants)"].append(code_IRIS)
-                #self._exploitationBilan["Exploités pour les stats générales"].append(code_IRIS)
+                self._exploitationBilan["Exploités pour les stats générales"].append(code_IRIS)
 
             if donnees["statut"] == "Exclu - CSV vide / Aucun retour":
                 self._exploitationBilan["Exclus des évaluations (CSV vide / aucun retour)"].append(code_IRIS)
-                #self._exploitationBilan["Exploités pour les stats générales"].append(code_IRIS)
+                self._exploitationBilan["Exploités pour les stats générales"].append(code_IRIS)
             
 
             if donnees["statut"] == "Exclu - Code IRIS pas dans Extract IRIS sessions":
                 self._exploitationBilan["Exclus entièrement du bilan (non présent dans IRIS / mauvais code)"].append(code_IRIS)
 
+        # === Afficher les statuts des CSV employés pour le bilan ===
+        #pprint(self._exploitationBilan)
+        self._commentairesBilan += "\nListe des sessions :"
+        for critere, lsessions in self._exploitationBilan.items():
+            if lsessions:
+                self._commentairesBilan += f"\n   • {critere} :" + "".join(f"\n       - {isession}" for isession in lsessions)
+        vlog.print("Info", f"\n{self._commentairesBilan}")      
 
+        
+        # === Préparation des dataframes des évaluation de la formation pour calcul des stats ===
+        self._df_stagiaires = fe_evaluations_formation._tableaux["Stagiaires"]._df  # Création d'un alias pour faciliter le code
+        
+        # df_stagiaires filtré sur les codes IRIS exploités pour le bilan (infos générales)
+        self._df_stagiaires_final = self._df_stagiaires[self._df_stagiaires['Code IRIS'].isin(self._exploitationBilan["Exploités pour les stats générales"])]
+        #vlog.print("Info", self._df_stagiaires_final)
+
+        # df_stagiaires avec 1 ligne pour chaque session différente (pour avoir les infos globales issues de IRIS comme le nb d'apprenants)
+        self._df_stagiaires_final_1ligne_session = self._df_stagiaires_final.drop_duplicates(subset=['Code IRIS'])  # Ne garde qu'une ligne par Code IRIS (la première rencontrée)
+        #vlog.print("Info", self._df_stagiaires_final_1ligne_session)
 
 
     def _maj_evalstat_formation_BAK(self) -> None:
@@ -2210,7 +2255,7 @@ class BilanSession:
         return self._codes_IRIS[0]
     
     @_code_IRIS.setter
-    def nom(self, valeur:int|str):
+    def _code_IRIS(self, valeur:int|str):
         """
         Renseigne un code IRIS (en considérant qu'on est sur un bilan contenant un code IRIS unique)
         """
