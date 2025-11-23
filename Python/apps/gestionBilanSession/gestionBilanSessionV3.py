@@ -59,23 +59,7 @@ def main():
 
 
 
-def test():
-
-    # === Bilan unique par code IRIS ===
-    #TODO déplacer les bilans originaux en cas de tests !!!
-    #BilanSession.bilanUnique_parCodeIRIS(16411) # TEL octobre 2025 : bilan avec CSV
-    #BilanSession.bilanUnique_parCodeIRIS(17343)  # TEL mars 2025 : bilan avec CSV manquant
-
-    #BilanSession.plusieursBilans_parCodeIRIS([17343, 16411])
-
-
-
-
-    # === Bilan unique : ok ===
-    # periode = ["1er semestre", "2nd semestre", "Année"]
-    #BilanSession.bilanUnique("948", 2024, "Année")
-    #BilanSession.bilanUnique("TEL", 2022, "Année")
-
+def backup_bilans_novembre_2025():
     # === Plusieurs bilans ===
     #bilans_a_traiter = [
         #("TEL", 2022, "Année"), OK
@@ -129,13 +113,6 @@ def test():
     #]
     #BilanSession.plusieursBilans(bilans_a_traiter)
 
-
-    # === Bilan unique par code IRIS ===
-    #BilanSession.bilanUnique_parCodeIRIS(17343)
-    #BilanSession.bilanUnique_parCodeIRIS(16411)
-
-    #BilanSession.plusieursBilans_parCodeIRIS([17343, 16411])
-
     pass
 
 
@@ -143,8 +120,8 @@ def test():
     
 
 if __name__ == "__main__":
-    test()
-    #main()
+    #test()
+    main()
 
 
 

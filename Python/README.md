@@ -30,10 +30,21 @@ git log --oneline
 
 # Créer un exe
 faire un cd pour aller dans le répertoire de l'appli à compiler :
-cd "C:\Users\vt238770\Documents\_CEA\Prog\Python\gestionBilanSessionV3"
+cd "C:\Users\vt238770\Documents\_CEA\Prog\Python\apps\gestionBilanSession"
 
 pyinstaller --onefile --name GestionBilanSession gestionBilanSessionV3.py --paths "C:\Users\vt238770\Documents\_CEA\Prog\Python"
 
+#   - V0
 Si pyinstaller pas dans le path :
-python -m PyInstaller --onefile --name GestionBilanSession gestionBilanSessionV3.py --paths "C:\Users\vt238770\Documents\_CEA\Prog\Python"
+python -m PyInstaller --onefile --name GestionBilanSession gestionBilanSessionV3.py --paths "\\harmonie\INSTN\UEM\_Echanges\VTE\Prog"
 
+#   - V2
+python -m PyInstaller `
+  --onefile `
+  --paths "C:\Users\vt238770\Documents\_CEA\Prog\Python\apps\gestionBilanSession\vte" `
+  --distpath "\\harmonie\INSTN\UEM\_Echanges\VTE\Prog\gestionBilanSession" `
+  "C:\Users\vt238770\Documents\_CEA\Prog\Python\apps\gestionBilanSession\gestionBilanSessionV3.py"
+
+OU
+
+python -m PyInstaller --onefile --paths "C:\Users\vt238770\Documents\_CEA\Prog\Python\apps\gestionBilanSession\vte" --distpath "\\harmonie\INSTN\UEM\_Echanges\VTE\Prog\gestionBilanSession" "C:\Users\vt238770\Documents\_CEA\Prog\Python\apps\gestionBilanSession\gestionBilanSessionV3.py"

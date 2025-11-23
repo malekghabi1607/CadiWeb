@@ -1627,21 +1627,43 @@ class BilanSession:
         instance._periodeSessionsEvaluees = instance._periode
 
 
-        # On met à jour l'Excel evalstat de la formation si la session demandée par l'utilisateur ne s'y trouve pas
-        instance._maj_evalstat_formation()
+        # Chemin du word
+        instance._chemin_word_bilan_session_output = config.format_path(config.CHEMIN_WORD_BILAN_SESSION_OUTPUT, trigramme_formation=instance._codeFormation, annee=instance._annee, periode=instance._periodeSessionsEvaluees, unite=config.UNITE)
 
-        # On calcule les stats
-        instance._calculer_stats_criteres()
-        #pprint(instance._stats_stagiaires)
+        # On teste l'existance du Word
+        continuer = tester_existance_fichier(instance._chemin_word_bilan_session_output)
 
-        # On construit le bilan de session (bilan de session V3)
-        instance._bilanSessionV3()
+        #if instance._chemin_word_bilan_session_output.exists() and instance._chemin_word_bilan_session_output.is_file():
+        #    print("Le fichier existe")
+            # Ouvrir tkinter de warning
+            # Informations : 
+            #    - Date de modification du fichier : mettreDate au format jjj jj mmm aaaa à hh"h"mm
+            #    - Existance pdf associé : Emojie fleche verte ou croix rouge si oui ou non (même chemin+nom qua le word mais pdf à la place de docx)
+            # Aides : 2 ou 3 boutons pour : "Ouvrir pdf" (bouton pas forcément présent), "Ouvrir Word", "Ouvrir répertoire"
+            # Actions : 3 boutons : "Annuler" (retourne False), Écraser avec backup (copie du word vers même chemin+même nom avec ajout "-Backup aaaa.mm.jj" avant l'extension docx (aaaa.mm.jj sont année mois et jour d'aujourd'hui) ; puis retourne True), "Écraser sans backup" (bouton rouge ; retourne True)
+        #else:
+        #    print("Le fichier n'existe pas")
+            # On continue
 
-        # On ouvre le word
-        FichierWord.depuisFichier(chemin_fichier=instance._chemin_word_bilan_session_output, charger_contentControl=False, afficherWord=True)
+        if continuer:
+            # On met à jour l'Excel evalstat de la formation si la session demandée par l'utilisateur ne s'y trouve pas
+            instance._maj_evalstat_formation()
 
-        # On envoie un mail au chef d'unité pour la signature du pdf
-        instance._envoyer_mail_chef_unite()
+            # On calcule les stats
+            instance._calculer_stats_criteres()
+            #pprint(instance._stats_stagiaires)
+
+            # On construit le bilan de session (bilan de session V3)
+            instance._bilanSessionV3()
+
+            # On ouvre le word
+            FichierWord.depuisFichier(chemin_fichier=instance._chemin_word_bilan_session_output, charger_contentControl=False, afficherWord=True)
+
+            # On envoie un mail au chef d'unité pour la signature du pdf
+            instance._envoyer_mail_chef_unite()
+
+        else:
+            print("❌  Fichier Word déjà existant → Arrêt du traitement du bilan par l'utilisateur")
 
     @classmethod
     def plusieursBilans_parCodeIRIS(cls, liste_codes_IRIS:list[int]) -> None:
@@ -2142,7 +2164,9 @@ class BilanSession:
         # On évalue les valeurs requises pour la fin de la méthode
         #####
         #self._periodeSessionsEvaluees = f"{self._periode} {self._annee}"  #Déjà évalué avant : dépend de si on fait une session unique ou une période
-        self._chemin_word_bilan_session_output = config.format_path(config.CHEMIN_WORD_BILAN_SESSION_OUTPUT, trigramme_formation=self._codeFormation, annee=self._annee, periode=self._periodeSessionsEvaluees, unite=config.UNITE)
+        
+        # TODO à mettre ailleurs au début
+        #self._chemin_word_bilan_session_output = config.format_path(config.CHEMIN_WORD_BILAN_SESSION_OUTPUT, trigramme_formation=self._codeFormation, annee=self._annee, periode=self._periodeSessionsEvaluees, unite=config.UNITE)
         
         #liste_numerosSession_statsgenerales_seulement = list(
         #    set(self._exploitationBilan["Exploités pour les stats générales"])
@@ -4064,7 +4088,9 @@ def demander_code_avec_renommage(typeCode:str, chemin:Path, renommage:Optional[C
 initialiser_PropExportIRIS_de_config()
 
 # Pour couleur barres de progression
-colorama.init(autoreset=True)
+#colorama.init(autoreset=True)
+# forcer la conversion ANSI dans toutes les consoles
+colorama.init(autoreset=True, convert=True, strip=False)
 
 # Pour chrono des fonctions
 timer = Timer()

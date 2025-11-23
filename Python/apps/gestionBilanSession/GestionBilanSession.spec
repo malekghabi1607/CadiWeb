@@ -3,7 +3,7 @@
 
 a = Analysis(
     ['gestionBilanSessionV3.py'],
-    pathex=['C:\\Users\\vt238770\\Documents\\_CEA\\Prog\\Python'],
+    pathex=['\\\\harmonie\\INSTN\\UEM\\_Echanges\\VTE\\Prog'],
     binaries=[],
     datas=[],
     hiddenimports=[],

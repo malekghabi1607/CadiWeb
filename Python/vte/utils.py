@@ -41,6 +41,8 @@ import importlib.util
 
 import hashlib
 
+import shutil
+
 ### --------------------------------------------------------------------
 #  Tests (log et timer)
 ### --------------------------------------------------------------------
@@ -1571,6 +1573,119 @@ def choisir_fichier(
             root.destroy()
             sys.exit()
 
+def tester_existance_fichier(chemin_fichier: Path) -> bool:
+    """
+    Teste l'existence d'un fichier Word. Si le fichier existe, affiche une fenêtre
+    Tkinter avec informations et choix de l'utilisateur.
+    
+    Retourne :
+        True si l'utilisateur choisit d'écraser (avec ou sans backup)
+        False si l'utilisateur annule
+    """
+    if not chemin_fichier.exists() or not chemin_fichier.is_file():
+        # Fichier n'existe pas → on continue
+        return True
+
+    # Informations sur le fichier
+    date_modif = datetime.fromtimestamp(chemin_fichier.stat().st_mtime)
+    date_modif_str = date_modif.strftime("%a %d %b %Y à %Hh%M")
+    
+    # Vérifier l'existence du PDF associé
+    chemin_pdf = chemin_fichier.with_suffix(".pdf")
+    pdf_existe = chemin_pdf.exists() and chemin_pdf.is_file()
+
+    # Variable de retour
+    continuer = {"valeur": False}
+
+    # Fonctions des boutons
+    def annuler():
+        continuer["valeur"] = False
+        fenetre.destroy()
+
+    def ecraser_backup():
+        # Créer backup
+        backup_nom = f"{chemin_fichier.stem}-Backup {datetime.now():%Y.%m.%d}{chemin_fichier.suffix}"
+        backup_chemin = chemin_fichier.parent / backup_nom
+        shutil.copy2(chemin_fichier, backup_chemin)
+        continuer["valeur"] = True
+        fenetre.destroy()
+
+    def ecraser_sans_backup():
+        continuer["valeur"] = True
+        fenetre.destroy()
+
+    def ouvrir_word():
+        os.startfile(chemin_fichier)
+
+    def ouvrir_pdf():
+        if pdf_existe:
+            os.startfile(chemin_pdf)
+
+    def ouvrir_repertoire():
+        os.startfile(chemin_fichier.parent)
+
+    # Création de la fenêtre
+    fenetre = tk.Tk()
+    fenetre.title("Fichier existant")
+    fenetre.resizable(False, False)
+
+    # Texte d'information
+    info_text = f"Le fichier existe déjà :\n{chemin_fichier.name}\nModifié le : {date_modif_str}\nPDF associé : {'✅' if pdf_existe else '❌'}"
+    label_info = tk.Label(fenetre, text=info_text, justify="left", font=("Segoe UI", 10))
+    label_info.pack(padx=10, pady=10)
+
+    # Boutons action
+    cadre_boutons = tk.Frame(fenetre)
+    cadre_boutons.pack(padx=10, pady=10)
+
+    largeur_bouton = 25
+
+    # Annuler (gris)
+    bouton_annuler = tk.Button(
+        cadre_boutons, text="Annuler", width=largeur_bouton,
+        bg="#DDDDDD", font=("Segoe UI", 10), command=annuler
+    )
+    bouton_annuler.grid(row=0, column=0, padx=5, pady=5)
+
+    # Écraser avec backup (vert)
+    bouton_backup = tk.Button(
+        cadre_boutons, text="Écraser avec backup", width=largeur_bouton,
+        bg="#4CAF50", fg="white", font=("Segoe UI", 10, "bold"),
+        command=ecraser_backup
+    )
+    bouton_backup.grid(row=1, column=0, padx=5, pady=5)
+
+    # Écraser sans backup (rouge)
+    bouton_ecraser = tk.Button(
+        cadre_boutons, text="Écraser sans backup", width=largeur_bouton,
+        bg="#E74C3C", fg="white", font=("Segoe UI", 10, "bold"),
+        command=ecraser_sans_backup
+    )
+    bouton_ecraser.grid(row=2, column=0, padx=5, pady=5)
+
+    # Boutons optionnels : ouvrir Word / PDF / répertoire
+    cadre_options = tk.Frame(fenetre)
+    cadre_options.pack(padx=10, pady=5)
+
+    bouton_ouvrir_word = tk.Button(
+        cadre_options, text="Ouvrir Word", width=20, command=ouvrir_word
+    )
+    bouton_ouvrir_word.grid(row=0, column=0, padx=5, pady=5)
+
+    if pdf_existe:
+        bouton_ouvrir_pdf = tk.Button(
+            cadre_options, text="Ouvrir PDF", width=20, command=ouvrir_pdf
+        )
+        bouton_ouvrir_pdf.grid(row=0, column=1, padx=5, pady=5)
+
+    bouton_ouvrir_rep = tk.Button(
+        cadre_options, text="Ouvrir répertoire", width=20, command=ouvrir_repertoire
+    )
+    bouton_ouvrir_rep.grid(row=0, column=2, padx=5, pady=5)
+
+    fenetre.mainloop()
+
+    return continuer["valeur"]
 
 
 def arranger_fenetres(word_app, excel_app):
