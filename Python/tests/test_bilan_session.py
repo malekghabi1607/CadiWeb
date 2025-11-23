@@ -8,9 +8,13 @@ from vte.instn import *
 #####
 # === Traiter bilans pour des sessions uniques (une seule session par bilan)
 #####
-### Cas 1 — Bilan unique avec code IRIS unique
+### Cas 1 — Bilan unique avec code IRIS unique, bilan csv existant
 def test_cas1() :
-    BilanSession.bilanUnique_parCodeIRIS(16411) # TEL octobre 2025 : bilan avec CSV
+    BilanSession.bilanUnique_parCodeIRIS(16411)  # TEL octobre 2025 : bilan avec CSV
+    
+### Cas 2 — Bilan unique avec code IRIS unique, bilan csv inexistant
+def test_cas2() :
+    BilanSession.bilanUnique_parCodeIRIS(17343)  # TEL mars 2025 : bilan avec CSV manquant
 
 """ 
 BilanSession.plusieursBilans_parCodeIRIS
@@ -27,4 +31,4 @@ BilanSession.plusieursBilans_parPeriode
 
 
 if __name__ == "__main__":
-    test_cas1()
+    test_cas2()

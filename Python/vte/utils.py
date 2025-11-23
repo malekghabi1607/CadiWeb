@@ -30,6 +30,7 @@ import colorama
 from colorama import Fore, Style
 
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import filedialog
 
 from bs4 import BeautifulSoup
@@ -1446,7 +1447,7 @@ def choisir_fichier(
 
         # === Calcul dynamique de la largeur des boutons ===
         # On mesure la largeur réelle (en pixels) du texte le plus long
-        police_bouton = tk.Font(family="Segoe UI", size=10, weight="bold")
+        police_bouton = tkfont.Font(family="Segoe UI", size=10, weight="bold")
         textes_boutons = [texte_bouton_choisir, texte_bouton_quitter]
         if not obligatoire:
             textes_boutons.append(texte_bouton_aucun)
