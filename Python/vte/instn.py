@@ -1183,6 +1183,8 @@ class EvalStat:
     
         # Étape 1 — Charger le CSV
         df_csv_stagiaires = self._charger_csv_stagiaire()
+        if df_csv_stagiaires is None:
+            return
         if df_csv_stagiaires.empty:
             return
         
@@ -1621,7 +1623,8 @@ class BilanSession:
         moisSession = mois_fr_depuis_date(instance._df_sessions_filtre["Date début ses."].iloc[0])
         numSession = instance._df_sessions_filtre["N° Session"].iloc[0]
         instance._periode = f"Session {numSession} uniquement ({moisSession} {instance._annee})"
-        instance._periodeSessionsEvaluees = f"{numSession}"
+        #instance._periodeSessionsEvaluees = f"{numSession}"
+        instance._periodeSessionsEvaluees = instance._periode
 
 
         # On met à jour l'Excel evalstat de la formation si la session demandée par l'utilisateur ne s'y trouve pas
@@ -1674,9 +1677,6 @@ class BilanSession:
         instance._charger_df_sessions_filtre_selon_periode()
 
         # On met à jour df_sessions_filtre selon les sessions que souhaite garder / exclure l'utilisateur
-        # TODO j'en suis là
-        # TODO il faudra adapter instance._demande_sessions_a_exclure() pour récupérer les codes iris depuis session_filtre directement (yc le bilanunique ; checker le type donnée str ou int)
-        # TODO il faudra adapter le retour du traitement ou non des evalstat pour savoir ce qui est dans le bilan en cas de pb
         instance._demande_sessions_a_exclure()
         #print("\nÉtat de Excel sessions filtré sur période et trigramme :")
         #pprint(instance._df_sessions_filtre)
@@ -1809,6 +1809,7 @@ class BilanSession:
         """
         # On affiche à l'utilisateur les sessions et dates et statuts 
         vlog.print("Info", f"\nListe des sessions {self._codeFormation} dans {self._fe_IRIS_sessions._chemin_fichier.name} - {self._periode} {self._annee}", style=["jaune"])
+        # TODO formats Date début ses.   |    Date fin ses. : 2024-01-23 00:00:00
         print(tabulate(
             self._df_sessions_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Présents', 'Statut Session', 'N° Session']], 
             headers='keys', 
@@ -2114,7 +2115,7 @@ class BilanSession:
         corps_html = remplacer_champs(config.CORPS_MAIL_CHEF_UNITE, [
             ["lien_pdf_bilan", chemin_pdf_bilan_output],
             ["formation", f"{self._titreFormation} ({self._codeFormation})"],
-            ["periode", minuscule_premiere_lettre(self._periode)],
+            ["periode", minuscule_premiere_lettre(self._periodeSessionsEvaluees)],
         ])
 
         Mail.creer_mail(
