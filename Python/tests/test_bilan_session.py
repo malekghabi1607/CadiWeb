@@ -1,5 +1,6 @@
 from vte.instn import *
 
+# TODO ⚠️ déplacer les bilans originaux en cas de tests !!! ⚠️
 
 ### --------------------------------------------------------------------
 #  BilanSession
@@ -8,6 +9,7 @@ from vte.instn import *
 #####
 # === Traiter bilans pour des sessions uniques (une seule session par bilan)
 #####
+# TODO ⚠️ déplacer les bilans originaux en cas de tests !!! ⚠️
 ### Cas 1 — Bilan unique avec code IRIS unique, bilan csv existant
 def test_cas1() :
     BilanSession.bilanUnique_parCodeIRIS(16411)  # TEL octobre 2025 : bilan avec CSV
@@ -15,7 +17,14 @@ def test_cas1() :
 ### Cas 2 — Bilan unique avec code IRIS unique, bilan csv inexistant
 def test_cas2() :
     BilanSession.bilanUnique_parCodeIRIS(17343)  # TEL mars 2025 : bilan avec CSV manquant
+    
+### Cas 2 — Plusieurs bilans avec codes IRIS unique, bilan csv existant / inexistant
+def test_cas3() :
+    BilanSession.plusieursBilans_parCodeIRIS([17343, 16411])  # TEL mars et octobre 2025
 
+
+
+    #BilanSession.plusieursBilans_parCodeIRIS()
 """ 
 BilanSession.plusieursBilans_parCodeIRIS
 
@@ -31,4 +40,5 @@ BilanSession.plusieursBilans_parPeriode
 
 
 if __name__ == "__main__":
-    test_cas2()
+    #TODO ⚠️ déplacer les bilans originaux en cas de tests !!! ⚠️
+    test_cas3()
