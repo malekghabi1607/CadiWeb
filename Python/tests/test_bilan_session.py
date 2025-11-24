@@ -59,4 +59,4 @@ BilanSession.plusieursBilans_parPeriode
 
 if __name__ == "__main__":
     #TODO ⚠️ déplacer les bilans originaux en cas de tests !!! ⚠️
-    test_cas1()
+    test_cas5()

@@ -1627,23 +1627,11 @@ class BilanSession:
         instance._periodeSessionsEvaluees = instance._periode
 
 
-        # Chemin du word
-        instance._chemin_word_bilan_session_output = config.format_path(config.CHEMIN_WORD_BILAN_SESSION_OUTPUT, trigramme_formation=instance._codeFormation, annee=instance._annee, periode=instance._periodeSessionsEvaluees, unite=config.UNITE)
+        # Chemin du bilan word
+        instance._chemin_word_bilan_session_output = config.format_path(config.CHEMIN_WORD_BILAN_SESSION_OUTPUT, trigramme_formation=instance._codeFormation, annee=instance._annee, periode=f"{numSession}-UEM", unite=config.UNITE)
 
-        # On teste l'existance du Word
+        # On teste la pré-existance du bilan Word
         continuer = tester_existance_fichier(instance._chemin_word_bilan_session_output)
-
-        #if instance._chemin_word_bilan_session_output.exists() and instance._chemin_word_bilan_session_output.is_file():
-        #    print("Le fichier existe")
-            # Ouvrir tkinter de warning
-            # Informations : 
-            #    - Date de modification du fichier : mettreDate au format jjj jj mmm aaaa à hh"h"mm
-            #    - Existance pdf associé : Emojie fleche verte ou croix rouge si oui ou non (même chemin+nom qua le word mais pdf à la place de docx)
-            # Aides : 2 ou 3 boutons pour : "Ouvrir pdf" (bouton pas forcément présent), "Ouvrir Word", "Ouvrir répertoire"
-            # Actions : 3 boutons : "Annuler" (retourne False), Écraser avec backup (copie du word vers même chemin+même nom avec ajout "-Backup aaaa.mm.jj" avant l'extension docx (aaaa.mm.jj sont année mois et jour d'aujourd'hui) ; puis retourne True), "Écraser sans backup" (bouton rouge ; retourne True)
-        #else:
-        #    print("Le fichier n'existe pas")
-            # On continue
 
         if continuer:
             # On met à jour l'Excel evalstat de la formation si la session demandée par l'utilisateur ne s'y trouve pas
@@ -1663,7 +1651,7 @@ class BilanSession:
             instance._envoyer_mail_chef_unite()
 
         else:
-            print("❌  Fichier Word déjà existant → Arrêt du traitement du bilan par l'utilisateur")
+            print("❌  Bilan de session déjà existant → Arrêt du traitement du bilan par l'utilisateur")
 
     @classmethod
     def plusieursBilans_parCodeIRIS(cls, liste_codes_IRIS:list[int]) -> None:
@@ -1695,35 +1683,46 @@ class BilanSession:
         instance._periodeSessionsEvaluees = f"{instance._periode} {instance._annee}"
 
 
-        # Ouverture / création du dataframe de l'extract IRIS sessions filtré selon la période demandée
-        instance._charger_df_sessions_filtre_selon_periode()
+        # Chemin du bilan word
+        instance._chemin_word_bilan_session_output = config.format_path(config.CHEMIN_WORD_BILAN_SESSION_OUTPUT, trigramme_formation=instance._codeFormation, annee=instance._annee, periode=instance._periodeSessionsEvaluees, unite=config.UNITE)
 
-        # On met à jour df_sessions_filtre selon les sessions que souhaite garder / exclure l'utilisateur
-        instance._demande_sessions_a_exclure()
-        #print("\nÉtat de Excel sessions filtré sur période et trigramme :")
-        #pprint(instance._df_sessions_filtre)
+        # On teste la pré-existance du bilan Word
+        continuer = tester_existance_fichier(instance._chemin_word_bilan_session_output)
 
-        # S'il n'y a plus de session à lire dans _df_sessions_filtre, alors il n'y a plus de raison de faire le bilan
-        if len(instance._df_sessions_filtre) != 0 :
-            # On met à jour l'Excel evalstat de la formation si des sessions demandées par l'utilisateur ne s'y trouvent pas
-            instance._maj_evalstat_formation()
+        if continuer:
+            # Ouverture / création du dataframe de l'extract IRIS sessions filtré selon la période demandée
+            instance._charger_df_sessions_filtre_selon_periode()
 
-            # On calcule les stats
-            instance._calculer_stats_criteres()
-            #pprint(instance._stats_stagiaires)
+            # On met à jour df_sessions_filtre selon les sessions que souhaite garder / exclure l'utilisateur
+            instance._demande_sessions_a_exclure()
+            #print("\nÉtat de Excel sessions filtré sur période et trigramme :")
+            #pprint(instance._df_sessions_filtre)
 
-            # On construit le bilan de session (bilan de session V3)
-            instance._bilanSessionV3()
+            # S'il n'y a plus de session à lire dans _df_sessions_filtre, alors il n'y a plus de raison de faire le bilan
+            if len(instance._df_sessions_filtre) != 0 :
+                # On met à jour l'Excel evalstat de la formation si des sessions demandées par l'utilisateur ne s'y trouvent pas
+                instance._maj_evalstat_formation()
 
-            # On ouvre le word
-            FichierWord.depuisFichier(chemin_fichier=instance._chemin_word_bilan_session_output, charger_contentControl=False, afficherWord=True)
+                # On calcule les stats
+                instance._calculer_stats_criteres()
+                #pprint(instance._stats_stagiaires)
 
-            # On envoie un mail au chef d'unité pour la signature du pdf
-            instance._envoyer_mail_chef_unite()
+                # On construit le bilan de session (bilan de session V3)
+                instance._bilanSessionV3()
+
+                # On ouvre le word
+                FichierWord.depuisFichier(chemin_fichier=instance._chemin_word_bilan_session_output, charger_contentControl=False, afficherWord=True)
+
+                # On envoie un mail au chef d'unité pour la signature du pdf
+                instance._envoyer_mail_chef_unite()
 
 
+            else:
+                vlog.print("Info", f"⚠️ Toutes les sessions sont exclues : il n'y a plus de raison de faire le bilan de session.")
+        
         else:
-            vlog.print("Info", f"⚠️ Toutes les sessions sont exclues : il n'y a plus de raison de faire le bilan de session.")
+            print("❌  Bilan de session déjà existant → Arrêt du traitement du bilan par l'utilisateur")
+
 
     @classmethod
     def plusieursBilans_parPeriode(cls, liste_periodes:list[Tuple[str, int, str]]) -> None:
@@ -1832,6 +1831,11 @@ class BilanSession:
         # On affiche à l'utilisateur les sessions et dates et statuts 
         vlog.print("Info", f"\nListe des sessions {self._codeFormation} dans {self._fe_IRIS_sessions._chemin_fichier.name} - {self._periode} {self._annee}", style=["jaune"])
         # TODO formats Date début ses.   |    Date fin ses. : 2024-01-23 00:00:00
+
+        # Adaptation format date
+        self._df_sessions_filtre['Date début ses.'] = pd.to_datetime(self._df_sessions_filtre['Date début ses.']).dt.strftime("%d/%m/%Y")
+        self._df_sessions_filtre['Date fin ses.'] = pd.to_datetime(self._df_sessions_filtre['Date fin ses.']).dt.strftime("%d/%m/%Y")
+
         print(tabulate(
             self._df_sessions_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Présents', 'Statut Session', 'N° Session']], 
             headers='keys', 
