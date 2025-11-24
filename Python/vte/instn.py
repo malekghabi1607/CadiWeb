@@ -1628,7 +1628,7 @@ class BilanSession:
 
 
         # Chemin du bilan word
-        instance._chemin_word_bilan_session_output = config.format_path(config.CHEMIN_WORD_BILAN_SESSION_OUTPUT, trigramme_formation=instance._codeFormation, annee=instance._annee, periode=f"{numSession}-UEM", unite=config.UNITE)
+        instance._chemin_word_bilan_session_output = config.format_path(config.CHEMIN_WORD_BILAN_SESSION_OUTPUT, trigramme_formation=instance._codeFormation, annee=instance._annee, periode=f"{numSession}", unite=config.UNITE)
 
         # On teste la pré-existance du bilan Word
         continuer = tester_existance_fichier(instance._chemin_word_bilan_session_output)
@@ -1830,7 +1830,6 @@ class BilanSession:
         """
         # On affiche à l'utilisateur les sessions et dates et statuts 
         vlog.print("Info", f"\nListe des sessions {self._codeFormation} dans {self._fe_IRIS_sessions._chemin_fichier.name} - {self._periode} {self._annee}", style=["jaune"])
-        # TODO formats Date début ses.   |    Date fin ses. : 2024-01-23 00:00:00
 
         # Adaptation format date
         self._df_sessions_filtre['Date début ses.'] = pd.to_datetime(self._df_sessions_filtre['Date début ses.']).dt.strftime("%d/%m/%Y")
