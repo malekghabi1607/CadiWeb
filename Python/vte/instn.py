@@ -140,7 +140,7 @@ class Contexte_formation(AbstractContextManager):
             - Un booléen indiquant si les anciennes données doivent être supprimées et remplacées 
                 (`True` si nouveau fichier créé, `False` sinon).
         """
-        # Exemple d'implémentation (à adapter à ta classe FichierExcel réelle)
+        # On définit le chemin du répertoire depuis le fichier config
         chemin_excel_evaluations_formation = config.format_path(config.CHEMIN_EXCEL_EVALUATIONS_FORMATION, trigramme_formation=trigramme_formation)
 
         # On vérifie que le répertoire dédié existe sinon on le créée : \\instnt\partage\FORMATIONS_C\###\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\AAAA
@@ -900,15 +900,23 @@ class EvalStat:
 
     # ==================================================================================
     # CONSTRUCTEURS ALTERNATIFS
-    # ==================================================================================
+    # ==================================================================================   
     @classmethod
-    def depuis_chemin_csv_evaluations_stagiaires(cls, chemin_csv_stagiaires:Path|str, ouvrirDossier:bool=False) -> EvalStat:
+    def depuis_chemin_csv_evaluations_stagiaires(cls, chemin_csv_stagiaires:Optional[Path|str] = None, trigramme_formation:str = None, ouvrirDossier:bool=False) -> EvalStat:
 
+        # Soit on a déjà un chemin, soit on va pointer le csv manuellement
+        if chemin_csv_stagiaires is None:
+            chemin_csv_stagiaires = cls._filedialog_csv(trigramme_formation=trigramme_formation)
+            if chemin_csv_stagiaires is None:
+                vlog.log_erreur("Pas de fichier CSV", continuer=True)
+                return
+            
         if isinstance(chemin_csv_stagiaires, str):
             chemin_csv_stagiaires = Path(chemin_csv_stagiaires)
 
         # On récupère le trigramme de la formation depuis le chemin du CSV
-        trigramme_formation = recupere_trig_formation_depuis_chemin(chemin_csv_stagiaires)
+        if trigramme_formation is None:
+            trigramme_formation = recupere_trig_formation_depuis_chemin(chemin_csv_stagiaires)
 
         with Contexte_formation(trigramme_formation):
             EvalStat.depuis_chemin_csv_evaluations_stagiaires_avec_contexte(chemin_csv_stagiaires=Path(chemin_csv_stagiaires),
@@ -944,7 +952,7 @@ class EvalStat:
         return instance
 
     @classmethod
-    def depuis_tuple_csv_stagiaires(cls, tuple_csv_stagiaires:Tuple[Path], ouvrirDossier:bool=False) -> None:
+    def depuis_tuple_csv_stagiaires(cls, tuple_csv_stagiaires:Tuple[Path|str], ouvrirDossier:bool=False) -> None:
         """
         A partir d'un tuple de chemins de CSV stagiaire (il peut il y avoir plusieurs trigrammes de formations différents)
         Permet de générer :
@@ -1509,21 +1517,34 @@ class EvalStat:
     # POPUP
     # ==================================================================================
     @classmethod
-    def _filedialog_csv(cls, code_IRIS: int, trigramme_formation: Optional[str] = None) -> str | None:
+    def _filedialog_csv(cls, code_IRIS: Optional[int] = None, trigramme_formation: Optional[str] = None) -> str | None:
         """
         Ouvre un filedialog pour demander à l'utilisateur de sélectionner un CSV.
         On pointe au mieux sur le répertoire des CSV de cette formation pour la boîte de dialogue.
         """
-        
-        if (trigramme_formation is None) and (cls._fe_evaluations_formation.chemin_fichier is not None):
-            trigramme_formation = recupere_trig_formation_depuis_chemin(cls._fe_evaluations_formation.chemin_fichier)
 
+        # Si on n'a pas de trigramme de foramtion, alors on tente de le récupérer depuis _fe_evaluations_formation s'il existe et de trouver un chemin optimisé
+        if (trigramme_formation is None) and (cls._fe_evaluations_formation is not None):
+            if cls._fe_evaluations_formation.chemin_fichier is not None:
+                trigramme_formation = recupere_trig_formation_depuis_chemin(cls._fe_evaluations_formation.chemin_fichier)
+
+        # Si on a un trigramme de formation, alors on est en mesure de trouver un chemin optimis
         if trigramme_formation:
-            chemin_repertoire_csv = optimiseCheminRepertoire(cls._fe_evaluations_formation.chemin_fichier.parent)
+            chemin_repertoire_csv = optimiseCheminRepertoire(
+                config.format_path(config.REPERTOIRE_CSV_EVALUATIONS, trigramme_formation=trigramme_formation)
+                )
         else:
-            chemin_repertoire_csv = Path.cwd()
+            chemin_repertoire_csv = optimiseCheminRepertoire(config.REPERTOIRE_FORMATION.parent)  #Path.cwd()  
+            
 
-        return choisir_fichier(titre=f"Sélectionner le fichier CSV de la session {code_IRIS}",
+
+        if code_IRIS is None :
+            fin_titre = "désiré"
+        else :
+            fin_titre = f"de la session {code_IRIS}"
+
+
+        return choisir_fichier(titre=f"Sélectionner le fichier EvalStat stagiaire {fin_titre}",
                         types_fichiers=[("Fichiers CSV", "*.csv")],
                         dossier_initial=chemin_repertoire_csv,
                         obligatoire=False,

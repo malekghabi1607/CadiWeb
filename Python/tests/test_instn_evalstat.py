@@ -89,7 +89,7 @@ def test_cas6() :
 
 
 
-# === Depuis Tuple stagiaires ===
+# === Depuis liste de codes IRIS ===
 # Cas 1 — Trigrammes différents, ordre random : si fichiers sessions inexistants & excel eval formation inexistant
 def test_cas7():
     """
