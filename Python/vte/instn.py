@@ -193,8 +193,14 @@ class InfosExportsIRIS:
     nom_onglet:Optional[str]
     nbLignes_avantET:Optional[int]
 
-class PropExportIRIS:
-    """C'est une fabrique. Contient toutes les propriétés des fichiers Excel issus des Exports IRIS (structure de configuration d'un export IRIS)"""
+    ordre_colonne:Optional[List[str]]
+    #TODO : à moyen terme je pourrai avoir une double liste avec le nom des colonnes initiales + ordre ; voire mettre 2 lignes d'en-têtes dans le modèle (nom extract IRIS & nom plus adapté)
+
+class ConfigExportIRIS:
+    """
+    Configuration d'un type d'export IRIS.
+    Contient les propriétés input, modèle, output.
+    """
     # === Constructeurs ===
     def __init__(self, 
                 nom_typeExport:str, 
@@ -206,6 +212,7 @@ class PropExportIRIS:
                 
                 repertoire_modele:Optional[Path] = config.REPERTOIRES_MODELES, 
                 nom_fichier_modele:Optional[str|Path] = None, 
+                ordre_colonnes_modele:Optional[List[str]] = None,
                 
                 repertoire_output:Optional[Path] = config.REPERTOIRE_EXCEL_IRIS_OUTPUT, 
                 nom_fichier_output:Optional[str|Path] = None
@@ -221,26 +228,29 @@ class PropExportIRIS:
 
         # Informations input données (i.e. extracts natifs d'IRIS)
         self._input:InfosExportsIRIS = InfosExportsIRIS(
-            repertoire=repertoire_input,
+            repertoire=repertoire_input, # TODO est-ce qu'avec Path je suis obligé d'avoir les 2 ?
             chemin_fichier=None,
             nom_onglet=nom_onglet_input,
-            nbLignes_avantET=nbLignes_avantET_input
+            nbLignes_avantET=nbLignes_avantET_input,
+            ordre_colonne = None
             )
 
         # Informations sur le modèle Excel à employer pour remplir l'output
         self._modele:InfosExportsIRIS = InfosExportsIRIS(
             repertoire=repertoire_modele,
-            chemin_fichier=repertoire_modele / nom_fichier_modele,
+            chemin_fichier=(repertoire_modele / nom_fichier_modele) if repertoire_modele else None,
             nom_onglet=nom_typeExport,
-            nbLignes_avantET=None
+            nbLignes_avantET=None,
+            ordre_colonne = ordre_colonnes_modele
             )
 
         # Informations output
         self._output:InfosExportsIRIS = InfosExportsIRIS(
             repertoire=repertoire_output,
-            chemin_fichier=repertoire_output / nom_fichier_output,
+            chemin_fichier=(repertoire_output / nom_fichier_output) if repertoire_output else None,
             nom_onglet=nom_typeExport,
-            nbLignes_avantET=None
+            nbLignes_avantET=None,
+            ordre_colonne = None
             )
 
     # === Affichage ===
@@ -263,7 +273,28 @@ class PropExportIRIS:
             f"{afficher_infos('Output', self._output)}"
         )
 
+class FichierIRIS:
+    """
+    Gestion d'un fichier IRIS unique : lecture, traitement et écriture dans un modèle.
+    """
+
+    # === CONSTRUCTEUR ===
+    def __init__(self, typeExtract:ConfigExportIRIS, fichier_Excel:Optional[FichierExcel] = None):
+        self._typeExtract:ConfigExportIRIS = typeExtract
+        self._fe:Optional[FichierExcel] = fichier_Excel
+
+
+
+
 class IRIS:
+    "C'est la classe qui contient l'environnement pour bosser sur des fichiers Exports IRIS"
+    
+    def __init__(self):
+        self._df_tableau:Optional[pd.DataFrame] = None  # dataframe du fichier IRIS
+        self_df_chemins:Optional[pd.DataFrame] = None  # dataframe des chemins CSV à traiter
+
+
+class FichierIRIS_BAK:
     "C'est la classe qui contient l'environnement pour bosser sur des fichiers Exports IRIS"
 
     # === VARIABLES DE CLASSE ===
@@ -2630,16 +2661,50 @@ class REE:
         return ti"""
     # === VARIABLES DE CLASSE ===
     # --- Paramètres d'environnement
-    _repertoire_documents_ree:str = r"\\harmonie\instn\uem\_Documents_communs\Formations\Formateurs\0.Docs à envoyer"  # Répertoire de la GED où sont 
-    _chemin_mailtype_informationsAdministratives = r"\\harmonie\instn\uem\_Documents_communs\Formations\Formateurs\Mails types\Demande des informations administratives.msg"  # Message type à envoyer aux intervenants
-    _repertoire_sauvegarde_fichiersREE:str = r"\\harmonie\INSTN\UEM\_Documents_communs\Formations\Formateurs\1.Intervenants - Documents administratifs" # Lieu où sauvegarder les fichiers de l'intervenant
-    _chemin_modele_excel_ficheIntervenant:str = r"\\harmonie\INSTN\UEM\_Documents_communs\Formations\Formateurs\P09-Pr01-Qualifier les ressources enseignantes\P09_Pr01_Ta.E_Grille des critères de qualification des compétences_V1.xlsx"  # Fichier Excel à remplir pour Laetitia Da Mota (RH INSTN qui s'occupe de rentrer les REE dans IRIS)
-    _adresse_mail_gestionnaire_ree_INSTN:str = "vacataires.instn@cea.fr"
-    _corps_html_mail_gestionnaire_ree_INSTN:str = "<p>Bonjour Laëtitia,</p><p>Je t’ai mis en PJ les documents pour intégrer/mettre à jour la fiche IRIS de ###.</p><p>Je te remercie, passe une excellente journée,</p>"
+    #_repertoire_documents_ree:str = r"\\harmonie\instn\uem\_Documents_communs\Formations\Formateurs\0.Docs à envoyer"  # Répertoire de la GED où sont 
+    #_chemin_mailtype_informationsAdministratives = r"\\harmonie\instn\uem\_Documents_communs\Formations\Formateurs\Mails types\Demande des informations administratives.msg"  # Message type à envoyer aux intervenants
+    #_repertoire_sauvegarde_fichiersREE:str = r"\\harmonie\INSTN\UEM\_Documents_communs\Formations\Formateurs\1.Intervenants - Documents administratifs" # Lieu où sauvegarder les fichiers de l'intervenant
+    #_chemin_modele_excel_ficheIntervenant:str = r"\\harmonie\INSTN\UEM\_Documents_communs\Formations\Formateurs\P09-Pr01-Qualifier les ressources enseignantes\P09_Pr01_Ta.E_Grille des critères de qualification des compétences_V1.xlsx"  # Fichier Excel à remplir pour Laetitia Da Mota (RH INSTN qui s'occupe de rentrer les REE dans IRIS)
+    #_adresse_mail_gestionnaire_ree_INSTN:str = "vacataires.instn@cea.fr"
+    #_corps_html_mail_gestionnaire_ree_INSTN:str = "<p>Bonjour Laëtitia,</p><p>Je t’ai mis en PJ les documents pour intégrer/mettre à jour la fiche IRIS de ###.</p><p>Je te remercie, passe une excellente journée,</p>"
     
     # Association colonnes excel avec command control Word
     # La préparation de ce ditionnaire peut être faite avec : ree._generer_dictionnaire_depuis_excel()
-    _dict_colExcel_cc:Dict[str, str] = {
+    _dict_colExcel_cc_V4:Dict[str, str] = {
+        "NOM": "Nom",
+        "Pr\u00e9nom": "Prenoms",
+        "Dipl\u00f4me ou formation/exp\u00e9rience professionnelle": "Diplome",
+        "Dur\u00e9e exp\u00e9rience professionnelle": "DureeExperiencePro",
+        "Niveau d'expertise permettant une reconnaissance": "NiveauExpertise",
+        "Domaine / Sp\u00e9cialit\u00e9 de l'expertise": "DomaineExpertise",
+        "ATTRIBUTION Niveau comp\u00e9tences techniques": None,
+        "Combien de jours anim\u00e9s, en moyenne par an": "formation_nbJoursAnimes",
+        "Combien de jours de formations suivies en p\u00e9dagogie (=animation)": "formation_nbJoursFormationPedagogie",
+        "Profils d'apprenants form\u00e9s": "formation_profilApprenants",
+        "Taux consolid\u00e9 de la satisfaction des apprenants relativement \u00e0 l'enseignant-formateur consid\u00e9r\u00e9": None,
+        "Estimation par le RP de la capacit\u00e9 de l'enseignant-formateur \u00e0 animer (fond de salle)": None,
+        "Outils num\u00e9riques utilis\u00e9s durant les animations r\u00e9alis\u00e9es (serious game, blended-learning\u2026)": "formation_outilsNumeriques",
+        "Combien de jours pass\u00e9s en conception de s\u00e9quence de formation, en moyenne par an": "IngPedago_nbJoursConception",
+        "Combien de jours de formations suivies en ing\u00e9nierie p\u00e9dagogique (=conception de s\u00e9quences de formation)": "IngPedago_nbJoursFormationIngPedago",
+        "Estimation par le RP de la conception de la s\u00e9quence en fonction des objectifs p\u00e9dagogiques fournis par le RP (fond de salle, analyse des supports fournis)": None,
+        "Estimation par le RP de la pertinence de l'\u00e9valuation des acquis r\u00e9alis\u00e9e par l'enseignant-formateur sur sa s\u00e9quence (analyse de la progression des apprenants : tests avant/apr\u00e8s)": None,
+        "Estimation par le RP de l'utilisation des m\u00e9thodes actives (\u00e9tudes de cas, r\u00e9solution de probl\u00e8mes, classes invers\u00e9es, travaux de groupes\u2026)": None,
+        "Combien d'ann\u00e9es d'exp\u00e9rience en conception de dispositifs de formations (=cr\u00e9ation et coordination)": "IngFormation_nbJoursConception",
+        "Combien de jours de formations suivies en ing\u00e9nierie de formation (=conception de dispositifs de formation)": "IngFormation_nbJoursFormationIngFormation",
+        "Estimation par le chef de projet ou le CUE de la complexit\u00e9 des pr\u00e9c\u00e9dents dispositifs de formation con\u00e7us": None,
+        "Profil des apprenants des dispositifs de formations prc\u00e9demment con\u00e7us": "IngFormation_profilApprenants",
+        "Estimation par le chef de projet ou le CUE de l'\u00e9valuation des acquis r\u00e9alis\u00e9 dans le dispositif de formation (mesure de la progression des apprenants=estimation de la qualit\u00e9 du dispositif de formation)": None,        
+        "Combien d'ann\u00e9es d'exp\u00e9rience en tant que tuteur acad\u00e9mique": "IngFormation_nbAnneesTuteur",
+        "Combien de r\u00e9f\u00e9rentiels d'activit\u00e9, de comp\u00e9tence et d'\u00e9valuation r\u00e9alis\u00e9s": "IngCompetences_nbReferentiels",
+        "Combien de jours de formations suivies en ing\u00e9nierie de comp\u00e9tences": "IngCompetences_nbJoursFormationIngCompetences",
+        "Estimation par la cellule p\u00e9dagogique de DPF de la complexit\u00e9 des pr\u00e9c\u00e9dentes r\u00e9alisations de l'ing\u00e9nieur/consultant en ing\u00e9nierie de comp\u00e9tences (complexit\u00e9 du m\u00e9tier et de son environnement : risques, r\u00e9glementation...)": None,
+        "ATTRIBUTION Niveau comp\u00e9tences p\u00e9dagogiques": None,
+        "Evaluation CECRL ou \u00e9quivalence TOEIC, TOEFL": "ResultatLangue1",
+        "ATTRIBUTION Niveau comp\u00e9tences linguistiques": None,
+        "Curriculum vitae": None
+    }
+
+    _dict_colExcel_cc_versionVTE_refusee:Dict[str, str] = {
         "NOM": "Nom",
         "Pr\u00e9nom": "Prenoms",
         "Dipl\u00f4me ou formation/exp\u00e9rience professionnelle": "Diplome",
@@ -2677,7 +2742,7 @@ class REE:
     # Documents à envoyer / demander
     _docsREE:dict[DocREE] ={
         "Fiche administrative" : DocREE(
-            nom_fichier=r"Fiche administrative vacataire INSTN.docx", 
+            nom_fichier=r"P09-Pr01-F01 - Fiche administrative vacataire INSTN-V4.docx", 
             frequence_maj=["Initialisation", "Mise à jour"],
             intervenants=["CEA", "vacataire", "contrat spécifique de collaboration", "auto-entrepreneur"]
         ),
@@ -2694,6 +2759,11 @@ class REE:
             nom_fichier=r"Attestation employeur.docx", 
             frequence_maj=["Initialisation", "Tous les ans"],
             intervenants=["vacataire", "contrat spécifique de collaboration"]
+        ),
+        "Attestation sur l'honneur" : DocREE(
+            nom_fichier=r"Attestation sur l'honneur profession libérale.docx", 
+            frequence_maj=["Initialisation", "Tous les ans"],
+            intervenants=["auto-entrepreneur"]
         ),
         "Devis" : DocREE(
             frequence_maj=["Initialisation", "Tous les ans"],
@@ -2730,17 +2800,19 @@ class REE:
             if doc.nom_fichier is not None:
                 # accès direct à la variable de classe REE._repertoire_documents_ree
                 doc.chemin_fichier = os.path.join(self._repertoire_documents_ree, doc.nom_fichier)"""
-        pass
+        self._repertoire_sauvegarde_fichiersREE:Path = None  # Répertoire de sauvegarde qui sera construit à partir du répertoire défini dans config et du NOM prénoms de la REE
 
-
+        # Variables créées / employées par traitement retour mail REE
+        #self._word_ficheAdministrative:FichierWord
 
     # === ENVOI MAIL REE ===
-    def envoyerMail_REE(self, 
+    @classmethod
+    def envoyerMail_REE(cls, 
         statut:str, 
         destinataire:Optional[Union[str, list[str], pd.Series]] = None, 
         copie:Optional[Union[str, list[str], pd.Series]] = None
     ) -> None:
-        # TODO : comment récupérer le statu depuis Excel ?
+        # TODO : comment récupérer le statut depuis Excel ?
         # TODO : comment faire une boucle auto sur les personnes à qui envoyer ?
         """
         Prépare et envoie automatiquement un e-mail d'informations administratives
@@ -2785,21 +2857,21 @@ class REE:
         """
 
 
+        instance = cls()
+
         # Faire choix auto pour existant ou nouveau
 
-        #Je crée le texte pour listeInfo
-
-        
+        # On crée le texte pour listeInfo + la liste des PJ
         listeInfos:str = ""
         listePJ:list[str] = []
         #self._correspondance_frequence_texte
-        for nom_doc, doc in self._docsREE.items():
+        for nom_doc, doc in instance._docsREE.items():
             if statut in doc.intervenants:
                 # Gestion de la liste des infos à afficher dans le mail
                 if doc.frequence_maj is not None:
                     # On mappe chaque élément de doc.frequence_maj via le dictionnaire
                     frequences = [
-                        self._correspondance_frequence_texte.get(freq, freq)
+                        instance._correspondance_frequence_texte.get(freq, freq)
                         for freq in doc.frequence_maj or []
                     ]
 
@@ -2807,48 +2879,63 @@ class REE:
 
                 # Gestion des PJ à mettre dans le mail
                 if doc.nom_fichier is not None:
-                    listePJ.append(os.path.join(self._repertoire_documents_ree, doc.nom_fichier))            
+                    #listePJ.append(os.path.join(self._repertoire_documents_ree, doc.nom_fichier))            
+                    listePJ.append(config.REPERTOIRE_DOCUMENTS_REE / doc.nom_fichier)
         
         if listeInfos != "":
             listeInfos = "<ul> "+listeInfos+" </ul>\n"
+        #print(listeInfos)
 
-        #Remplacer les textes avec statut et listeInfos
 
+
+        # Mail en remplaçant les textes avec statut et listeInfos
         Mail.depuis_modele(
-            chemin_modele=self._chemin_mailtype_informationsAdministratives,
+            chemin_modele=config.CHEMIN_MAIL_DEMANDE_INFOS_ADMIN_REE,
             destinataires=destinataire,
             copies=copie,
             pieces_jointes=listePJ,
-            remplaceBalises=[["###statut###", statut], ["###listeInfos###", listeInfos]]
+            balises_a_remplacer=[["statut", statut], ["listeInfos", listeInfos]]
         )
 
 
 
     # === RECEPTION / TRAITEMENT DOC REE
-    def traiter_docs_REE(self) -> None:
+    @classmethod
+    def traiter_docs_REE(cls) -> None:
 
         # TODO : mettre à jour le fichier Excel des coordonnées des intervenants
         # TODO : mettre à jour le fichier Excel des AI
+        # TODO : il y aura de la recherche approximative de noms à faire
+
+        
+        instance = cls()
+        #instance._word_ficheAdministrative:FichierWord
 
         # On ouvre le word et on charge tous les command control (filedialog depuis "Download"). On le ferme
-        self._word_ficheAdministrative = FichierWord.depuisFichier()
+        instance._word_ficheAdministrative = FichierWord.depuisFichier()
         #print(self._word_ficheAdministrative)
 
         # TODO : Peut-être afficher NOM et prénoms pour que l'utilisateur redéfinisse quel nom et quel prénom écrire (peut-être enlever les prénos en sus)
 
         # On crée le répertoire dans le répertoire des REE s'il n'existe pas (ou assimilé) (NOM Prénom (Société - AAAA))
-        self._creer_repertoire_REE()
+        instance._creer_repertoire_REE()
         
         # L'utilisateur sélectionne tous les fichiers de la REE et on les déplace dans le répertoire idoine
-        fichiers_sortie = self._deplacer_fichiers(self._repertoire_sauvegarde_fichiersREE)
+        fichiers_sortie = instance._deplacer_fichiers(instance._repertoire_sauvegarde_fichiersREE)
+        if fichiers_sortie is None:
+            vlog.log_erreur("Aucun fichier sélectionné pour le déplacement dans le répertoire de la REE, sortie de la procédure REE", continuer=True)
+            return
 
         # On emplit le fichier Excel à transférer à Laetitia Da Mota à partir d'un modèle
-        self._remplit_excel_avecInfos_word()
+        instance._remplit_excel_avecInfos_word()
 
 
         # On ouvre l'Excel et le Word pour comparaison et adaptations manuelles
-        chemin_word = os.path.join(self._repertoire_sauvegarde_fichiersREE, os.path.basename(self._word_ficheAdministrative._chemin_fichier))
-        chemin_excel = os.path.join(self._repertoire_sauvegarde_fichiersREE, os.path.basename(self._chemin_modele_excel_ficheIntervenant))
+        # chemin_word = os.path.join(self._repertoire_sauvegarde_fichiersREE, os.path.basename(self._word_ficheAdministrative._chemin_fichier))
+        chemin_word = instance._repertoire_sauvegarde_fichiersREE / instance._word_ficheAdministrative._chemin_fichier.name
+        # chemin_excel = os.path.join(self._repertoire_sauvegarde_fichiersREE, os.path.basename(self._chemin_modele_excel_ficheIntervenant))
+        chemin_excel = instance._repertoire_sauvegarde_fichiersREE / config.CHEMIN_MODELE_EXCEL_FICHE_INTERVENANT.name
+        
         fichiers_sortie.append(chemin_excel)
         ouvrir_word_excel_cote_a_cote(chemin_word, chemin_excel, split_ecranPrincipal=True)  # on peut rajouter split_ecranPrincipal=True
 
@@ -2856,7 +2943,7 @@ class REE:
         input("🕒 Attente pour adaptations de l'Excel.\nAppuyez sur une touche après adaptation/sauvegarde de l'Excel REE pour continuer")
 
         # Dès que l'Excel est fermé, on prépare le mail pour Laetitia
-        self._envoyer_mail_gestionnaire_ree_instn(pj=fichiers_sortie)  # On peut aussi mettre delai=timedelta(days=30)
+        instance._envoyer_mail_gestionnaire_ree_instn(pj=fichiers_sortie)  # On peut aussi mettre delai=timedelta(days=30)
 
         # On met à jour le fichier Excel Liste AI formateurs.xlsx : onglet intervenant, on cherche et remplace la date de validité de l'attestation employeur sinon nouvelle ligne (recopier formule + format)
         # On met à jour le fichier Excel  avec la liste des intervenants :  on cherche et remplace les données mail, tel, Ville, la date de validité de l'attestation employeur... sinon nouvelle ligne (recopier formule + format)        
@@ -2870,17 +2957,17 @@ class REE:
         """
         # TODO : comment faire si pas de content control ?
         if all(k in self._word_ficheAdministrative.cc for k in ["Nom", "Prenoms", "RaisonSociale"]):
-            self._repertoire_sauvegarde_fichiersREE += f"\\{self._word_ficheAdministrative.cc['Nom'].upper()} {self._word_ficheAdministrative.cc['Prenoms'].title()} ({self._word_ficheAdministrative.cc['RaisonSociale'] if self._word_ficheAdministrative.cc['RaisonSociale'] != 'Raison sociale employeur principal' else 'CEA'} - {datetime.now().year})"
+            self._repertoire_sauvegarde_fichiersREE = config.REPERTOIRE_SAUVEGARDE_FICHIERS_REE / f"{self._word_ficheAdministrative.cc['Nom'].upper()} {self._word_ficheAdministrative.cc['Prenoms'].title()} ({self._word_ficheAdministrative.cc['RaisonSociale'] if self._word_ficheAdministrative.cc['RaisonSociale'] != 'Raison sociale employeur principal' else 'CEA'} - {datetime.now().year})"
         else :
-            print("⚠️ Certaines clés sont manquantes dans cc :", [k for k in ["Nom", "Prenoms", "RaisonSociale"] if k not in self._word_ficheAdministrative.cc])
+            vlog.log_erreur("⚠️ Certaines clés sont manquantes dans cc :", [k for k in ["Nom", "Prenoms", "RaisonSociale"] if k not in self._word_ficheAdministrative.cc])
         #print(self._repertoire_sauvegarde_fichiersREE)
         if not test:
-            os.makedirs(self._repertoire_sauvegarde_fichiersREE, exist_ok=True)
-            # TODO : self._repertoire_sauvegarde_fichiersREE.mkdir(parents=True, exist_ok=True)
+            # os.makedirs(self._repertoire_sauvegarde_fichiersREE, exist_ok=True)
+            self._repertoire_sauvegarde_fichiersREE.mkdir(parents=True, exist_ok=True)
         else :
             print(self._repertoire_sauvegarde_fichiersREE)
 
-    def _deplacer_fichiers(self, destination: str = None) -> list[str]:
+    def _deplacer_fichiers(self, destination: Path = None) -> list[Path]:
         """
         Ouvre un dialogue pour sélectionner des fichiers, puis les déplace vers un dossier choisi.
 
@@ -2889,7 +2976,7 @@ class REE:
                                         Si None, un dialogue s'ouvrira pour le choisir.
         """
 
-        fichiers_sortie:list[str] = []
+        fichiers_sortie:list[Path] = []
 
         # Fenêtre Tkinter cachée
         root = tk.Tk()
@@ -2909,9 +2996,10 @@ class REE:
                 return
 
         # Déplacement de chaque fichier
-        for fichier in fichiers:
-            nom_fichier = os.path.basename(fichier)
-            chemin_destination = os.path.join(destination, nom_fichier)
+        for fichier_str in fichiers:
+            fichier = Path(fichier_str)
+            nom_fichier:Path = fichier.name  # os.path.basename(fichier)
+            chemin_destination:Path = destination / nom_fichier  # os.path.join(destination, nom_fichier)
 
             try:
                 shutil.move(fichier, chemin_destination)
@@ -2932,8 +3020,8 @@ class REE:
         """
         # On ouvre le fichier Excel à remplir pour Laetitia Da Mota (c'est un modèle, on l'enregistrera avec le bon nom dans le répertoire idoine)
         excel_ficheIntervenant = FichierExcel.depuis_modele(
-            chemin_modele = self._chemin_modele_excel_ficheIntervenant,
-            chemin_fichier_sauv = os.path.join(self._repertoire_sauvegarde_fichiersREE, os.path.basename(self._chemin_modele_excel_ficheIntervenant)),
+            chemin_modele = config.CHEMIN_MODELE_EXCEL_FICHE_INTERVENANT,
+            chemin_fichier_sauv = self._repertoire_sauvegarde_fichiersREE / config.CHEMIN_MODELE_EXCEL_FICHE_INTERVENANT.name,  # os.path.join(self._repertoire_sauvegarde_fichiersREE, os.path.basename(self._chemin_modele_excel_ficheIntervenant)),
             charger_df = True
         )
         
@@ -2943,7 +3031,7 @@ class REE:
 
         # On pré-rempli le fichier Excel fiche intervenant grâce aux contecnt control du word et au dictionnaire
         nouvelle_ligne = {}
-        for col_df, cc_key in self._dict_colExcel_cc.items():
+        for col_df, cc_key in self._dict_colExcel_cc_V4.items():
             if cc_key is None:
                 # Pas de clé correspondante => valeur vide dans la DataFrame
                 nouvelle_ligne[col_df] = None
@@ -2979,9 +3067,9 @@ class REE:
         
 
         Mail.creer_mail(
-            destinataires=self._adresse_mail_gestionnaire_ree_INSTN,
-            sujet="Documents pour mise à jour IRIS", # Pimper avec le nom de l'intervenant
-            corps_html=self._corps_html_mail_gestionnaire_ree_INSTN.replace("###", self._word_ficheAdministrative.cc['Prenoms'].title()+" "+self._word_ficheAdministrative.cc['Nom'].upper()),
+            destinataires=config.ADRESSE_MAIL_GESTIONNAIRE_REE_INSTN,  # self._adresse_mail_gestionnaire_ree_INSTN,
+            sujet=f"Documents pour mise à jour IRIS de {self._word_ficheAdministrative.cc['Prenoms'].title()} {self._word_ficheAdministrative.cc['Nom'].upper()}", # Pimper avec le nom de l'intervenant
+            corps_html=remplacer_champs(config.CORPS_MAIL_GESTIONNAIRE_REE_INSTN, [["Prenoms", self._word_ficheAdministrative.cc['Prenoms'].title()], ["NOM", self._word_ficheAdministrative.cc['Nom'].upper()]]),  # self._corps_html_mail_gestionnaire_ree_INSTN.replace("###", self._word_ficheAdministrative.cc['Prenoms'].title()+" "+self._word_ficheAdministrative.cc['Nom'].upper()),
             pieces_jointes=pj,
             envoyer_mail=False  # envoie directement sans afficher
         )  
@@ -2989,10 +3077,10 @@ class REE:
     #  Pour aider à générer le dictionnaire des noms de colonne du fichier Excel REE
     def _generer_dictionnaire_depuis_excel(
         self,
-        chemin_fichier: str=None,
-        nomOngletQualifications: str=None,
-        nomOngletAssociationCC: str=None,
-        nomColonneCC: str=None,
+        chemin_fichier:Path=None,
+        nomOngletQualifications:str=None,
+        nomOngletAssociationCC:str=None,
+        nomColonneCC:str=None,
     ) -> None:
         """
         Génère et affiche un dictionnaire Python liant les colonnes Excel de l'onglet 'nomOngletQualifications'
@@ -3009,7 +3097,7 @@ class REE:
         import json
 
         if chemin_fichier is None :
-            chemin_fichier = self._chemin_modele_excel_ficheIntervenant
+            chemin_fichier = config.CHEMIN_MODELE_EXCEL_FICHE_INTERVENANT  # self._chemin_modele_excel_ficheIntervenant
         if nomOngletQualifications is None :
             nomOngletQualifications = "QualificationsREE"
         if nomOngletAssociationCC is None :
@@ -3681,7 +3769,7 @@ class Traiter_contactsApprentis:
 #  Fonctions globales INSTN
 ### --------------------------------------------------------------------
 
-def initialiser_PropExportIRIS_de_config() -> None:
+def initialiser_fichierConfig_ExportIRIS_standards() -> None:
     """
     Initialise les dataclass PropExportIRIS de config.py
     Je suis obligé de fonctionner comme ça car sinon :
@@ -3689,10 +3777,10 @@ def initialiser_PropExportIRIS_de_config() -> None:
        - instn.py importe config.py
     → Référence circulaire
     """
-    config.IRIS_SESSIONS = PropExportIRIS(**config.IRIS_SESSIONS_PARAMS)
-    config.IRIS_FORMATIONS = PropExportIRIS(**config.IRIS_FORMATIONS_PARAMS)
-    config.IRIS_VENTES = PropExportIRIS(**config.IRIS_VENTES_PARAMS)
-    config.IRIS_INSCRIPTIONS = PropExportIRIS(**config.IRIS_INSCRIPTIONS_PARAMS)
+    config.IRIS_SESSIONS = ConfigExportIRIS(**config.IRIS_SESSIONS_PARAMS)
+    config.IRIS_FORMATIONS = ConfigExportIRIS(**config.IRIS_FORMATIONS_PARAMS)
+    config.IRIS_VENTES = ConfigExportIRIS(**config.IRIS_VENTES_PARAMS)
+    config.IRIS_INSCRIPTIONS = ConfigExportIRIS(**config.IRIS_INSCRIPTIONS_PARAMS)
 
 def lire_fdc(chemin_fdc):
 
@@ -4108,8 +4196,8 @@ def demander_code_avec_renommage(typeCode:str, chemin:Path, renommage:Optional[C
 #  Initialisations variables globales communes
 ### --------------------------------------------------------------------
 
-# Requis pour avoir des PropExportIRIS dans config.py (dinon références circulaires à l'import)
-initialiser_PropExportIRIS_de_config()
+# Requis pour avoir des ConfExportIRIS dans config.py (dinon références circulaires à l'import)
+initialiser_fichierConfig_ExportIRIS_standards()
 
 # Pour couleur barres de progression
 #colorama.init(autoreset=True)

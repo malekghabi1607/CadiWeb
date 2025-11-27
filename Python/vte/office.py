@@ -1307,13 +1307,16 @@ class FichierWord:
         if chemin_fichier is None:
             root = Tk()
             root.withdraw()
-            chemin_fichier = Path(filedialog.askopenfilename(
+            chemin_fichier_str = filedialog.askopenfilename(
                 filetypes=[("Fichiers Word", "*.docx *.doc")],
                 title="Sélectionner un fichier Word"
-            ))
+            )
             root.destroy()
-            if not chemin_fichier:
-                raise ValueError("Aucun fichier sélectionné")
+            if not chemin_fichier_str:
+                #raise ValueError("Aucun fichier sélectionné")
+                vlog.log_erreur("Aucun fichier Word sélectionné (fiche administrative REE)")
+            else :
+                chemin_fichier = Path(chemin_fichier_str)
 
         repertoire = chemin_fichier.parent
 
@@ -1685,7 +1688,7 @@ class Mail:
         corps_html: Optional[str] = None,
         pieces_jointes: Optional[Union[str, List[str], pd.Series]] = None,
         envoyer_mail: bool = False,
-        remplaceBalises: Optional[List[List[str]]] = None,  #liste de couples [[texte_a_remplacer, texte_de_remplacement], ...]
+        balises_a_remplacer: Optional[List[List[str]]] = None,  #liste de couples [[texte_a_remplacer, texte_de_remplacement], ...]
     ) -> None:
         """
         Crée un mail Outlook à partir d'un modèle .msg et ajoute éventuellement
@@ -1712,9 +1715,12 @@ class Mail:
 
         # ✅ Si des adaptations sont fournies, on les applique dans le corps du mail
         corps = mail.HTMLBody
-        if remplaceBalises:
-            for ancien, nouveau in remplaceBalises:
-                corps = corps.replace(ancien, nouveau)
+
+        if balises_a_remplacer:
+            corps = remplacer_champs(corps, balises_a_remplacer)
+            #for ancien, nouveau in balises_a_remplacer:
+            #    corps = corps.replace(ancien, nouveau)
+                
 
 
         # si un corps est passé manuellement, il a la priorité

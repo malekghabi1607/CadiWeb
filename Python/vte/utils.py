@@ -774,9 +774,14 @@ def remplacer_champs(
 ) -> str:
     """
     Remplace dans une chaîne de texte des champs encadrés par des accolades (ou autre format) par leurs valeurs associées.
+    FOnctionne même si Word/Outlook a ajouté des <span> autour du texte à l'intérieur des accolades.
 
     Chaque champ à remplacer doit être écrit dans le texte sous la forme définie par `format_champ`.
     Exemple : "Bonjour {nom}, votre formation {formation} est prévue."
+
+    Exemples de balises gérées :
+    {listeInfos} vu dans Word/Outllok
+    qui serait en fait comme ceci dans le HTML : {<span class=SpellE>listeInfos</span>}
 
     Args:
         str_in (str): 
@@ -817,14 +822,25 @@ def remplacer_champs(
         >>> print(resultat3)
         Bonjour Bob !
     """
-    # Normalisation : si un seul remplacement est fourni sous forme [clé, valeur]
+    # Normalisation : si un seul remplacement sous forme [clé, valeur]
     if isinstance(liste_remplacements[0], str):
         liste_remplacements = [liste_remplacements]
 
     str_out = str_in
+
     for champ, valeur in liste_remplacements:
-        champ_formate = format_champ % champ
-        str_out = str_out.replace(champ_formate, str(valeur))
+
+        # Regex pour trouver :
+        # 1) {champ}
+        # 2) {<span ...>champ</span>} avec n'importe quel attribut
+        # On capture tout ce qui est entre { et }
+        pattern = re.compile(
+            r"\{(?:<[^>]+>)*" + re.escape(champ) + r"(?:</[^>]+>)*\}"
+        )
+
+        # Remplacement par la valeur fournie (str)
+        str_out = pattern.sub(str(valeur), str_out)
+
     return str_out
 
 def hash_df(df: pd.DataFrame) -> str:
@@ -863,6 +879,8 @@ def rechercheX_dataframe(
     
     # Aucun résultat
     return fallback() if callable(fallback) else fallback
+
+
 ### --------------------------------------------------------------------
 #  Chargement config
 ### --------------------------------------------------------------------

@@ -72,7 +72,96 @@ IRIS_INSCRIPTIONS_PARAMS = dict(
     nom_typeExport="Inscriptions",
     codeExport="R04500",
     repertoire_input=REPERTOIRE_EXTRACT_IRIS_GED,
-    nbLignes_avantET_input = 1
+    nbLignes_avantET_input = 1,
+
+    ordre_colonnes_modele=[
+        "N° Session", 
+        "Intitulé Session", 
+        "Trigramme formation", 
+        "Code IRIS", 
+        "Type de formation", 
+        "Année", 
+        "Trigramme RP", 
+        "Trigramme AF", 
+        "3ème élément de la référence", 
+        "Statut Session", 
+        "Lieu Session", 
+        "Modalité", 
+        "Type", 
+        "Resp pédagogique", 
+        "Affectation RP", 
+        "Organisatrice", 
+        "Domaine parent", 
+        "Participants MIN", 
+        "Participants MAX", 
+        "Durée (H) Session", 
+        "Durée (J) Session", 
+        "Date Début Session", 
+        "Année Début Session", 
+        "Mois Début Session", 
+        "Date Fin Session", 
+        "Année Fin Session", 
+        "Mois Fin Session", 
+        "Gestionnaire Session", 
+        "Lieu de formation", 
+        "Chef de projet", 
+        "Code Formation", 
+        "Ref. Formation", 
+        "Intitulé Formation", 
+        "Spécialité Formation", 
+        "Code Domaine", 
+        "Ref. Domaine", 
+        "Domaine", 
+        "Ref. Domaine principal", 
+        "Domaine principal", 
+        "Ref. Org. Facturation", 
+        "Intitulé Org. Facturation", 
+        "Dossier N°", 
+        "Statut Dossier", 
+        "N°Cde", 
+        "Statut Cde", 
+        "Organisme", 
+        "Commercial", 
+        "Client", 
+        "Secteur d'activité", 
+        "Catégorie  client", 
+        "Fidélité", 
+        "Autre critère", 
+        "Contact Client", 
+        "Mail contact client", 
+        "Fonction contact client", 
+        "Civilité stagiaire", 
+        "Nom Stagiaire", 
+        "Prénom Stagiaire", 
+        "Sexe Stagiaire", 
+        "Age Stagiaire", 
+        "Date de naissance", 
+        "Mail Stagiaire", 
+        "Nationalité Stagiaire", 
+        "Etablissement Stagiaire", 
+        "SIRET", 
+        "Entité Juridique Stagiaire", 
+        "Affect. CEA / Société", 
+        "CSP  Stagiaire", 
+        "Contrat Stagiaire", 
+        "Fonction Stagiaire", 
+        "Référence Stagiaire", 
+        "Motif annulation", 
+        "Statut de la qualif.", 
+        "Pédagogie terminée", 
+        "Financier terminé", 
+        "Planifiée (H)", 
+        "Qualifiée (H)", 
+        "Réalisée (H)", 
+        "Planifiée (J)", 
+        "Qualifiée (J)", 
+        "Réalisée (J)", 
+        "Prévu", 
+        "Réalisé", 
+        "Facturé", 
+        "A facturer", 
+        "Réglé", 
+    ]
 )
 
 # Sera rempli après import de instn.py depuis instn.py sinon boucle récursive (méthode .initialiser_PropExportIRIS_de_config() )
@@ -134,6 +223,31 @@ CHEMIN_WORD_BILAN_FORMATION_OUTPUT:Path = REPERTOIRE_BILANS / "P07-Pr05-F06-Bila
 
 # Bilan en sortie après remplissage
 chemin_word_bilan_formation_output = r'C:\Users\vt238770\Documents\_CEA\Prog\Modèles\Bilan formation - output.docx'
+
+
+
+
+
+
+
+
+###
+# === REE ===
+###
+REPERTOIRE_DOCUMENTS_REE:Path = REPERTOIRES_MODELES / "REE"  #Path(r"\\harmonie\instn\uem\_Documents_communs\Formations\Formateurs\0.Docs à envoyer")  # Répertoire avec les docs REE
+#_chemin_mailtype_informationsAdministratives
+CHEMIN_MAIL_DEMANDE_INFOS_ADMIN_REE:Path = REPERTOIRES_MODELES / "REE" / "Demande des informations administratives.msg" # Path(r"\\harmonie\instn\uem\_Documents_communs\Formations\Formateurs\Mails types\Demande des informations administratives.msg")  # Message type à envoyer aux intervenants
+#_repertoire_sauvegarde_fichiersREE
+REPERTOIRE_SAUVEGARDE_FICHIERS_REE:Path = Path("//harmonie/INSTN/UEM/_Documents_communs/Formations/Formateurs/1.Intervenants - Documents administratifs") # Lieu où sauvegarder les fichiers de l'intervenant
+#_chemin_modele_excel_ficheIntervenant:str
+CHEMIN_MODELE_EXCEL_FICHE_INTERVENANT:Path = REPERTOIRES_MODELES / "REE" / "P09_Pr01_Ta.E_Grille des critères de qualification des compétences_V1.xlsx"  # Path(r"\\harmonie\INSTN\UEM\_Documents_communs\Formations\Formateurs\P09-Pr01-Qualifier les ressources enseignantes\P09_Pr01_Ta.E_Grille des critères de qualification des compétences_V1.xlsx")  # Fichier Excel à remplir pour Laetitia Da Mota (RH INSTN qui s'occupe de rentrer les REE dans IRIS)
+#_adresse_mail_gestionnaire_ree_INSTN
+ADRESSE_MAIL_GESTIONNAIRE_REE_INSTN:str = "vacataires.instn@cea.fr"
+#_corps_html_mail_gestionnaire_ree_INSTN:str
+CORPS_MAIL_GESTIONNAIRE_REE_INSTN:str = "<p>Bonjour Laëtitia,</p><p>Je t’ai mis en PJ les documents pour intégrer/mettre à jour la fiche IRIS de {Prenoms} {NOM}.</p><p>Je te remercie, passe une excellente journée :)</p>"
+    
+
+
 
 
 
