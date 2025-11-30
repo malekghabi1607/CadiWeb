@@ -1216,11 +1216,29 @@ def html_vers_texte(html: str) -> str:
 
     return texte_final
 
-def convertir_tuple_path(input:Path|Tuple[Path]) -> Tuple[Path]:
-        if isinstance(input, Path):
-            return (input,)
-        else:
-            return input
+def convertir_tuple_path(input:str | Path | tuple[str|Path] | list[str|Path]) -> tuple[Path]:
+    """
+    Convertit en Tuple[Path] un str, un Path, un Tuple[str|Path] ou une List[str|Path]
+    """
+    if isinstance(input, str):
+        return (Path(input),)
+    elif isinstance(input, (tuple, list)) and all(isinstance(i, str) for i in input):
+        return tuple(Path(i) for i in input)
+    elif isinstance(input, Path):
+        return (input,)
+    elif isinstance(input, (tuple, list)) and all(isinstance(i, Path) for i in input):
+        return tuple(i for i in input)
+    else:
+        return input
+
+def convertir_tuple_str(input:str|tuple[str]) -> tuple[str]:
+    """
+    Convertit un str ou un Tuple[str] en Tuple[str]
+    """
+    if isinstance(input, str):
+        return (input,)
+    else:
+        return input
 
 def convertir_liste_str(x: Any) -> list[str]:
     """
