@@ -1,6 +1,8 @@
 from vte.instn import *
-#from vte.ihm_console import IHM_console
-#from vte.ihm_tkinter import IHMTkinter
+from vte.ihm_console import IHM_console
+
+from colorama import init
+init(autoreset=True)
 
     
 # === Ecrire nouveaux extracts IRIS complets (qui concatène plusieurs extracts individuels) ===
@@ -11,14 +13,70 @@ from vte.instn import *
 # COPIER-COLLER ventes depuis référence (GED) sans écraser car petits bugs sur en-têtes de certains fichiers
 # IRIS.mettreAJourTousLesExportsIRIS_fileDialog(("Sessions", "Formations", "Ventes", "Inscriptions"))
 
+MODE = "console"
+
+depuis_config:bool = False
+MENUS = {
+    "Tout traiter": {
+        "action": IRIS.concatener_exportsIRIS_plusieursTypes,
+        "kwargs": {"typesExports":("Sessions", "Formations", "Ventes", "Inscriptions")},
+        "demander": ["depuis_config"],
+        "indications":"Entrez :\n   - 0 pour sélection manuelle des fichiers (filedialog)\n   - 1 pour sélection automatique (emploi de config_extractsIRIS)"
+    },
+    
+    "Traiter sessions (R04110)": {
+        "action": IRIS.concatener_exportsIRIS_plusieursTypes,
+        "kwargs": {"typesExports":"Sessions"},
+        "demander": ["depuis_config"],
+        "indications":"Entrez :\n   - 0 pour sélection manuelle des fichiers (filedialog)\n   - 1 pour sélection automatique (emploi de config_extractsIRIS)"
+    },
+    "Traiter Formations (R0304)": {
+        "action": IRIS.concatener_exportsIRIS_plusieursTypes,
+        "kwargs": {"typesExports":"Formations"},
+        "demander": ["depuis_config"],
+        "indications":"Entrez :\n   - 0 pour sélection manuelle des fichiers (filedialog)\n   - 1 pour sélection automatique (emploi de config_extractsIRIS)"
+    },
+    "Traiter Ventes (R04301)": {
+        "action": IRIS.concatener_exportsIRIS_plusieursTypes,
+        "kwargs": {"typesExports":"Ventes"},
+        "demander": ["depuis_config"],
+        "indications":"Entrez :\n   - 0 pour sélection manuelle des fichiers (filedialog)\n   - 1 pour sélection automatique (emploi de config_extractsIRIS)"
+    },
+    "Traiter Inscriptions (R04500)": {
+        "action": IRIS.concatener_exportsIRIS_plusieursTypes,
+        "kwargs": {"typesExports":"Inscriptions"},
+        "demander": ["depuis_config"],
+        "indications":"Entrez :\n   - 0 pour sélection manuelle des fichiers (filedialog)\n   - 1 pour sélection automatique (emploi de config_extractsIRIS)"
+    }
+
+    
+}
+
 def main():
+    vlog.print("Info", "*************\nBienvenue dans le script pour concaténer des fichiers IRIS.\n*************", style=["vert clair"])
+    """
+    ihm = IHM_console({})  # Pas besoin de menu ici
+
+    # On demande si on veut être en auto ou en filedialog
+    depuis_config = ihm.demander_saisie(
+    texte="Choisissez le mode de sélection :\n1) Sélection manuelle (filedialog)\n2) Sélection automatique (emploi de config_extractsIRIS)\n",
+    type_attendu=int
+    )
+
+    # Convertir la réponse en booléen
+    if depuis_config == 1:
+        depuis_config = False
+    elif depuis_config == 2:
+        depuis_config = True
+
+
+    """
+    ihm = IHM_console(MENUS)
+    ihm.afficher_menu()
 
 
 
 
-
-
-    print("")
 
 
 ### --------------------------------------------------------------------
@@ -70,8 +128,8 @@ def test07():
     
 
 if __name__ == "__main__":
-    test07()
-    #main()
+    #test07()
+    main()
 
 
 

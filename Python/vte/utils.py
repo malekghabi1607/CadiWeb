@@ -723,6 +723,8 @@ def chemin_vers_unc(path:Path|str, retour_type:Type[Path]|Type[str]=Path) -> Pat
         print(f"Conversion UNC échouée (code erreur : {result}). Chemin renvoyé tel quel.")
         return retour_type(path)
 
+
+
 ### --------------------------------------------------------------------
 #  Divers
 ### --------------------------------------------------------------------
@@ -1349,6 +1351,8 @@ def mois_fr_depuis_date(date_val: Union[datetime, str, int, float, pd.Timestamp]
 def minuscule_premiere_lettre(s: str) -> str:
     """Met en minuscule uniquement la première lettre d'une chaîne."""
     return s[:1].lower() + s[1:] if s else s
+
+
 
 ### --------------------------------------------------------------------
 #  Fenêtres / Popup

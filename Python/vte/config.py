@@ -38,7 +38,7 @@ REPERTOIRE_SPECS:Path = REPERTOIRE_CONCEPTION / "specifications-pedagogiques-et-
 ###
 # === EXTRACT IRIS ===
 ###
-REPERTOIRE_EXTRACT_IRIS_GED:Path = Path("//instnt/HOME/REFERENCE/IRIS - rapports de synthese")  # Répertoire extracts originaux
+REPERTOIRE_EXTRACT_IRIS_GED:Path = Path("//instnt/HOME/REFERENC/IRIS - rapports de synthese")  # Répertoire extracts originaux
 REPERTOIRE_EXTRACT_IRIS_LOCAL:Path = Path("//harmonie/instn/uem/_Echanges/VTE/Prog/IRIS/Extracts originaux")  # Répertoire local extracts originaux (à causes de 2/3 adaptations d'exports mal fichus/buggés et que je ne pouvais pas mettre moi sur la GED après réparation)
 REPERTOIRE_EXCEL_IRIS_OUTPUT:Path = Path("//harmonie/instn/uem/_Echanges/VTE/Prog/IRIS/Extracts complets")  # Répertoire avec les extracts concaténés et dans les modèles
 
