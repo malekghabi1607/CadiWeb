@@ -48,3 +48,6 @@ python -m PyInstaller `
 OU
 
 python -m PyInstaller --onefile --paths "C:\Users\vt238770\Documents\_CEA\Prog\Python\apps\gestionBilanSession\vte" --distpath "\\harmonie\INSTN\UEM\_Echanges\VTE\Prog\gestionBilanSession" "C:\Users\vt238770\Documents\_CEA\Prog\Python\apps\gestionBilanSession\gestionBilanSessionV3.py"
+
+
+python -m PyInstaller --onefile --paths "C:\Users\vt238770\Documents\_CEA\Prog\Python\apps\gestionIRIS\vte" --distpath "\\harmonie\INSTN\UEM\_Echanges\VTE\Prog\gestionIRIS" "C:\Users\vt238770\Documents\_CEA\Prog\Python\apps\gestionIRIS\gestionIRIS.py"
