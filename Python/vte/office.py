@@ -818,14 +818,14 @@ class FichierExcel:
 
     @classmethod
     def depuis_fichier(cls,
-                      chemin_fichier: Optional[Path] = None,
+                      chemin_fichier: Optional[Path|str] = None,
                       avec_ouverture_wb: bool = True,
                       charger_tableau: bool = True,
                       nom_onglet: Optional[str] = None,
                       nom_tableau: Optional[str] = None,
                       nbLignes_avantET: int = 0,
                       charger_df: bool = True,
-                      repertoire_recherche_ini:Optional[Path] = None) -> FichierExcel:
+                      repertoire_recherche_ini:Optional[Path|str] = None) -> FichierExcel:
         """
         Fabrique un FichierExcel à partir d'un chemin. Par défaut ouvre le workbook et 
         charge les tableaux structurés (ou un seul tableau, si nom_onglet fourni).
@@ -840,8 +840,11 @@ class FichierExcel:
             charger_df = False
 
         # Si aucun fichier d'entrée, alors l'utilisateur le pointe avec filedialog
-        if not chemin_fichier:
-            chemin_fichier = cls.choisirFichiers_filedialog(initialdir=repertoire_recherche_ini)
+        if chemin_fichier:
+            if isinstance(chemin_fichier, str):
+                chemin_fichier = Path(chemin_fichier)
+        else :
+            chemin_fichier = cls.choisirFichiers_filedialog(initialdir=repertoire_recherche_ini if isinstance(repertoire_recherche_ini, Path) else Path(repertoire_recherche_ini))
 
         instance = cls.depuis_repertoire(chemin_fichier.parent)
         instance._chemin_fichier = chemin_fichier

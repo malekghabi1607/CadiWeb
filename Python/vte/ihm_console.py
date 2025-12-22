@@ -60,6 +60,79 @@ class IHM_console:
         self.menus = menus
         self.contexte = contexte
 
+
+
+    @classmethod
+    def depuis_sous_menu(cls, liste, action=None, attr=None, titre="Sous-menu"):
+        """
+        Constructeur rapide pour créer un menu console à partir d'une liste
+        et récupérer directement le choix utilisateur.
+
+        Exemple d’usage :
+        -----------------
+        >>> mapping = {"UGA": Traiter_contactsApprentis.UGA, "L3D": Traiter_contactsApprentis.L3D}
+        >>> contexte = IHM_console.depuis_sous_menu(
+        ...     liste=list(mapping.keys()),
+        ...     action=lambda choix: mapping[choix](),
+        ...     titre="Choisir le contexte"
+        ... )
+        (renvoie l’objet contexte sélectionné)
+
+        Paramètres
+        ----------
+        liste : list
+            Liste d’éléments à afficher (chaînes ou objets)
+        action : callable
+            Fonction à exécuter sur l’élément choisi. Peut renvoyer un résultat.
+        attr : str | None
+            Si non None, on affiche getattr(obj, attr) pour chaque élément.
+            Si None, on affiche directement str(obj).
+        titre : str
+            Titre affiché pour le sous-menu.
+
+        Retour
+        ------
+        Tout objet renvoyé par `action(élément_choisi)`, ou l’élément lui-même si action=None.
+        None si l’utilisateur quitte (choix 0).
+        """
+        print(f"\n--- {titre} ---")
+
+        # Préparation du sous-menu
+        if attr:
+            sous_menu_temp = {getattr(obj, attr): obj for obj in liste}
+        else:
+            sous_menu_temp = {str(obj): obj for obj in liste}
+
+        # Boucle d’interaction utilisateur
+        while True:
+            options = list(sous_menu_temp.keys())
+            for i, opt in enumerate(options, start=1):
+                print(f"{i}. {opt}")
+            print("0. Retour")
+
+            try:
+                choix = int(input("Votre choix : "))
+            except ValueError:
+                print("⚠️ Entrée invalide, merci de saisir un nombre.")
+                continue
+
+            if choix == 0:
+                return None  # Quitter sans rien renvoyer
+
+            if not (1 <= choix <= len(options)):
+                print("⚠️ Choix invalide, réessayez.")
+                continue
+
+            label = options[choix - 1]
+            element_choisi = sous_menu_temp[label]
+
+            # Retourne le résultat de l’action si fournie, sinon l’élément choisi
+            if action:
+                return action(element_choisi)
+            else:
+                return element_choisi
+
+
     # -------------------------------------------------------------------------
     # MÉTHODE : demander_saisie
     # -------------------------------------------------------------------------
