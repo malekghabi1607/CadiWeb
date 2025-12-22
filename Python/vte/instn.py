@@ -273,6 +273,9 @@ class ConfigExportIRIS:
             f"{afficher_infos('Output', self._output)}"
         )
 
+
+
+
 class IRIS:
     """
     C'est la classe qui contient l'environnement pour bosser sur des fichiers Exports IRIS
@@ -763,14 +766,17 @@ class IRIS:
                         )
 
     @staticmethod
-    def charger_excel_IRIS_sessions(fe_IRIS_sessions:Optional[FichierExcel]=None) -> FichierExcel:
+    def charger_excel_IRIS_sessions(fe_IRIS_sessions:Optional[FichierExcel]=None, chemin_IRIS_sessions:Optional[Path]=None) -> FichierExcel:
         """
         Retourne l’extract IRIS sessions s'il n'existe pas déjà.
         """
         if fe_IRIS_sessions is None:
             timer.debut("Lecture fichier IRIS sessions")
-            chemin_iris_sessions = IRIS.choisir_fichier_IRIS_sessions()
-            fe_IRIS_sessions = FichierExcel.depuis_fichier(chemin_fichier=chemin_iris_sessions)
+
+            if chemin_IRIS_sessions is None:
+                chemin_IRIS_sessions = IRIS.choisir_fichier_IRIS_sessions()
+
+            fe_IRIS_sessions = FichierExcel.depuis_fichier(chemin_fichier=chemin_IRIS_sessions)
             timer.fin()
 
         return fe_IRIS_sessions
@@ -886,8 +892,6 @@ class IRIS:
     @property
     def _cei(self) -> ConfigExportIRIS:
         return self._dict_exports_IRIS["ConfigExportIRIS"][self._typeExport]
-
-
 
 
     # ============================
@@ -3013,8 +3017,177 @@ class BilanSession:
         else:
             self._codes_IRIS[0] = valeur
 
-
 class BilanFormation:
+    # === VARIABLES PARTAGÉES ENTRE TOUTES LES INSTANCES
+    _fe_IRIS_sessions:Optional[FichierExcel] = None  # Fichier Excel qui contient les extracts IRIS Sessions (ou a minima celles de la période en cours)
+
+
+
+
+
+    def __init__(self, trigramme_formation:str, annee:int):
+        self._annee:int = annee
+        self._trigramme_formation:str = trigramme_formation
+
+
+    # =========================
+    # === Propriétés === 
+    # =========================
+    @property
+    def _df_sessions(self) -> pd.DataFrame:
+        return self._fe_IRIS_sessions._tableaux[IRIS._SESSIONS._nom_typeExport]._df
+
+    @property
+    def _df_sessions_filtre(self) -> pd.DataFrame:
+        return self._df_sessions[(self._df_sessions['Trigramme formation'] == self._trigramme_formation) & (self._df_sessions['Année début ses.'] == self._annee)]
+
+
+class BilanFormation_V3(BilanFormation):
+    """
+    C'est la classe qui contient tous les éléments de ma formation pour mon bilan
+
+    TODO j'en suis là
+    ? Exploiter export formation plutôt que export sessions pour les valeurs par défaut nmin/max...
+    """
+    def __init__(self, trigramme_formation:str, annee:int):
+        super().__init__(trigramme_formation, annee)
+
+        #Liste des champs de fusion du word
+        #instance._annee:int = annee
+        self._titreFormation:str #  Sessions
+        #instance._trigramme_formation:str = trigramme_formation
+        self._date_creationFormation:Optional[datetime] = None  # FdC
+        self._rp:str = ""  # Sessions
+        self._rt:str = ""
+        self._min_participants_fdc:int = -1  # FdC
+        self._prevus_participants_fdc:int = -1  # FdC
+        self._max_participants_fdc:int = -1  # FdC
+
+        self._nb_sessions_nm1:int = -1  # Sessions
+        self._nb_sessions_n:int = -1  # Sessions
+
+        self._nb_apprenants_nm1:int = -1  # Sessions
+        self._nb_apprenants_n:int = -1  # Sessions
+
+        self._prix_nm1:float = -1  # Offre formation / left join avec Sessions sur "Réf. Formation" → On récupère Intitulé de l'offre (des fois plusieurs par trigramme) Type tarif OffreFormation.Montant # Todo rajouter année au traitement / concaténation de OffreFormation
+        self._prix_n:float = -1  # Offre formation / left join avec Sessions sur "Réf. Formation" → On récupère Intitulé de l'offre (des fois plusieurs par trigramme) Type tarif OffreFormation.Montant # Todo rajouter année au traitement / concaténation de OffreFormation
+
+        self._satisfactionGlobale_nm1:float = -1  # EvalStat
+        self._satisfactionGlobale_n:float = -1  # EvalStat
+        self._satisfactionGlobale_n_com:str = -1  # EvalStat
+
+        self._qualiteAnimations_nm1:float = -1  # EvalStat
+        self._qualiteAnimations_n:float = -1  # EvalStat
+        self._qualiteAnimations_n_com:str = -1  # EvalStat
+
+        self._qualiteMoyensPedagogiques_nm1:float = -1  # EvalStat
+        self._qualiteMoyensPedagogiques_n:float = -1  # EvalStat
+        self._qualiteMoyensPedagogiques_n_com:str = -1  # EvalStat
+
+
+        #####
+        # Exploitation de l'extract IRIS sessions
+        #####
+        
+        # TODO à virer après les phases de test
+        chemin_IRIS_sessions = Path(r"R:\_Echanges\VTE\Prog\IRIS\Extracts complets\TEST 948-R04110_Sessions-COMPLET-2025.10.22.xlsx")
+
+        # On charge le fichier IRIS Sessions si non déjà ouvert
+        self._fe_IRIS_sessions = IRIS.charger_excel_IRIS_sessions(fe_IRIS_sessions=self._fe_IRIS_sessions, chemin_IRIS_sessions=chemin_IRIS_sessions)
+        
+        self._titreFormation:str #  Sessions
+        self._rp:str = ""  # Sessions
+
+        self._nb_sessions_nm1:int = -1  # Sessions
+        self._nb_sessions_n:int = -1  # Sessions
+
+        self._nb_apprenants_nm1:int = -1  # Sessions
+        self._nb_apprenants_n:int = -1  # Sessions
+
+
+
+        # Trier par date pour avoir la plus récente en 1ère ligne
+        df_sorted = self._df_sessions_filtre.sort_values("Date début ses.", ascending=False)
+
+
+        # Trouver la ligne avec la date la plus récente
+        ligne_plus_recente = df_sorted.iloc[0]
+        # Exraire les données stockées sur une ligne
+        [self._titreFormation, self._min_participants_sessions, self._max_participants_sessions, self._depassementAutorise_participants_sessions] = ligne_plus_recente[["Session", "Min.", "Max.", "Dépass. autorisé"]]
+        
+
+
+        # Pour obtenir la liste des RP et de leurs lieux
+        # Grouper et prendre la première occurrence (la plus récente)
+        grouped = df_sorted.groupby("Nom responsable pédag.").first()
+
+        # Formater les informations
+        formatted_info = (
+            grouped["Prénom responsable pédag."] + " " +
+            grouped["Nom responsable pédag."] + " (" +
+            grouped["Lieu principal"] + ")"
+        )
+
+        # Joindre avec des virgules
+        self._lieuxFormation = ", ".join(formatted_info)
+        #print(self._lieuxFormation)
+
+
+
+        #####
+        # Exploitation de la fiche de coûts
+        #####
+        self._date_creationFormation:Optional[datetime] = None  # FdC
+
+        self._min_participants_fdc:int = -1  # FdC
+        self._prevus_participants_fdc:int = -1  # FdC
+        self._max_participants_fdc:int = -1  # FdC
+
+
+
+
+
+        #####
+        # Offre formation / left join avec Sessions
+        #####
+        self._prix_nm1:float = -1  # Offre formation / left join avec Sessions sur "Réf. Formation" → On récupère Intitulé de l'offre (des fois plusieurs par trigramme) Type tarif OffreFormation.Montant # Todo rajouter année au traitement / concaténation de OffreFormation
+        self._prix_n:float = -1  # Offre formation / left join avec Sessions sur "Réf. Formation" → On récupère Intitulé de l'offre (des fois plusieurs par trigramme) Type tarif OffreFormation.Montant # Todo rajouter année au traitement / concaténation de OffreFormation
+
+        
+
+
+
+        #####
+        # Exploitation de EvalStat
+        #####
+        self._satisfactionGlobale_nm1:float = -1  # EvalStat
+        self._satisfactionGlobale_n:float = -1# EvalStat
+        self._satisfactionGlobale_n_com:str = -1# EvalStat
+
+        self._qualiteAnimations_nm1:float = -1  # EvalStat
+        self._qualiteAnimations_n:float = -1  # EvalStat
+        self._qualiteAnimations_n_com:str = -1  # EvalStat
+
+        self._qualiteMoyensPedagogiques_nm1:float = -1  # EvalStat
+        self._qualiteMoyensPedagogiques_n:float = -1  # EvalStat
+        self._qualiteMoyensPedagogiques_n_com:str = -1  # EvalStat
+
+
+        
+
+
+
+        #####
+        # ? Je ne sais pas où le trouver dans IRIS
+        #####
+        self._rt:str = ""
+
+
+
+
+        
+
+class BilanFormation_VTE:
     """
     C'est la classe qui contient tous les éléments de ma formation pour mon bilan
 
@@ -3852,7 +4025,7 @@ class Traiter_contactsApprentis:
         prefixe_sujet = "Master IN - Suivi d'alternance"
         mail_responsables_univ = "master-in-responsables@univ-grenoble-alpes.fr"
 
-        chemin_modele_mail_priseContact = r"C:\Users\vt238770\Documents\_CEA\Modèles adaptés\Mails\Master IN\Master IN - Tutorat en entreprise - Prise de contact.msg"
+        chemin_modele_mail_priseContact = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\Modèles\Tutorat\Master IN\Master IN - Tutorat en entreprise - Prise de contact.msg"
 
         chemin_fichier_etudiants =  fr"\\instnt\partage\FORMATIONS_I\GDRA - Master IN (parcours ADIN-GDRA-SN)\{annee_scolaire}\1-dossier etudiants\Master ADIN - {annee_scolaire.replace('-', '_')}.xlsx"
         
@@ -3865,21 +4038,21 @@ class Traiter_contactsApprentis:
             "Engagement des parties", "Entretien de prise de fonction", "1ère visite en entreprise", "2ème visite en entreprise", "Fiche évaluation 1", "Fiche évaluation 2"]
 
         # Entretiens
-        prise_de_fonction = cls.PropEntretien(
+        suivi_1 = cls.PropEntretien(
             sujet = "Entretien de prise de fonction",
-            chemin_modele = r"C:\Users\vt238770\Documents\_CEA\Modèles adaptés\Mails\Master IN\Master IN - Suivi d'alternance - Entretien.oft",
+            chemin_modele = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\Modèles\Tutorat\Master IN\Master IN - Suivi d'alternance - Entretien.oft",
             duree = timedelta(hours=0, minutes=45),
             date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=41) # (Autour du 6 octobre : dernière semaine de la première période en entreprise → A faire avant mi-novembre)
         )
         
-        premiere_visite = cls.PropEntretien(
+        suivi_2 = cls.PropEntretien(
             sujet = "1ère visite en entreprise",
             chemin_modele = r"C:\Users\vt238770\Documents\_CEA\Modèles adaptés\Mails\Master IN\Master IN - Suivi d'alternance - Entretien.oft",
             duree = timedelta(hours=1),
             date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=51) # (Autour du 15 décembre : dernière semaine avant vacances Noël et reprise école → A faire avant mi-janvier)
         )
 
-        deuxieme_visite = cls.PropEntretien(
+        suivi_3 = cls.PropEntretien(
             sujet = "2ème visite en entreprise",
             chemin_modele = r"C:\Users\vt238770\Documents\_CEA\Modèles adaptés\Mails\Master IN\Master IN - Suivi d'alternance - Entretien.oft",
             duree = timedelta(hours=1),
@@ -3918,9 +4091,9 @@ class Traiter_contactsApprentis:
         instance._df_etudiants = instance._df_etudiants[instance._df_etudiants["Ma fonction de suivi de l'alternant"] == "Tuteur"]
 
         # RDV entretiens
-        instance._entretiens.append(prise_de_fonction)
-        instance._entretiens.append(premiere_visite)
-        instance._entretiens.append(deuxieme_visite)
+        instance._entretiens.append(suivi_1)
+        instance._entretiens.append(suivi_2)
+        instance._entretiens.append(suivi_3)
 
         # Mail + RDV de rappel fiche évaluation TODO : faire liste
         instance._fichiersARenvoyer.append(ficheEvaluation1)
