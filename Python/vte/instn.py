@@ -3951,6 +3951,9 @@ class Traiter_contactsApprentis:
     TODO :
        - Pouvoir faire un RDV Skpe (lié à classe RDV_outlook)
        - Ouvrir un mail vide, on le remplit, on sauve, et ça envoie à tous les apprentis et tuteurs
+       - Heures RDV avec rappel pour appréciations = 7h00-7h30 → Faire 8h-8h
+       - Si pb pour aller rechercher la PJ : faire un file picker
+       - Quid si mails tutoiement
 
     Validation :
        - mail de premier contact (à partir d'un modèle .msg) → Oui mais TODO signature à enlever
@@ -4035,26 +4038,26 @@ class Traiter_contactsApprentis:
             "Cursus", 
             "Nom", "Prénom", "Mail apprenti", "Téléphone apprenti", 
             "Entreprise ", "Lieu entreprise", "Nom TE", "Prénom TE", "Mail TE", "Téléphone TE", "Ma fonction de suivi de l'alternant", 
-            "Engagement des parties", "Entretien de prise de fonction", "1ère visite en entreprise", "2ème visite en entreprise", "Fiche évaluation 1", "Fiche évaluation 2"]
+            "Engagement des parties", "Suivi n°1 : prise de fonction", "Suivi n°2", "Suivi n°3", "Fiche évaluation 1", "Fiche évaluation 2"]
 
         # Entretiens
         suivi_1 = cls.PropEntretien(
-            sujet = "Entretien de prise de fonction",
+            sujet = "Suivi n°1 : prise de fonction",
             chemin_modele = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\Modèles\Tutorat\Master IN\Master IN - Suivi d'alternance - Entretien.oft",
             duree = timedelta(hours=0, minutes=45),
             date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=41) # (Autour du 6 octobre : dernière semaine de la première période en entreprise → A faire avant mi-novembre)
         )
         
         suivi_2 = cls.PropEntretien(
-            sujet = "1ère visite en entreprise",
-            chemin_modele = r"C:\Users\vt238770\Documents\_CEA\Modèles adaptés\Mails\Master IN\Master IN - Suivi d'alternance - Entretien.oft",
+            sujet = "Suivi n°2",
+            chemin_modele = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\Modèles\Tutorat\Master IN\Master IN - Suivi d'alternance - Entretien.oft",
             duree = timedelta(hours=1),
             date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=51) # (Autour du 15 décembre : dernière semaine avant vacances Noël et reprise école → A faire avant mi-janvier)
         )
 
         suivi_3 = cls.PropEntretien(
-            sujet = "2ème visite en entreprise",
-            chemin_modele = r"C:\Users\vt238770\Documents\_CEA\Modèles adaptés\Mails\Master IN\Master IN - Suivi d'alternance - Entretien.oft",
+            sujet = "Suivi n°3",
+            chemin_modele = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\Modèles\Tutorat\Master IN\Master IN - Suivi d'alternance - Entretien.oft",
             duree = timedelta(hours=1),
             date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=17) # (Autour du 20 avril : dernière semaine reprise école → A faire avant fin mai)
         )
@@ -4062,14 +4065,14 @@ class Traiter_contactsApprentis:
         # Fichiers à renvoyer
         ficheEvaluation1 = cls.PropFichierARenvoyer(
             sujet = "Fiche évaluation 1",
-            chemin_fichier = r"\\instnt\partage\FORMATIONS_I\GDRA - Master IN (parcours ADIN-GDRA-SN)\2024-2025\9-stages\Fiche_Evaluation_alternance_M2_Ingénierie_Nucléaire_janvier.docx",
+            chemin_fichier = r"\\instnt\partage\FORMATIONS_I\GDRA - Master IN (parcours ADIN-GDRA-SN)\2025-2026\9-stages\Fiche_Evaluation_alternance_M2_Ingénierie_Nucléaire_janvier.docx",
             periode = "mi-année",
-            deadline_retour = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=6) # (Autour du 5 février)
+            deadline_retour = datetime(2026, 1, 27) #RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=6) # (Autour du 5 février)
         )
         
         ficheEvaluation2 = cls.PropFichierARenvoyer(
             sujet = "Fiche évaluation 2",
-            chemin_fichier = r"\\instnt\partage\FORMATIONS_I\GDRA - Master IN (parcours ADIN-GDRA-SN)\2024-2025\9-stages\Fiche_Evaluation_alternance_M2_Ingénierie_Nucléaire_aout.docx",
+            chemin_fichier = r"\\instnt\partage\FORMATIONS_I\GDRA - Master IN (parcours ADIN-GDRA-SN)\2025-2026\9-stages\Fiche_Evaluation_alternance_M2_Ingénierie_Nucléaire_aout.docx",
             periode = "fin d'année",
             deadline_retour = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=35) # (Autour du 25 août)
         )
@@ -4124,7 +4127,7 @@ class Traiter_contactsApprentis:
         prefixe_sujet = "LP3D - Suivi d'alternance"
         mail_responsables_univ = "isabelle.techer@unimes.fr"
 
-        chemin_modele_mail_priseContact = r"C:\Users\vt238770\Documents\_CEA\Modèles adaptés\Mails\LP3D\LP3D - Tutorat en entreprise - Prise de contact.msg"
+        chemin_modele_mail_priseContact = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\Modèles\Tutorat\LP3D\LP3D - Tutorat en entreprise - Prise de contact.msg"
 
         chemin_fichier_etudiants =  fr"\\instnt\partage\FORMATIONS_I\LP3D+-démantelement désamiantage dépollution\{annee_scolaire}\1-dossier etudiants\LP3D - {annee_scolaire.replace('-', '_')}.xlsx"
         
@@ -4138,22 +4141,22 @@ class Traiter_contactsApprentis:
 
         # Entretiens
         premiere_visite = cls.PropEntretien(
-            sujet = "Entretien d’installation + fin période 1 en entreprise",
-            chemin_modele = r"C:\Users\vt238770\Documents\_CEA\Modèles adaptés\Mails\LP3D\LP3D - Suivi d'alternance - Entretien.oft",
+            sujet = "1er entretien : installation + fin période 1 en entreprise",
+            chemin_modele = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\Modèles\Tutorat\LP3D\LP3D - Suivi d'alternance - Entretien.oft",
             duree = timedelta(hours=0, minutes=45),
             date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=51) # (Autour du 15 décembre : dernière semaine avant vacances Noël et reprise école → A faire avant début janvier)
         )
         
         deuxieme_visite = cls.PropEntretien(
             sujet = "2ème entretien : fin période 2 en entreprise",
-            chemin_modele = r"C:\Users\vt238770\Documents\_CEA\Modèles adaptés\Mails\LP3D\LP3D - Suivi d'alternance - Entretien.oft",
+            chemin_modele = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\Modèles\Tutorat\LP3D\LP3D - Suivi d'alternance - Entretien.oft",
             duree = timedelta(hours=1),
             date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=15) # (Autour du 6 avril : dernière semaine avant reprise école → A faire avant 17 avril)
         )
 
         troisieme_visite = cls.PropEntretien(
             sujet = "3ème entretien : milieu période 3 en entreprise",
-            chemin_modele = r"C:\Users\vt238770\Documents\_CEA\Modèles adaptés\Mails\LP3D\LP3D - Suivi d'alternance - Entretien.oft",
+            chemin_modele = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\Modèles\Tutorat\LP3D\LP3D - Suivi d'alternance - Entretien.oft",
             duree = timedelta(hours=1),
             date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=28) # (Autour du 6 juillet : avant vacances de chacun → A faire avant fin août)
         )
@@ -4181,7 +4184,7 @@ class Traiter_contactsApprentis:
 
         # Relances → Doit avoir la même structure que les colonnes Excel qui trace les retours tuteurs et apprentis
         instance._relances.append("Documents CFA à viser")
-        instance._relances.append("Entretien d'installation")
+        #instance._relances.append("Entretien d'installation")
         for entretien in instance._entretiens:
             instance._relances.append(entretien.sujet)
 

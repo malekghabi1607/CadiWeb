@@ -61,12 +61,17 @@ def main(retour_contexte_menus=False):
     #    print("⚠️ Aucun contexte sélectionné, arrêt du programme.")
     #    return  # ou sys.exit(), ou un comportement par défaut
 
+
+
+
     # Appel direct, menu interactif pour choisir le contexte
     contexte = IHM_console.depuis_sous_menu(
         liste=list(CONTEXTES_MAPPING.keys()),
         action=lambda choix: CONTEXTES_MAPPING[choix](),  # renvoie l’instance du contexte choisi
         titre="Choisir le contexte"
     )
+
+
 
 # contexte contient maintenant Traiter_contactsApprentis.UGA() ou L3D()
 

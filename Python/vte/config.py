@@ -215,7 +215,7 @@ CORPS_MAIL_CHEF_UNITE:str = """
 # === Bilan de formation ===
 ###
 # Modèle du bilan à remplir
-CHEMIN_MODELE_WORD_BILAN_FORMATION:Path = REPERTOIRES_MODELES / "P07-Pr05-F06-Bilan-formation-V3.docx"
+CHEMIN_MODELE_WORD_BILAN_FORMATION:Path = REPERTOIRES_MODELES / "P07-Pr05-F06-Bilan-formation-V3_VTE.docx"
 CHEMIN_WORD_BILAN_FORMATION_OUTPUT:Path = REPERTOIRE_BILANS / "P07-Pr05-F06-Bilan formation-Année {annee}.docx"
 
 # Bilan en sortie après remplissage
