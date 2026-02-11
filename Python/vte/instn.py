@@ -1635,7 +1635,8 @@ class EvalStat:
             if chemin_csv_stagiaires is None:
                 vlog.log_erreur("Pas de fichier CSV", continuer=True)
                 return
-            
+
+        # On convertit en Path   
         if isinstance(chemin_csv_stagiaires, str):
             chemin_csv_stagiaires = Path(chemin_csv_stagiaires)
 
@@ -1909,9 +1910,9 @@ class EvalStat:
         # On récupère IRIS sessions, seulement si nécessaire (je le fais ici car si besoin action utilisateur ça évite de couper le traitement de la boucle)
         self._charger_IRIS_sessions()
 
-        # Définition self._codeIRIS. Sinon Non existant, on récupère le numéro IRIS depuis le CSV (c'est le plus sur), sinon popup pour demander
+        # Définition self._codeIRIS. Si non existant, on récupère le numéro IRIS depuis le CSV (c'est le plus sur), sinon popup pour demander
         if self._codeIRIS is None:
-            self._codeIRIS = IRIS.extraire_code_iris_depuis_chemin(self._chemin_csv_evaluations_stagiaires)
+            self._codeIRIS = IRIS.extraire_code_IRIS_depuis_chemin(self._chemin_csv_evaluations_stagiaires)
 
     
         # Étape 1 — Charger le CSV
@@ -1921,7 +1922,7 @@ class EvalStat:
         if df_csv_stagiaires.empty:
             return
         
-        # Étape 2 — Vérifier la cohérence avec l'Extract IRIS
+        # Étape 2 — Vérifier la cohérence avec l'Extract IRIS (i.e. s'il est bien existant dans l'extract)
         if self._codeIRIS not in self._df_IRIS_sessions["Code IRIS"].values:
             print(f"⚠️  Code IRIS {self._codeIRIS} non trouvé dans l’extract IRIS.")
             self._statut_csv = "Exclu - Code IRIS pas dans Extract IRIS sessions"
@@ -4806,7 +4807,7 @@ class FdC:
     # ==================================================================================
     # CONSTRUCTEUR ALTERNATIFS
     # ==================================================================================        
-    def __
+    #def __
 
 
 ### --------------------------------------------------------------------
