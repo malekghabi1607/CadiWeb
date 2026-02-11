@@ -43,6 +43,8 @@ import hashlib
 
 import shutil
 
+from tabulate import tabulate
+
 ### --------------------------------------------------------------------
 #  Tests (log et timer)
 ### --------------------------------------------------------------------
@@ -1084,7 +1086,43 @@ def charger_config_user_BAK(nom_fichier: str = "user_config.py") -> Optional[Mod
     print(f"✅ Configuration utilisateur chargée depuis : {chemin_conf}")
     return user_config
 
- 
+
+
+
+
+### --------------------------------------------------------------------
+#  print améliorés
+### --------------------------------------------------------------------
+def afficher_colonnes_avec_caracteres_speciaux(df):
+    """
+    Affiche pour chaque colonne du DataFrame le nom incluant les caractères spéciaux et le type de la colonne dans une liste de deux colonnes avec des en-têtes.
+
+    :param df: DataFrame à analyser
+    :type df: pandas.DataFrame
+
+    :Example:
+
+    >>> afficher_colonnes_avec_caracteres_speciaux(df)
+    +------------------------------------------------+---------+
+    | Nom de la colonne                              | Type    |
+    +================================================+=========+
+    | 'Nom de la colonne avec caractères spéciaux\n' | object  |
+    +------------------------------------------------+---------+
+    | 'Autre colonne avec caractères spéciaux\t'   | object  |
+    +------------------------------------------------+---------+
+    | 'Colonne normale'                             | float64 |
+    +------------------------------------------------+---------+
+
+    .. seealso:: pandas.DataFrame, tabulate
+    .. warning:: Cette méthode affiche les caractères spéciaux tels qu'ils sont présents dans le DataFrame.
+    .. note:: Les caractères spéciaux peuvent inclure des sauts de ligne, des espaces, etc.
+    .. todo:: Rien du tout.
+    """
+    # Création de la liste des colonnes et de leurs types
+    colonnes_info = [(repr(col), df[col].dtype) for col in df.columns]
+
+    # Affichage des résultats avec tabulate
+    print(tabulate(colonnes_info, headers=["Nom de la colonne", "Type"], tablefmt="grid"))
 
 ### --------------------------------------------------------------------
 #  Conversions
