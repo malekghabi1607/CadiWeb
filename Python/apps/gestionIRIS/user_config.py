@@ -25,10 +25,12 @@ _tSessions = (
     'R04110_Sessions-2022 FINAL.xlsx',
     'R04110_Sessions-2023 FINAL.xlsx',
     'R04110_Sessions-2024 FINAL.xlsx',
-    'R04110_Sessions-2025 au 2025.10.21.xlsx')
+    'R04110_Sessions-2025 FINAL.xlsx',
+    'R04110_Sessions-2026 au 2026.02.11.xlsx',
+    )
 
 _tFormations = (
-    "R0304_Ref_Formation-Listedesformations-2025.10.22.xlsx", )
+    "R0304_Ref_Formation-Listedesformations-2026.02.11.xlsx", )
 
 _tVentes = (
     'R04301_Sessions-Ventes-FC2020 FINAL.xlsx',
@@ -36,15 +38,9 @@ _tVentes = (
     'R04301_Sessions-Ventes-FC2022 FINAL.xlsx',
     'R04301_Sessions-Ventes-FC2023 FINAL.xlsx',
     'R04301_Sessions-Ventes-FC2024 FINAL.xlsx',
-    'R04301_Sessions-Ventes-filtre sur FC-2025 au 2025-02-05 LG.xlsx',
-    'R04301_Sessions-Ventes-filtre sur FC-2025 au 2025-03-03 LG.xlsx',
-    'R04301_Sessions-Ventes-filtre sur FC-2025 au 2025-04-01 LG.xlsx',
-    'R04301_Sessions-Ventes-filtre sur FC-2025 au 2025-05-12 LG.xlsx',
-    'R04301_Sessions-Ventes-filtre sur FC-2025 au 2025-06-02 LG.xlsx',
-    'R04301_Sessions-Ventes-filtre sur FC-2025 au 2025-07-01 LG.xlsx',
-    'R04301_Sessions-Ventes-filtre sur FC-2025 au 2025-08-01 LG.xlsx',
-    'R04301_Sessions-Ventes-filtre sur FC-2025 au 2025-09-01 LG.xlsx',
-    'R04301_Sessions-Ventes-filtre sur FC-2025 au 2025-10-01 LG.xlsx')
+    'R04301_Sessions-Ventes-FC2025 FINAL.xlsx',
+    'R04301_Sessions-Ventes-filtre sur FC2026 au 2026-02-02 LG.xlsx',
+    )
     
 _tInscriptions = (
     'R04500_Sessions-Inscriptions-FC2020 FINAL.xlsx',
@@ -52,12 +48,6 @@ _tInscriptions = (
     'R04500_Sessions-Inscriptions-FC2022 FINAL.xlsx',
     'R04500_Sessions-Inscriptions-FC2023 FINAL.xlsx',
     'R04500_Sessions-Inscriptions-FC2024 FINAL.xlsx',
-    'R04500_Sessions-Inscriptions-filtre sur FC-2025 au 2025-02-05.xlsx',
-    'R04500_Sessions-Inscriptions-filtre sur FC-2025 au 2025-03-03.xlsx',
-    'R04500_Sessions-Inscriptions-filtre sur FC-2025 au 2025-04-01.xlsx',
-    'R04500_Sessions-Inscriptions-filtre sur FC-2025 au 2025-05-12.xlsx',
-    'R04500_Sessions-Inscriptions-filtre sur FC-2025 au 2025-06-02.xlsx',
-    'R04500_Sessions-Inscriptions-filtre sur FC-2025 au 2025-07-01.xlsx',
-    'R04500_Sessions-Inscriptions-filtre sur FC-2025 au 2025-08-01.xlsx',
-    'R04500_Sessions-Inscriptions-filtre sur FC-2025 au 2025-09-01.xlsx',
-    'R04500_Sessions-Inscriptions-filtre sur FC-2025 au 2025-10-01.xlsx')
+    'R04500_Sessions-Inscriptions-FC2025 FINAL.xlsx',
+    'R04500_Sessions-Inscriptions-filtre sur FC2026 au 2026-02-02.xlsx',
+    )
