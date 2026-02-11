@@ -99,11 +99,22 @@ class Contexte_formation(AbstractContextManager):
 
         Ce bloc est exécuté même en cas d'erreur dans le traitement des sessions.
         """
+        # TODO : dans _mettre_a_jour_evaluations_formation() je mets à jour le df de l'excel évaluation formation. Il sera écrit physiquement à la sortie du contexte formation.
+        # TODO : df nouveau df comprend l'ancien (i.e. évaluation formation existant) + le nouveau que l'on traite.
+        # TODO : pour l'instant je réécrit tout ce df mais pour être optimal on ne pourrait écrire que le nouveau
+
+
         if self._fe_evaluations_formation is not None:
 
             df_final_hash = hash_df(self._fe_evaluations_formation._tableaux["Stagiaires"]._df)
 
             if df_final_hash != self._df_initial_hash:
+                #TODO : pour l'instant je force à tout réécrire et pas seulement faire les mises à jour
+                # Forçage réécriture en entier du df
+                EvalStat._supprimeDonneesEtRemplace_evaluations_formation = True
+
+
+
                 # Le DataFrame a changé → on sauvegarde
                 EvalStat._sauver_excel_evaluations_formation(fermer_fichier=False)
             else:
@@ -1885,6 +1896,7 @@ class EvalStat:
     def traiter(self, ouvrirDossier:bool=False) -> None:
         """
         Traitement principal du CSV EvalStat stagiaire individuel.
+
         Inclut la mise à jour du fichier Excel de la formation courante.
         """
         if not self._chemin_csv_evaluations_stagiaires:
@@ -2189,6 +2201,10 @@ class EvalStat:
 
         df_formation_csv = self._fe_evaluations_formation._tableaux["CSV_stagiaires"]._df  # Alias
         df_formation_stagiaires = self._fe_evaluations_formation._tableaux["Stagiaires"]._df  # Alias
+
+        # TODO : ici je mets à jour le df de l'excel évaluation formation. Il sera écrit physiquement à la sortie du contexte formation.
+        # TODO : df nouveau df comprend l'ancien (i.e. évaluation formation existant) + le nouveau que l'on traite.
+        # TODO : pour l'instant je réécrit tout ce df mais pour être optimal on ne pourrait écrire que le nouveau
 
         # Si df_formation_csv est vide, il faut l'initialiser avec le premier df sinon on concatène
         if (df_formation_csv is None) or (df_formation_csv.empty):
