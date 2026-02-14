@@ -4233,6 +4233,9 @@ class Traiter_contactsApprentis:
         """
         """
 
+        # TODO : mettre même initialisation des colonnes Excel que LP3D qui est un peu optimisé
+        # TODO : il faudra refactoriser cette partie pour les 2 contextes
+
         # === Initialisations statiques ===
         annee_scolaire = "2025-2026"
         envoyer_mail = False
@@ -4254,21 +4257,21 @@ class Traiter_contactsApprentis:
 
         # Entretiens
         suivi_1 = cls.PropEntretien(
-            sujet = "Suivi n°1 : prise de fonction",
+            sujet = "Suivi n°1 : prise de fonction (autour de S41)",
             chemin_modele = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\Modèles\Tutorat\Master IN\Master IN - Suivi d'alternance - Entretien.oft",
             duree = timedelta(hours=0, minutes=45),
             date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=41) # (Autour du 6 octobre : dernière semaine de la première période en entreprise → A faire avant mi-novembre)
         )
         
         suivi_2 = cls.PropEntretien(
-            sujet = "Suivi n°2",
+            sujet = "Suivi n°2 (autour de S51)",
             chemin_modele = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\Modèles\Tutorat\Master IN\Master IN - Suivi d'alternance - Entretien.oft",
             duree = timedelta(hours=1),
             date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=51) # (Autour du 15 décembre : dernière semaine avant vacances Noël et reprise école → A faire avant mi-janvier)
         )
 
         suivi_3 = cls.PropEntretien(
-            sujet = "Suivi n°3",
+            sujet = "Suivi n°3 (autour de S17)",
             chemin_modele = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\Modèles\Tutorat\Master IN\Master IN - Suivi d'alternance - Entretien.oft",
             duree = timedelta(hours=1),
             date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=17) # (Autour du 20 avril : dernière semaine reprise école → A faire avant fin mai)
@@ -4345,60 +4348,72 @@ class Traiter_contactsApprentis:
         
         nom_onglet = "Etudiants"
         
+        # Colonnes de l'Excel, hors relances et entretiens
         colonnes_fe_etudiants = [
             "Cursus", 
             "Nom", "Prénom", "Mail apprenti", "Téléphone apprenti", 
             "Entreprise ", "Lieu entreprise", "Nom TE", "Prénom TE", "Mail TE", "Téléphone TE", "Ma fonction de suivi de l'alternant", 
-            "Première prise de contact", "Documents CFA à viser", "Entretien d'installation", "Entretien d’installation + fin période 1 en entreprise", "2ème entretien : fin période 2 en entreprise", "3ème entretien : milieu période 3 en entreprise"]
-
-        # Entretiens
-        premiere_visite = cls.PropEntretien(
-            sujet = "1er entretien : installation + fin période 1 en entreprise",
-            chemin_modele = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\Modèles\Tutorat\LP3D\LP3D - Suivi d'alternance - Entretien.oft",
-            duree = timedelta(hours=0, minutes=45),
-            date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=51) # (Autour du 15 décembre : dernière semaine avant vacances Noël et reprise école → A faire avant début janvier)
-        )
+            "Première prise de contact"]
+            #"Première prise de contact", "Documents CFA à viser", "Entretien d'installation", "Entretien d’installation + fin période 1 en entreprise (autour de  S51)", "2ème entretien : fin période 2 en entreprise (autour de  S15)", "3ème entretien : milieu période 3 en entreprise"]
         
-        deuxieme_visite = cls.PropEntretien(
-            sujet = "2ème entretien : fin période 2 en entreprise",
-            chemin_modele = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\Modèles\Tutorat\LP3D\LP3D - Suivi d'alternance - Entretien.oft",
-            duree = timedelta(hours=1),
-            date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=15) # (Autour du 6 avril : dernière semaine avant reprise école → A faire avant 17 avril)
-        )
 
-        troisieme_visite = cls.PropEntretien(
-            sujet = "3ème entretien : milieu période 3 en entreprise",
-            chemin_modele = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\Modèles\Tutorat\LP3D\LP3D - Suivi d'alternance - Entretien.oft",
-            duree = timedelta(hours=1),
-            date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=28) # (Autour du 6 juillet : avant vacances de chacun → A faire avant fin août)
-        )
+        # Entretiens  → Doit avoir les mêmes noms que les colonnes Excel qui trace les retours tuteurs et apprentis et colonnes_fe_etudiants
+        entretiens = [
+            cls.PropEntretien(
+                sujet = "1er entretien : installation + fin période 1 en entreprise (autour de S51)",
+                chemin_modele = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\Modèles\Tutorat\LP3D\LP3D - Suivi d'alternance - Entretien.oft",
+                duree = timedelta(hours=0, minutes=45),
+                date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=51) # (Autour du 15 décembre : dernière semaine avant vacances Noël et reprise école → A faire avant début janvier)
+            ),
         
+            cls.PropEntretien(
+                sujet = "2ème entretien : fin période 2 en entreprise (autour de S15)",
+                chemin_modele = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\Modèles\Tutorat\LP3D\LP3D - Suivi d'alternance - Entretien.oft",
+                duree = timedelta(hours=1),
+                date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=15) # (Autour du 6 avril : dernière semaine avant reprise école → A faire avant 17 avril)
+            ),
+        
+            cls.PropEntretien(
+                sujet = "3ème entretien : milieu période 3 en entreprise (autour de S28)",
+                chemin_modele = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\Modèles\Tutorat\LP3D\LP3D - Suivi d'alternance - Entretien.oft",
+                duree = timedelta(hours=1),
+                date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=28) # (Autour du 6 juillet : avant vacances de chacun → A faire avant fin août)
+            ),
+        ]
+ 
+
+
+        # Relances pour signature docs → Doit avoir la même structure (ordre + nom) que les colonnes Excel qui trace les retours tuteurs et apprentis : relances puis entretiens
+        relances = [
+            "Documents CFA à viser",
+            "Entretien d'installation"
+        ]
+
+
+        
+
+
+
+
 
         # Initialisation de l'instance
         instance = cls(chemin_fichier_etudiants, nom_onglet)
 
-        # Constantes du contexte UGA
+        # Constantes du contexte LP3D
         instance._annee_scolaire = annee_scolaire
         instance._prefixe_sujet = prefixe_sujet
         instance._chemin_modele_mail_priseContact = chemin_modele_mail_priseContact
         instance._envoyer_mail = envoyer_mail
         instance._mail_responsables_univ = mail_responsables_univ
-        instance._colonnes_fe_etudiants = colonnes_fe_etudiants
+        instance._entretiens = entretiens
+        instance._relances = relances + [iEntretien.sujet for iEntretien in instance._entretiens] # On ajoute aux relances les RDV entretiens (on relancera pour les signatures Studea/Lea)
+        instance._colonnes_fe_etudiants = colonnes_fe_etudiants + [iRelance for iRelance in instance._relances] # On ajoute à la suite des colonnes Excel à récupérer les relances qui comprend les relances initiales + les entretiens
+        # On ajoute à la suite des colonnes Excel à récupérer les relances qui comprend les relances initiales + les entretiens
+        #colonnes_fe_etudiants.append(iRelance for iRelance in instance._relances)
         
         # On réduit le DataFrame aux informations qui nous sont utiles
         instance._df_etudiants = instance._fe_etudiants._tableaux[nom_onglet]._df[instance._colonnes_fe_etudiants] # On ne garde que les colonnes qui nous intéressent mais attention ça reste une vue dont les modifications affectent le dataframe initial
         instance._df_etudiants = instance._df_etudiants[instance._df_etudiants["Ma fonction de suivi de l'alternant"] == "Tuteur"]
-
-        # RDV entretiens
-        instance._entretiens.append(premiere_visite)
-        instance._entretiens.append(deuxieme_visite)
-        instance._entretiens.append(troisieme_visite)
-
-        # Relances → Doit avoir la même structure que les colonnes Excel qui trace les retours tuteurs et apprentis
-        instance._relances.append("Documents CFA à viser")
-        #instance._relances.append("Entretien d'installation")
-        for entretien in instance._entretiens:
-            instance._relances.append(entretien.sujet)
 
 
         # Tests :
