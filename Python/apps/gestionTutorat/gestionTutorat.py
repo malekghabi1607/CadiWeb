@@ -9,8 +9,8 @@ from vte.ihm_tkinter import IHMTkinter
 # MAPPING CENTRALISÉ DES CONTEXTES DISPONIBLES
 # =====================================================
 CONTEXTES_MAPPING = {
-    "UGA": Traiter_contactsApprentis.UGA,
-    "L3D": Traiter_contactsApprentis.L3D
+    "UGA": Traiter_contactsApprentis.depuis_nomUniversite("UGA"),
+    "L3D": Traiter_contactsApprentis.depuis_nomUniversite("LP3D")
 }
     
 # mode = input("Choisir mode (console/tkinter) : ").strip().lower()
@@ -64,10 +64,11 @@ def main(retour_contexte_menus=False):
 
 
 
-    # Appel direct, menu interactif pour choisir le contexte
+    # Appel direct, menu interactif pour choisir le contexte → Marche
+    # Emploie le CONTEXT_MAPPING
     contexte = IHM_console.depuis_sous_menu(
         liste=list(CONTEXTES_MAPPING.keys()),
-        action=lambda choix: CONTEXTES_MAPPING[choix](),  # renvoie l’instance du contexte choisi
+        action=lambda choix: CONTEXTES_MAPPING[choix],  # renvoie l’instance du contexte choisi
         titre="Choisir le contexte"
     )
 

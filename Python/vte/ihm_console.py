@@ -227,7 +227,7 @@ class IHM_console:
             except Exception as e:
                 print(f"⚠️ Erreur de saisie ({e}). Réessayez.")
 
-# -------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     # MÉTHODE : executer_action
     # -------------------------------------------------------------------------
     def executer_action(self, action_def: dict, choix_sousmenu: Any = None) -> Any:
@@ -390,3 +390,30 @@ class IHM_console:
 
             else:
                 raise ValueError(f"⚠️ Entrée de menu non valide : {valeur}")
+
+
+
+# -------------------------------------------------------------------------
+# AIDE
+# -------------------------------------------------------------------------
+"""
+J'ai déjà fait un menu pour aller chercher une @classmethod Traiter_contactsApprentis.L3D() qui renvoyait donc une instance.
+Je faisais comme ça :
+
+CONTEXTES_MAPPING = {
+    "UGA": Traiter_contactsApprentis.UGA,
+    "L3D": Traiter_contactsApprentis.L3D
+}
+
+# Appel direct, menu interactif pour choisir le contexte
+contexte = IHM_console.depuis_sous_menu(
+    liste=list(CONTEXTES_MAPPING.keys()),
+    action=lambda choix: CONTEXTES_MAPPING[choix](),  # renvoie l’instance du contexte choisi
+    titre="Choisir le contexte"
+)
+# contexte est maintenance une instance de Traiter_contactsApprentis
+
+
+
+
+"""

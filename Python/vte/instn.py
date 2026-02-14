@@ -4194,232 +4194,88 @@ class Traiter_contactsApprentis:
         periode:str
         deadline_retour:Optional[datetime]=None
 
-    # Fichier Excel avec les informations des étudiants
-    _fe_etudiants:FichierExcel
-    _df_etudiants:DataFrame
+    def __init__(self) -> None:
+        
+        # Année en cours
+        self._annee_scolaire:str
 
-    # Année en cours
-    _annee_scolaire:str
-
-    # Infos mails
-    _prefixe_sujet:str
-    _chemin_modele_mail_priseContact:Optional[str] = None
-    _mail_responsables_univ:Optional[str] = None
-    
-    _entretiens:list[PropEntretien] = []
-    _relances:list[str] = []
-    _fichiersARenvoyer:list[PropFichierARenvoyer] = []
-
-    _envoyer_mail:bool = False
-
-    # === Initialisations statiques ===
-    # Colonnes du fichier etudiant à récupérer
-    _colonnes_fe_etudiants = []
-
-
-    def __init__(self, chemin_fichier_etudiants:str, nom_onglet:str) -> None:
+        # Infos mails
+        self._prefixe_sujet:str
+        self._mail_responsables_univ:Optional[str] = None
+        self._chemin_modele_mail_priseContact:Optional[str] = None
+        self._envoyer_mail:bool = False
 
         # Fichier Excel avec les informations des étudiants
-        self._chemin_fichier_etudiants = chemin_fichier_etudiants
-
-        # Par défaut, il faut charger l'Excel des coordonnées des étudiants
-        self._fe_etudiants = FichierExcel.depuis_fichier(
-            chemin_fichier = chemin_fichier_etudiants,
-            nom_onglet = nom_onglet
-        )
-
+        self._chemin_fichier_etudiants:str
+        self._nom_onglet:str
+        self._fe_etudiants:FichierExcel
+        self._df_etudiants:DataFrame
+        
+        self._colonnes_fe_etudiants = [] # Colonnes à récupérer du fichier Excel étudiant, hors relances, envoi de docs et entretiens
+        
+        # Entretiens, relances, fichiers à envoyer
+        self._relances:list[str] = []
+        self._entretiens:list[Traiter_contactsApprentis.PropEntretien] = []
+        self._fichiersARenvoyer:list[Traiter_contactsApprentis.PropFichierARenvoyer] = []
+  
     @classmethod
-    def UGA(cls) -> Traiter_contactsApprentis:
-        """
-        """
+    def depuis_nomUniversite(cls, nomUniversite:str) -> Traiter_contactsApprentis:
 
-        # TODO : mettre même initialisation des colonnes Excel que LP3D qui est un peu optimisé
-        # TODO : il faudra refactoriser cette partie pour les 2 contextes
-
-        # === Initialisations statiques ===
-        annee_scolaire = "2025-2026"
-        envoyer_mail = False
-
-        prefixe_sujet = "Master IN - Suivi d'alternance"
-        mail_responsables_univ = "master-in-responsables@univ-grenoble-alpes.fr"
-
-        chemin_modele_mail_priseContact = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\Modèles\Tutorat\Master IN\Master IN - Tutorat en entreprise - Prise de contact.msg"
-
-        chemin_fichier_etudiants =  fr"\\instnt\partage\FORMATIONS_I\GDRA - Master IN (parcours ADIN-GDRA-SN)\{annee_scolaire}\1-dossier etudiants\Master ADIN - {annee_scolaire.replace('-', '_')}.xlsx"
+        # Pour charger les bonnes propriétés selon l'université
+        match nomUniversite:
+            case "UGA":
+                cfg = importlib.import_module("user_config_UGA")
+            case "LP3D":
+                cfg = importlib.import_module("user_config_LP3D")
+            case _:
+                log_erreur("Code université faux")
         
-        nom_onglet = "Etudiants"
-        
-        colonnes_fe_etudiants = [
-            "Cursus", 
-            "Nom", "Prénom", "Mail apprenti", "Téléphone apprenti", 
-            "Entreprise ", "Lieu entreprise", "Nom TE", "Prénom TE", "Mail TE", "Téléphone TE", "Ma fonction de suivi de l'alternant", 
-            "Engagement des parties", "Suivi n°1 : prise de fonction", "Suivi n°2", "Suivi n°3", "Fiche évaluation 1", "Fiche évaluation 2"]
-
-        # Entretiens
-        suivi_1 = cls.PropEntretien(
-            sujet = "Suivi n°1 : prise de fonction (autour de S41)",
-            chemin_modele = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\Modèles\Tutorat\Master IN\Master IN - Suivi d'alternance - Entretien.oft",
-            duree = timedelta(hours=0, minutes=45),
-            date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=41) # (Autour du 6 octobre : dernière semaine de la première période en entreprise → A faire avant mi-novembre)
-        )
-        
-        suivi_2 = cls.PropEntretien(
-            sujet = "Suivi n°2 (autour de S51)",
-            chemin_modele = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\Modèles\Tutorat\Master IN\Master IN - Suivi d'alternance - Entretien.oft",
-            duree = timedelta(hours=1),
-            date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=51) # (Autour du 15 décembre : dernière semaine avant vacances Noël et reprise école → A faire avant mi-janvier)
-        )
-
-        suivi_3 = cls.PropEntretien(
-            sujet = "Suivi n°3 (autour de S17)",
-            chemin_modele = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\Modèles\Tutorat\Master IN\Master IN - Suivi d'alternance - Entretien.oft",
-            duree = timedelta(hours=1),
-            date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=17) # (Autour du 20 avril : dernière semaine reprise école → A faire avant fin mai)
-        )
-        
-        # Fichiers à renvoyer
-        ficheEvaluation1 = cls.PropFichierARenvoyer(
-            sujet = "Fiche évaluation 1",
-            chemin_fichier = r"\\instnt\partage\FORMATIONS_I\GDRA - Master IN (parcours ADIN-GDRA-SN)\2025-2026\9-stages\Fiche_Evaluation_alternance_M2_Ingénierie_Nucléaire_janvier.docx",
-            periode = "mi-année",
-            deadline_retour = datetime(2026, 1, 27) #RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=6) # (Autour du 5 février)
-        )
-        
-        ficheEvaluation2 = cls.PropFichierARenvoyer(
-            sujet = "Fiche évaluation 2",
-            chemin_fichier = r"\\instnt\partage\FORMATIONS_I\GDRA - Master IN (parcours ADIN-GDRA-SN)\2025-2026\9-stages\Fiche_Evaluation_alternance_M2_Ingénierie_Nucléaire_aout.docx",
-            periode = "fin d'année",
-            deadline_retour = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=35) # (Autour du 25 août)
-        )
-
-
         # Initialisation de l'instance
-        instance = cls(chemin_fichier_etudiants, nom_onglet)
+        instance = cls()  
 
-        # Constantes du contexte UGA
-        instance._annee_scolaire = annee_scolaire
-        instance._prefixe_sujet = prefixe_sujet
-        instance._chemin_modele_mail_priseContact = chemin_modele_mail_priseContact
-        instance._envoyer_mail = envoyer_mail
-        instance._mail_responsables_univ = mail_responsables_univ
-        instance._colonnes_fe_etudiants = colonnes_fe_etudiants
+        # On initialises les variables d'instance avec les données de la config UGA ou LP3D
+        # Année en cours
+        instance._annee_scolaire = cfg.annee_scolaire
+
+        # Infos mails
+        instance._prefixe_sujet = cfg.prefixe_sujet
+        instance._mail_responsables_univ = cfg.mail_responsables_univ
+        instance._chemin_modele_mail_priseContact = cfg.chemin_modele_mail_priseContact
+        instance._envoyer_mail = cfg.envoyer_mail
+
+        # Fichier Excel avec les informations des étudiants
+        instance._chemin_fichier_etudiants = cfg.chemin_fichier_etudiants
+        instance._nom_onglet = cfg.nom_onglet
         
-        # On réduit le DataFrame aux informations qui nous sont utiles
-        instance._df_etudiants = instance._fe_etudiants._tableaux[nom_onglet]._df[instance._colonnes_fe_etudiants] # On ne garde que les colonnes qui nous intéressent mais attention ça reste une vue dont les modifications affectent le dataframe initial
-        instance._df_etudiants = instance._df_etudiants[instance._df_etudiants["Ma fonction de suivi de l'alternant"] == "Tuteur"]
-
-        # RDV entretiens
-        instance._entretiens.append(suivi_1)
-        instance._entretiens.append(suivi_2)
-        instance._entretiens.append(suivi_3)
-
-        # Mail + RDV de rappel fiche évaluation TODO : faire liste
-        instance._fichiersARenvoyer.append(ficheEvaluation1)
-        instance._fichiersARenvoyer.append(ficheEvaluation2)
-
-        # Relances → Doit avoir la même structure que les colonnes Excel qui trace les retours tuteurs et apprentis
-        instance._relances.append("Engagement des parties")
-        for entretien in instance._entretiens:
-            instance._relances.append(entretien.sujet)
-        for fichierARenvoyer in instance._fichiersARenvoyer:
-            instance._relances.append(fichierARenvoyer.sujet)
-
-
-        # Tests :
-        #instance._df_etudiants = instance._df_etudiants.head(1)
+        # RDV, fiches d'évaluation et relances
+        instance._entretiens = [instance.PropEntretien(**iEntretien) for iEntretien in cfg.entretiens]
+        instance._fichiersARenvoyer = [instance.PropFichierARenvoyer(**iFichiersARenvoyer) for iFichiersARenvoyer in cfg.fichiersARenvoyer]
+        instance._relances = cfg.relances + [iEntretien.sujet for iEntretien in instance._entretiens] + [iFichiersARenvoyer.sujet for iFichiersARenvoyer in instance._fichiersARenvoyer] # On ajoute aux relances les RDV entretiens (on relancera pour les signatures Studea/Lea) + les fiches d'évaluation (à relancer également)
         
-        return instance
-
-    @classmethod
-    def L3D(cls) -> Traiter_contactsApprentis:
-        """
-        """
-
-        # === Initialisations statiques ===
-        annee_scolaire = "2025-2026"
-        envoyer_mail = False
-
-        prefixe_sujet = "LP3D - Suivi d'alternance"
-        mail_responsables_univ = "isabelle.techer@unimes.fr"
-
-        chemin_modele_mail_priseContact = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\Modèles\Tutorat\LP3D\LP3D - Tutorat en entreprise - Prise de contact.msg"
-
-        chemin_fichier_etudiants =  fr"\\instnt\partage\FORMATIONS_I\LP3D+-démantelement désamiantage dépollution\{annee_scolaire}\1-dossier etudiants\LP3D - {annee_scolaire.replace('-', '_')}.xlsx"
-        
-        nom_onglet = "Etudiants"
-        
-        # Colonnes de l'Excel, hors relances et entretiens
-        colonnes_fe_etudiants = [
-            "Cursus", 
-            "Nom", "Prénom", "Mail apprenti", "Téléphone apprenti", 
-            "Entreprise ", "Lieu entreprise", "Nom TE", "Prénom TE", "Mail TE", "Téléphone TE", "Ma fonction de suivi de l'alternant", 
-            "Première prise de contact"]
-            #"Première prise de contact", "Documents CFA à viser", "Entretien d'installation", "Entretien d’installation + fin période 1 en entreprise (autour de  S51)", "2ème entretien : fin période 2 en entreprise (autour de  S15)", "3ème entretien : milieu période 3 en entreprise"]
-        
-
-        # Entretiens  → Doit avoir les mêmes noms que les colonnes Excel qui trace les retours tuteurs et apprentis et colonnes_fe_etudiants
-        entretiens = [
-            cls.PropEntretien(
-                sujet = "1er entretien : installation + fin période 1 en entreprise (autour de S51)",
-                chemin_modele = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\Modèles\Tutorat\LP3D\LP3D - Suivi d'alternance - Entretien.oft",
-                duree = timedelta(hours=0, minutes=45),
-                date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=51) # (Autour du 15 décembre : dernière semaine avant vacances Noël et reprise école → A faire avant début janvier)
-            ),
-        
-            cls.PropEntretien(
-                sujet = "2ème entretien : fin période 2 en entreprise (autour de S15)",
-                chemin_modele = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\Modèles\Tutorat\LP3D\LP3D - Suivi d'alternance - Entretien.oft",
-                duree = timedelta(hours=1),
-                date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=15) # (Autour du 6 avril : dernière semaine avant reprise école → A faire avant 17 avril)
-            ),
-        
-            cls.PropEntretien(
-                sujet = "3ème entretien : milieu période 3 en entreprise (autour de S28)",
-                chemin_modele = r"\\harmonie\instn\uem\_Echanges\VTE\Prog\Modèles\Tutorat\LP3D\LP3D - Suivi d'alternance - Entretien.oft",
-                duree = timedelta(hours=1),
-                date_debut = RDV_Outlook.get_lundi_depuis_num_semaine(numero_semaine=28) # (Autour du 6 juillet : avant vacances de chacun → A faire avant fin août)
-            ),
-        ]
- 
-
-
-        # Relances pour signature docs → Doit avoir la même structure (ordre + nom) que les colonnes Excel qui trace les retours tuteurs et apprentis : relances puis entretiens
-        relances = [
-            "Documents CFA à viser",
-            "Entretien d'installation"
-        ]
-
-
-        
-
-
-
-
-
-        # Initialisation de l'instance
-        instance = cls(chemin_fichier_etudiants, nom_onglet)
-
-        # Constantes du contexte LP3D
-        instance._annee_scolaire = annee_scolaire
-        instance._prefixe_sujet = prefixe_sujet
-        instance._chemin_modele_mail_priseContact = chemin_modele_mail_priseContact
-        instance._envoyer_mail = envoyer_mail
-        instance._mail_responsables_univ = mail_responsables_univ
-        instance._entretiens = entretiens
-        instance._relances = relances + [iEntretien.sujet for iEntretien in instance._entretiens] # On ajoute aux relances les RDV entretiens (on relancera pour les signatures Studea/Lea)
-        instance._colonnes_fe_etudiants = colonnes_fe_etudiants + [iRelance for iRelance in instance._relances] # On ajoute à la suite des colonnes Excel à récupérer les relances qui comprend les relances initiales + les entretiens
+        # Colonnes à récupérer du fichier Excel étudiant avec hors relances et entretiens
+        instance._colonnes_fe_etudiants = cfg.colonnes_fe_etudiants + [iRelance for iRelance in instance._relances] # On ajoute à la suite des colonnes Excel à récupérer les relances qui comprend les relances initiales + les entretiens
         # On ajoute à la suite des colonnes Excel à récupérer les relances qui comprend les relances initiales + les entretiens
         #colonnes_fe_etudiants.append(iRelance for iRelance in instance._relances)
         
+
+
+        # On charge l'Excel qui contient les coordonnées des étudiants + traçage relances
+        instance._fe_etudiants = FichierExcel.depuis_fichier(
+            chemin_fichier = instance._chemin_fichier_etudiants,
+            nom_onglet = instance._nom_onglet
+        )
         # On réduit le DataFrame aux informations qui nous sont utiles
-        instance._df_etudiants = instance._fe_etudiants._tableaux[nom_onglet]._df[instance._colonnes_fe_etudiants] # On ne garde que les colonnes qui nous intéressent mais attention ça reste une vue dont les modifications affectent le dataframe initial
+        instance._df_etudiants = instance._fe_etudiants._tableaux[instance._nom_onglet]._df[instance._colonnes_fe_etudiants] # On ne garde que les colonnes qui nous intéressent mais attention ça reste une vue dont les modifications affectent le dataframe initial
         instance._df_etudiants = instance._df_etudiants[instance._df_etudiants["Ma fonction de suivi de l'alternant"] == "Tuteur"]
 
 
         # Tests :
         #instance._df_etudiants = instance._df_etudiants.head(1)
-        
+
         return instance
+
+
+
 
     def creer_mails_contactInitial(self, chemin_modele_mail_priseContact:Optional[str]=None) -> None:
         """
