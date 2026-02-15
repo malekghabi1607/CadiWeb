@@ -1614,7 +1614,7 @@ class EvalStat:
         "Type de formation",
         "Trigramme RP",
         "Trigramme AF",
-        "Nb. Présents"]
+        "Nb. Nommés"]
 
     # ==================================================================================
     # CONSTRUCTEUR
@@ -2251,15 +2251,15 @@ class EvalStat:
                 #print("Colonnes de df_formation_stagiaires :", df_formation_stagiaires.columns)
                 #print("Colonnes de df :", df.columns)
 
-                print("\nTypes de données de df_formation_stagiaires :")
-                print(df_formation_stagiaires.dtypes)
+                #print("\nTypes de données de df_formation_stagiaires :")
+                #print(df_formation_stagiaires.dtypes)
 
-                print("\nTypes de données de df_stagiaires :")
-                print(df_stagiaires.dtypes)
+                #print("\nTypes de données de df_stagiaires :")
+                #print(df_stagiaires.dtypes)
 
                 # Tester index
-                print("Index de df_formation_stagiaires :", df_formation_stagiaires.index)
-                print("Index de df :", df_stagiaires.index)
+                #print("Index de df_formation_stagiaires :", df_formation_stagiaires.index)
+                #print("Index de df :", df_stagiaires.index)
 
 
                 df_formation_stagiaires = pd.concat([df_formation_stagiaires, df_stagiaires], ignore_index=True)

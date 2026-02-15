@@ -71,8 +71,8 @@ def test_ajout_csv_a_evaluationFormation_existant():
     EvalStat.depuis_chemin_csv_evaluations_stagiaires(chemin_csv_stagiaires=chemin_csv_stagiaires, chemin_IRIS_sessions=chemin_IRIS_sessions)
 
 if __name__ == "__main__":
-    test_ajout_csv_a_evaluationFormation_existant()
-    #main()
+    #test_ajout_csv_a_evaluationFormation_existant()
+    main()
 
 
 

@@ -1810,6 +1810,12 @@ def adapter_colonnes_dataframe_selon_modele(df_modele, df_a_modifier):
     # Vérifier si les DataFrames sont vides
     if df_modele.empty or df_a_modifier.empty:
         raise ValueError("Les DataFrames ne doivent pas être vides.")
+    
+    #print("\nTypes de données de df_modele :")
+    #print(df_modele.dtypes)
+
+    #print("\nTypes de données de df_a_modifier :")
+    #print(df_a_modifier.dtypes)
 
     # Renommer les colonnes de df_a_modifier pour correspondre à df_modele
     colonnes_modele = df_modele.columns
