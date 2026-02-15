@@ -3542,7 +3542,7 @@ class BilanFormation_V3(BilanFormation):
             texte_detail = ""
 
         texte = f"{nombre_sessions_tousLesLieux} {texte_sessions}{texte_detail}"
-        print(texte)
+        #print(texte)
 
         return texte
 
@@ -3564,7 +3564,7 @@ class BilanFormation_V3(BilanFormation):
         texte_detail = f"\n({' + '.join(f'{count} {config.UNITES[lieu]}' for lieu, count in nombre_personnes_par_lieu.items())})" if len(nombre_personnes_par_lieu) > 1 else ""
 
         texte = f"{nombre_personnes_total} pers.{texte_detail}"
-        print(texte)
+        #print(texte)
 
         return texte
 
