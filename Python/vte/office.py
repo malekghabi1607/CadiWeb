@@ -1094,6 +1094,119 @@ class FichierExcel:
             vlog.log_erreur("Le workbook n'est pas chargé")
 
 
+
+    # === Méthodes pour lire des cellules individuelles
+    # =====================================================
+    #  Accès optimisé aux cellules par référence Excel
+    #  (cellules libres, non tabulaires)
+    # =====================================================
+
+    def initialise_cache_cellules(self):
+        """
+        Initialise un cache mémoire de l'onglet Excel afin de permettre
+        des accès rapides aux cellules via leur référence Excel
+        (ex: "J12", "AB2").
+
+        - Lecture Excel effectuée une seule fois
+        - Gère les cellules fusionnées
+        - Gère les cellules vides
+        """
+
+        ws = self._worksheet
+
+        self._cache_max_ligne = ws.max_row
+        self._cache_max_colonne = ws.max_column
+
+        # --- Cache des valeurs des cellules ---
+        self._cache_cellules = [
+            [ws.cell(row=ligne, column=colonne).value
+             for colonne in range(1, self._cache_max_colonne + 1)]
+            for ligne in range(1, self._cache_max_ligne + 1)
+        ]
+
+        # --- Cache des cellules fusionnées ---
+        self._cache_fusions = {}
+
+        for plage_fusionnee in ws.merged_cells.ranges:
+            min_col, min_row, max_col, max_row = plage_fusionnee.bounds
+            cellule_maitre = (min_row - 1, min_col - 1)
+
+            for ligne in range(min_row - 1, max_row):
+                for colonne in range(min_col - 1, max_col):
+                    self._cache_fusions[(ligne, colonne)] = cellule_maitre
+
+
+    def _convertit_reference_excel(self, reference: str) -> tuple[int, int]:
+        """
+        Convertit une référence Excel (ex: 'AB12') en indices Python
+        (base 0).
+
+        :param reference: Référence Excel
+        :return: Tuple (ligne, colonne)
+        """
+        match = re.match(r"([A-Z]+)(\d+)", reference.upper())
+        if not match:
+            raise ValueError(f"Référence Excel invalide : {reference}")
+
+        lettres_colonne, ligne = match.groups()
+
+        colonne = 0
+        for lettre in lettres_colonne:
+            colonne = colonne * 26 + (ord(lettre) - ord("A") + 1)
+
+        return int(ligne) - 1, colonne - 1
+
+
+    def valeur_cellule_reference(self, reference: str):
+        """
+        Retourne la valeur d'une cellule à partir de sa référence Excel.
+
+        - Prend en charge les cellules fusionnées
+        - Retourne None si la cellule est vide ou hors limites
+
+        :param reference: Référence Excel (ex: "J12")
+        :return: Valeur de la cellule ou None
+
+        Exemple :
+            tableau = fichier_excel.tableau("Feuil1")
+            tableau.initialise_cache_cellules()
+            tableau.valeur_cellule_reference("J12")
+        """
+
+        if not hasattr(self, "_cache_cellules"):
+            raise RuntimeError(
+                "Le cache des cellules n'est pas initialisé. "
+                "Appelez initialise_cache_cellules()."
+            )
+
+        ligne, colonne = self._convertit_reference_excel(reference)
+
+        if (
+            ligne < 0 or ligne >= self._cache_max_ligne or
+            colonne < 0 or colonne >= self._cache_max_colonne
+        ):
+            return None
+
+        # Gestion des cellules fusionnées
+        if (ligne, colonne) in self._cache_fusions:
+            ligne, colonne = self._cache_fusions[(ligne, colonne)]
+
+        return self._cache_cellules[ligne][colonne]
+
+
+    def __getitem__(self, reference: str):
+        """
+        Accès direct à une cellule par sa référence Excel.
+
+        Exemple :
+            tableau = fichier_excel.tableau("Feuil1")
+            tableau.initialise_cache_cellules()
+            tableau["J12"]
+        """
+        return self.valeur_cellule_reference(reference)
+
+
+
     # === Méthodes utilisataires xlwings ou com
     def open_xlwings(self, nom_onglet:Optional[str], visible:bool=False) -> None:
         """ Ouvrir l'App xlwings proprement """
