@@ -244,7 +244,32 @@ CORPS_MAIL_GESTIONNAIRE_REE_INSTN:str = "<p>Bonjour Laëtitia,</p><p>Je t’ai m
 
 
 
+###
+# === REE ===
+###
+UNITES = {
+    "INSTN Saclay" : "UES",
+    "INSTN Marcoule" : "UEM",
+    "INSTN Cadarache" : "UEM",
+    "INSTN Grenoble" : "UEG",
+    "INSTN Cherbourg-Octeville" : "UECC",
+    "INSTN Cherbourg-en-Cotentin" : "UECC",
 
+    "Plateforme DOSEO" : "DOSEO",
+    "École du sodium" : "École du sodium",
+    "Cluses" : "Cluses",
+    "St-Etienne" : "St-Etienne",
+    "Bureau Formation Cadarache" : "BF CAD",
+    "Bourges" : "Bourges",
+    "Distanciel" : "Distanciel",
+    "SANOFI Chilly-Mazarin" : "SANOFI Chilly-Mazarin",
+    "PARIS - Plateforme IHU ICAN - Pitié Salpêtrière" : "Pitié Salpêtrière",
+    "PARIS - Plate-forme d'Imagerie du Petit Animal - Hôpital Cochin" : "Hôpital Cochin",
+    "E-learning" : "E-learning",
+    "PARIS - Plate-forme d'imageries du vivant (PIV) - Hôpital Cochin" : "Hôpital Cochin",
+    "SANOFI Vitry" : "SANOFI Vitry",
+    "EDF Itech" : "EDF Itech",
+}
 
 ###
 # === GETTER ===
