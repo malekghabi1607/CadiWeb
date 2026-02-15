@@ -843,7 +843,12 @@ def remplacer_champs(
         )
 
         # Remplacement par la valeur fournie (str)
-        str_out = pattern.sub(str(valeur), str_out)
+        #str_out = pattern.sub(str(valeur), str_out)
+
+        # Astuce 2000 : sans le lambda, sub interprète les \ des chemins en caractères d'échappement regex ; avec le lambda, il insère la chaîne sans l'interpréter
+        str_out = pattern.sub(lambda _: str(valeur), str_out)
+
+
 
     return str_out
 

@@ -874,22 +874,22 @@ class IRIS:
                 - Le second élément est la valeur convertie dans le type demandé (ou None si invalide).
 
         Exemple:
-            >>> verifier_code_iris(12345)
+            >>> verifier_code_IRIS(12345)
             (True, '12345')
 
-            >>> verifier_code_iris("01234")
+            >>> verifier_code_IRIS("01234")
             (True, '01234')
 
-            >>> verifier_code_iris("9999")
+            >>> verifier_code_IRIS("9999")
             (False, None)
 
-            >>> verifier_code_iris("12345.0")
+            >>> verifier_code_IRIS("12345.0")
             (True, '12345')
 
-            >>> verifier_code_iris("abcde")
+            >>> verifier_code_IRIS("abcde")
             (False, None)
 
-            >>> verifier_code_iris("67890", int)
+            >>> verifier_code_IRIS("67890", int)
             (True, 67890)
 
         Remarques:
@@ -2415,7 +2415,7 @@ class BilanSession:
         instance = cls()
 
         # Vérifier que code_iris est bien un entier à 5 chiffres, on le convertit en str
-        est_code_IRIS_valide, instance._code_IRIS = IRIS.verifier_code_iris(code_IRIS)
+        est_code_IRIS_valide, instance._code_IRIS = IRIS.verifier_code_IRIS(code_IRIS)
 
         if not est_code_IRIS_valide:
             vlog.log_erreur(f"Code IRIS en entrée non valide : {instance._code_IRIS} non traité", continuer=True)

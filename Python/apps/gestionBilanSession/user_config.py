@@ -13,7 +13,7 @@ Pour chacun de ces cas, vous pouvez :
 
 """
 
-liste_codes_IRIS = [16411, 17343]
+liste_codes_IRIS = [17139]
 
 liste_periodes = [
     ("TEL", 2023, "Année"),

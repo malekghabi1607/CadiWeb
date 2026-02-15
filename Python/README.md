@@ -53,3 +53,6 @@ python -m PyInstaller --onefile --paths "C:\Users\vt238770\Documents\_CEA\Prog\P
 python -m PyInstaller --onefile --paths "C:\Users\vt238770\Documents\_CEA\Prog\Python\apps\gestionIRIS\vte" --distpath "\\harmonie\INSTN\UEM\_Echanges\VTE\Prog\gestionIRIS" "C:\Users\vt238770\Documents\_CEA\Prog\Python\apps\gestionIRIS\gestionIRIS.py"
 
 python -m PyInstaller --onefile --paths "C:\Users\vt238770\Documents\_CEA\Prog\Python\apps\gestionTutorat\vte" --distpath "\\harmonie\INSTN\UEM\_Echanges\VTE\Prog\gestionTutorat" "C:\Users\vt238770\Documents\_CEA\Prog\Python\apps\gestionTutorat\gestionTutorat.py"
+
+
+python -m PyInstaller --onefile --paths "C:\Users\vt238770\Documents\_CEA\Prog\Python\apps\gestionEvalStat\vte" --distpath "\\harmonie\INSTN\UEM\_Echanges\VTE\Prog\gestionEvalStat" "C:\Users\vt238770\Documents\_CEA\Prog\Python\apps\gestionEvalStat\gestionEvalStat.py"
