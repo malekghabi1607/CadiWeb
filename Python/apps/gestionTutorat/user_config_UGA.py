@@ -1,17 +1,8 @@
 from vte.instn import *
 """
-Mode op
+Paramètres de chaque cursus à employer dans Gestion Tutorat.
 
-Vous pouvez soit traiter des bilans de session :
-   - soit par session [liste_codes_IRIS] en indiquant des codes IRIS à 5 chiffres
-   - soit par période (1er semestre, 2nd semestre ou annuel) en indiquant :
-        ¤ un trigramme formation en majuscule (ex. : TEL)
-        ¤ une année à 4 chiffres (ex. : 2025)
-        ¤ une periode = [1er semestre, 2nd semestre, Année] (ex. : 2nd semestre)
-
-Pour chacun de ces cas, vous pouvez :
-   - soit les faire un par un ;
-
+Ici pour la LP3D
 """
 
 
