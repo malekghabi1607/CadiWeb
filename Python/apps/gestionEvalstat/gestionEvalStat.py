@@ -41,10 +41,38 @@ def main():
     ihm = IHM_console(MENUS)
     ihm.afficher_menu()
 
+
+
+def test_ajout_csv_a_evaluationFormation_existant():
+    """
+    Pour debugger le fait qu'actuellement si l'on rajoute un nouveau csv à un fichier Excel de l'évaluation d'un formation est ajouté, alors les 3 colonnes merdent et sont rajoutés après le tableau.
+
+    Donc je :
+      - réinitialise (supprime l'excel évaluation formation ; copie-colle un backup et le renomme) ;
+      - relance ma fonction
+    """
+
+
+    fichier_evalStat_formation:Path = chemin_vers_unc(r"P:\FORMATIONS_C\948\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\Evaluation-Stagiaires-Global-948.xlsx", retour_type=Path)
+    fichier_evalStat_formation_BAK:Path = chemin_vers_unc(r"P:\FORMATIONS_C\948\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\Evaluation-Stagiaires-Global-948 - Bak sans 17139.xlsx", retour_type=Path)
+
+    chemin_csv_stagiaires:Path = chemin_vers_unc(r"P:\FORMATIONS_C\948\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\2025-12-S17139 UEM\S-17139-FC25-948-VTE-VCA-Stagiaires.csv", retour_type=Path)
+    chemin_IRIS_sessions:Path = chemin_vers_unc(r"R:\_Echanges\VTE\Prog\IRIS\Extracts complets\TESTS - 948 - R04110_Sessions-COMPLET.xlsx", retour_type=Path)
+
+    # Supprimer l'ancien fichier
+    if fichier_evalStat_formation.exists():
+        fichier_evalStat_formation.unlink()
     
+    # Copier le backup
+    if fichier_evalStat_formation_BAK.exists():
+        shutil.copy2(fichier_evalStat_formation_BAK, fichier_evalStat_formation)
+
+    # Lancer la fonction
+    EvalStat.depuis_chemin_csv_evaluations_stagiaires(chemin_csv_stagiaires=chemin_csv_stagiaires, chemin_IRIS_sessions=chemin_IRIS_sessions)
 
 if __name__ == "__main__":
-    main()
+    test_ajout_csv_a_evaluationFormation_existant()
+    #main()
 
 
 

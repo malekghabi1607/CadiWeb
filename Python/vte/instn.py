@@ -1563,6 +1563,7 @@ class EvalStat:
     # === VARIABLES DE CLASSE COMMUNES À TOUTES LES INSTANCES ===
 
     # Extract IRIS Sessions (R04110)
+    _chemin_IRIS_sessions:Path=None
     _fe_IRIS_sessions: Optional[FichierExcel] = None  # Fichier Excel contenant l'extract IRIS Sessions (ou celles de la période en cours)
     _df_IRIS_sessions: Optional[pd.DataFrame] = None  # Alias du dataframe
 
@@ -1638,7 +1639,23 @@ class EvalStat:
     # CONSTRUCTEURS ALTERNATIFS
     # ==================================================================================   
     @classmethod
-    def depuis_chemin_csv_evaluations_stagiaires(cls, chemin_csv_stagiaires:Optional[Path|str] = None, trigramme_formation:str = None, ouvrirDossier:bool=False) -> EvalStat:
+    def depuis_chemin_csv_evaluations_stagiaires(cls, chemin_csv_stagiaires:Optional[Path|str] = None, trigramme_formation:Optional[str] = None, chemin_IRIS_sessions:Optional[Path]=None, ouvrirDossier:bool=False) -> EvalStat:
+        """
+        Permet de traiter un CSV stagiaire d'une session.
+        Intègre le CSV natif dans un modèle Excel plus user-friendly
+        
+        :param cls: Description
+        :param chemin_csv_stagiaires: Chemin du CSV que l'on souhaite traiter. Si non présent, l'utilisateur le pointera avec une filedialog. Dans ce cas il faut un trigramme formation.
+        :type chemin_csv_stagiaires: Optional[Path | str]
+        :param trigramme_formation: Trigramme du CSV que l'on souhaite traiter. Si CSV présent, alors on essayera de le déduire du chemin du CSV.
+        :type trigramme_formation: Optional[str]
+        :param chemin_IRIS_sessions: Permet de forcer un chemin pour IRIS_sessions plutôt que de demander à l'utilisateur de le pointer avec un fileDialog
+        :type chemin_IRIS_sessions: Optional[Path]
+        :param ouvrirDossier: Permet d'ouvrir le répertoire à l'utilisateur en fin de traitement (jamais exploité)
+        :type ouvrirDossier: bool
+        :return: Un EvalStat
+        :rtype: EvalStat
+        """
 
         # Soit on a déjà un chemin, soit on va pointer le csv manuellement
         if chemin_csv_stagiaires is None:
@@ -1654,6 +1671,10 @@ class EvalStat:
         # On récupère le trigramme de la formation depuis le chemin du CSV
         if trigramme_formation is None:
             trigramme_formation = recupere_trig_formation_depuis_chemin(chemin_csv_stagiaires)
+
+        # Si on force un chemin pour chemin_IRIS_sessions, alors on renseigne la valeur
+        if chemin_IRIS_sessions is not None:
+            cls._chemin_IRIS_sessions = chemin_IRIS_sessions
 
         with Contexte_formation(trigramme_formation):
             EvalStat.depuis_chemin_csv_evaluations_stagiaires_avec_contexte(chemin_csv_stagiaires=Path(chemin_csv_stagiaires),
@@ -1857,7 +1878,7 @@ class EvalStat:
         (Chargé une seule fois, partagé entre toutes les instances.)
         """
         # Vérifie existance de fe_IRIS sinon on le charge
-        cls._fe_IRIS_sessions = IRIS.charger_excel_IRIS_sessions(fe_IRIS_sessions=cls._fe_IRIS_sessions)
+        cls._fe_IRIS_sessions = IRIS.charger_excel_IRIS_sessions(fe_IRIS_sessions=cls._fe_IRIS_sessions, chemin_IRIS_sessions=cls._chemin_IRIS_sessions)
 
         # Conversion du code IRIS en string pour jointure future
         cls._df_IRIS_sessions = cls._fe_IRIS_sessions._tableaux["Sessions"]._df
@@ -1946,6 +1967,8 @@ class EvalStat:
         self._fe_evaluations_stagiaires.actualiser_TCD()  # Mise à jour TCD
         self._statut_csv = "Traité"
 
+        #print("\nTypes de données de df_stagiaires dans méthode traiter :")
+        #print(df_stagiaires.dtypes)
 
         # Étape 4 — Mettre à jour le DataFrame de formation partagé
         self._mettre_a_jour_evaluations_formation()
@@ -2140,7 +2163,9 @@ class EvalStat:
             [col for col in df_stagiaires.columns if col not in df_sessions_filtre.columns]  # le reste (i.e. celles de df_stagiaires)
         )
         df_stagiaires = df_stagiaires[colonnes_resultat]
-        #print(_df_stagiaires)
+        #print("\nTypes de données de df_stagiaires dans _traiter_onglet_stagiaires :")
+        #print(df_stagiaires.dtypes)
+        #print(df_stagiaires)
         
         # On vire "Code session" qui est redondante avec "Code IRIS"
         df_stagiaires.drop(columns=["Code session"], inplace=True)
@@ -2212,13 +2237,32 @@ class EvalStat:
             df_formation_stagiaires = self._fe_evaluations_stagiaires._tableaux["Stagiaires"]._df.copy()
             
         else:
-            df = self._fe_evaluations_stagiaires._tableaux["CSV_stagiaires"]._df # Alias
-            if (not df.empty) and (df is not None): # Evite un future wanring de concaténer avec un df vide
-                df_formation_csv = pd.concat([df_formation_csv, df], ignore_index=True)
+            df_csv_stagiaires = self._fe_evaluations_stagiaires._tableaux["CSV_stagiaires"]._df # Alias
+            if (not df_csv_stagiaires.empty) and (df_csv_stagiaires is not None): # Evite un future wanring de concaténer avec un df vide
+                df_csv_stagiaires = adapter_colonnes_dataframe_selon_modele(df_modele=df_formation_csv, df_a_modifier=df_csv_stagiaires)
+                df_formation_csv = pd.concat([df_formation_csv, df_csv_stagiaires], ignore_index=True)
             
-            df = self._fe_evaluations_stagiaires._tableaux["Stagiaires"]._df # Alias
-            if (not df.empty) and (df is not None): # Evite un future wanring de concaténer avec un df vide
-                df_formation_stagiaires = pd.concat([df_formation_stagiaires, df], ignore_index=True)
+            df_stagiaires = self._fe_evaluations_stagiaires._tableaux["Stagiaires"]._df # Alias
+            if (not df_stagiaires.empty) and (df_stagiaires is not None): # Evite un future wanring de concaténer avec un df vide
+                
+                df_stagiaires = adapter_colonnes_dataframe_selon_modele(df_modele=df_formation_stagiaires, df_a_modifier=df_stagiaires)
+                
+                # Tester colonnes
+                #print("Colonnes de df_formation_stagiaires :", df_formation_stagiaires.columns)
+                #print("Colonnes de df :", df.columns)
+
+                print("\nTypes de données de df_formation_stagiaires :")
+                print(df_formation_stagiaires.dtypes)
+
+                print("\nTypes de données de df_stagiaires :")
+                print(df_stagiaires.dtypes)
+
+                # Tester index
+                print("Index de df_formation_stagiaires :", df_formation_stagiaires.index)
+                print("Index de df :", df_stagiaires.index)
+
+
+                df_formation_stagiaires = pd.concat([df_formation_stagiaires, df_stagiaires], ignore_index=True)
 
         self._fe_evaluations_formation._tableaux["CSV_stagiaires"]._df = df_formation_csv
         self._fe_evaluations_formation._tableaux["Stagiaires"]._df = df_formation_stagiaires

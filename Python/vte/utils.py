@@ -1793,7 +1793,51 @@ def arranger_fenetres(word_app, excel_app):
 
 
 
+### --------------------------------------------------------------------
+#  DataFrame
+### --------------------------------------------------------------------
+def adapter_colonnes_dataframe_selon_modele(df_modele, df_a_modifier):
+    """
+    Adapte les noms des colonnes et les types du second DataFrame en fonction du premier.
 
+    Args:
+        df_modele (pd.DataFrame): Le DataFrame modèle dont les noms de colonnes et les types serviront de référence.
+        df_a_modifier (pd.DataFrame): Le DataFrame à modifier pour correspondre au modèle.
+
+    Returns:
+        pd.DataFrame: Le DataFrame modifié pour correspondre au modèle.
+    """
+    # Vérifier si les DataFrames sont vides
+    if df_modele.empty or df_a_modifier.empty:
+        raise ValueError("Les DataFrames ne doivent pas être vides.")
+
+    # Renommer les colonnes de df_a_modifier pour correspondre à df_modele
+    colonnes_modele = df_modele.columns
+    colonnes_a_modifier = df_a_modifier.columns
+
+    # Créer un dictionnaire de renommage
+    renommage = {}
+    for col_modele, col_a_modifier in zip(colonnes_modele, colonnes_a_modifier):
+        if col_modele != col_a_modifier:
+            renommage[col_a_modifier] = col_modele
+
+    # Renommer les colonnes
+    df_a_modifier = df_a_modifier.rename(columns=renommage)
+
+    # Vérifier les types de données et les convertir si nécessaire
+    for col in colonnes_modele:
+        if col in df_a_modifier.columns:
+            type_modele = df_modele[col].dtype
+            type_a_modifier = df_a_modifier[col].dtype
+
+            # Convertir le type si nécessaire
+            if type_modele != type_a_modifier:
+                try:
+                    df_a_modifier[col] = df_a_modifier[col].astype(type_modele)
+                except Exception as e:
+                    print(f"Erreur lors de la conversion de la colonne {col} : {e}")
+
+    return df_a_modifier
 
 
 
