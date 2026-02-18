@@ -328,6 +328,108 @@ class IRIS:
         "Inscriptions" : config_extractsIRIS._colonnes_modele_inscriptions
         }
 
+
+
+    class Extract_traite:
+        """
+        Classe qui permet d'ouvrir et traiter un Extract IRIS déjà traité
+        """
+        def __init__(self, nom_typeExport:str, chemin:Optional[Path]=None, fe:Optional[FichierExcel]=None):
+            # Type d'export traité
+            self._nom_typeExport:str = nom_typeExport
+
+            # Chemin du fichier Excel IRIS
+            self._chemin:Optional[Path]=None
+            if chemin:
+                self._chemin = chemin
+
+            # Fichier Excel IRIS
+            self._fe:Optional[FichierExcel]=None
+            if fe:
+                self._fe = fe
+
+            self.charger_excel(fe=self._fe, chemin=self._chemin)
+
+        def charger_excel(self, fe:Optional[FichierExcel]=None, chemin:Optional[Path]=None):
+            """
+                Retourne l’extract IRIS Ventes s'il n'existe pas déjà.
+                Soit on fournit un FichierExcel, soit un chemin vers ce fichier .xlsx
+
+                Si fe_ventes existe (not None), alors on ne fait rien.
+                Si chemin_ventes est vide, alors on demande à l'utilisateur de pointer un fichier.
+                On crée un FichierExcel depuis le chemin.
+        
+                :param fe: FichierExcel de l'extract IRIS ventes qu'on souhaite traiter
+                :type fe: FichierExcel
+                :param chemin: Chemin de l'extract IRIS ventes qu'on souhaite traiter
+                :type chemin: Path
+                :return: un FichierExcel de l'extract IRIS ventes
+                :rtype: FichierExcel
+        
+                :Example:
+        
+                >>> charger_excel(chemin_sessions=chemin_input)
+                >>> charger_excel()
+
+        
+                .. seealso:: Rien du tout.
+                .. warning:: Rien du tout.
+                .. note:: Rien du tout.
+                .. todo:: Rien du tout.
+            """
+            if fe is None:
+                timer.debut(f"Lecture fichier IRIS {self._nom_typeExport}")
+
+                # On remplace la valeur par défaut si renseigné par l'utilisateur
+                if chemin is not None:
+                    self._chemin = chemin
+                    
+                # S'il n'y a pas de chemin, alors l'utilisateur le pointe
+                if self._chemin is None:
+                    self._chemin = self.choisir_fichier()
+
+
+                # On ouvre le ficheir IRIS
+                self._fe = FichierExcel.depuis_fichier(chemin_fichier=self._chemin)
+
+                match self._nom_typeExport:
+                    case "Sessions":
+                        # On convertit trigramme formation et code_IRIS
+                        self._fe._tableaux["Sessions"]._df = IRIS.convertit_types_colonnes_df_sessions(self._fe)
+                        
+                        # On trie
+                        self._fe = self._fe.sort_values(by="Date début ses.")  # Trie par "Date début ses."
+
+                    case "Ventes":
+                        # On convertit la colonne "Date de début" en datetime
+                        self.df['Date de début'] = pd.to_datetime(self.df['Date de début'])
+                        
+                        # On trie
+                        self._fe = self._fe.sort_values(by="Date de début")  # Si ventes. Trie par "Date de début"
+                
+                
+                timer.fin()
+
+        def choisir_fichier(self) -> Path | None:
+            """
+            Ouvre un filedialog pour demander à l'utilisateur de sélectionner un extract IRIS.
+            On pointe au mieux sur le répertoire des extracts IRIS pour la boîte de dialogue.
+            """
+
+            return choisir_fichier(titre=f"Sélectionner l'extract IRIS {str.lower(self._nom_typeExport)} {IRIS.cei(self._nom_typeExport)._codeExport} à employer.",
+                        types_fichiers=[("Fichiers Excel", "*.xlsx")],
+                        dossier_initial=IRIS.cei(self._nom_typeExport)._output.repertoire, # Pour aller vers mes fichiers concaténés, sinon pour les originaux il faut pointer vers input
+                        texte_bouton_choisir=f"Choisir extract IRIS {str.lower(self._nom_typeExport)} {IRIS.cei(self._nom_typeExport)._codeExport} à nouveau"
+                        )
+
+        @property
+        def fe(self) -> FichierExcel:
+            return self._fe
+
+        @property
+        def df(self) -> DataFrame:
+            return self._fe.tableaux[self._nom_typeExport].df
+
     # ====================
     # === Constructeur ===
     # ====================
@@ -533,6 +635,15 @@ class IRIS:
         for typeExport in typesExports:
             IRIS.concatener_exportsIRIS_typeUnique(typeExport, dict_chemins_fichiersInpout[typeExport])
 
+
+
+
+
+
+
+
+
+
     # =========================
     # === Méthodes internes ===
     # =========================
@@ -617,9 +728,120 @@ class IRIS:
         return df_concat_iris
 
 
+
     # ==========================
-    # === Méthodes statiques ===
+    # === Méthodes pour ouvir un extract existant IRIS Session (excel VTE qui concatène plusieurs natifs)  ===
     # ==========================
+    @staticmethod
+    def choisir_fichier_IRIS_sessions() -> Path | None:
+        """
+        Ouvre un filedialog pour demander à l'utilisateur de sélectionner un extract IRIS sessions.
+        On pointe au mieux sur le répertoire des extracts IRIS pour la boîte de dialogue.
+        """
+
+        return choisir_fichier(titre=f"Sélectionner l'extract IRIS session {IRIS.cei("Sessions")._codeExport} à employer.",
+                        types_fichiers=[("Fichiers Excel", "*.xlsx")],
+                        dossier_initial=IRIS.cei("Sessions")._output.repertoire, # Pour aller vers mes fichiers concaténés, sinon pour les originaux il faut pointer vers input
+                        texte_bouton_choisir=f"Choisir extract IRIS session {IRIS.cei("Sessions")._codeExport} à nouveau"
+                        )
+
+    @staticmethod
+    def charger_excel_IRIS_sessions(fe_IRIS_sessions:Optional[FichierExcel]=None, chemin_IRIS_sessions:Optional[Path]=None) -> FichierExcel:
+        """
+            Retourne l’extract IRIS sessions s'il n'existe pas déjà.
+            Soit on fournit un FichierExcel, soit un chemin vers ce fichier .xlsx
+
+            Si fe_IRIS_sessions existe (not None), alors on ne fait rien.
+            Si chemin_IRIS_sessions est vide, alors on demande à l'utilisateur de pointer un fichier.
+            On crée un FichierExcel depuis le chemin.
+    
+            :param fe_IRIS_sessions: FichierExcel de l'extract IRIS sessions qu'on souhaite traiter
+            :type fe_IRIS_sessions: FichierExcel
+            :param chemin_IRIS_sessions: Chemin de l'extract IRIS sessions qu'on souhaite traiter
+            :type chemin_IRIS_sessions: Path
+            :return: un FichierExcel de l'extract IRIS Sessions
+            :rtype: FichierExcel
+    
+            :Example:
+    
+            >>> charger_excel_IRIS_sessions(chemin_IRIS_sessions=chemin_input)
+            >>> charger_excel_IRIS_sessions()
+
+    
+            .. seealso:: Rien du tout.
+            .. warning:: Rien du tout.
+            .. note:: Rien du tout.
+            .. todo:: Rien du tout.
+        """
+        if fe_IRIS_sessions is None:
+            timer.debut("Lecture fichier IRIS sessions")
+
+            # S'il n'y a pas de chemin, alors l'utilisateur le pointe
+            if chemin_IRIS_sessions is None:
+                chemin_IRIS_sessions = IRIS.choisir_fichier_IRIS_sessions()
+
+            # On ouvre le fichier IRIS session
+            fe_IRIS_sessions = FichierExcel.depuis_fichier(chemin_fichier=chemin_IRIS_sessions)
+            
+            # Alias
+            df_IRIS_sessions = fe_IRIS_sessions._tableaux["Sessions"]._df
+            
+            # On convertit trigramme formation et code_IRIS
+            df_IRIS_sessions = IRIS.convertit_types_colonnes_df_sessions(fe_IRIS_sessions)
+
+            # On trie
+            df_IRIS_sessions = df_IRIS_sessions.sort_values(by="Date début ses.")  # Trie par "Date début ses."
+            
+            
+            timer.fin()
+
+        return fe_IRIS_sessions
+
+    @staticmethod
+    def convertit_types_colonnes_df_sessions(fe_IRIS_sessions:FichierExcel) -> pd.DataFrame:
+        """
+            Convertit les types suivants de l'extract Session de IRIS :
+               - trigrammes ;
+               - code IRIS.
+
+            On le fait car l'import du df convertit en entiers ou en d'autres types certaines colonnes alors que ça ne devrait pas (trigrammes, code IRIS).
+            Il en résulte que des filtres ne fonctionnement pas sans conversion.
+    
+            :param fe_IRIS_sessions: FichierExcel de l'extract IRIS sessions qu'on souhaite traiter
+            :type fe_IRIS_sessions: FichierExcel
+            :return: un DataFrame convertit sur les colonnes
+            :rtype: DataFrame
+    
+            :Example:
+
+            >>> convertit_types_colonnes_df_sessions(fe_IRIS_sessions = fe)
+
+    
+            .. seealso:: Rien du tout.
+            .. warning:: Rien du tout.
+            .. note:: Rien du tout.
+            .. todo:: Rien du tout.
+        """
+
+        df_IRIS_sessions = fe_IRIS_sessions._tableaux["Sessions"]._df  # Alias
+
+        # On convertit
+        df_IRIS_sessions["Trigramme formation"] = df_IRIS_sessions["Trigramme formation"].astype(str)  # Retype "Trigramme formation"
+        df_IRIS_sessions["Code IRIS"] = df_IRIS_sessions["Code IRIS"].astype(str)  # Retype "Code IRIS"
+
+        return df_IRIS_sessions
+
+
+
+
+
+    # ==========================
+    # === Méthodes statiques de traitement d'infos ===
+    # ==========================
+    @staticmethod
+    def cei(typeExport:str) -> ConfigExportIRIS:
+        return IRIS._dict_exports_IRIS["ConfigExportIRIS"][typeExport]
+    
     @staticmethod
     def _extraire_infos_numSessionIRIS(numSession:str) -> pd.Series:
         """
@@ -752,104 +974,6 @@ class IRIS:
             'Unité de formation': unite_formation,
             '3ème élément de la référence': troisieme_bloc
         })
-   
-
-
-    @staticmethod
-    def cei(typeExport:str) -> ConfigExportIRIS:
-        return IRIS._dict_exports_IRIS["ConfigExportIRIS"][typeExport]
-
-    @staticmethod
-    def choisir_fichier_IRIS_sessions() -> Path | None:
-        """
-        Ouvre un filedialog pour demander à l'utilisateur de sélectionner un extract IRIS sessions.
-        On pointe au mieux sur le répertoire des extracts IRIS pour la boîte de dialogue.
-        """
-
-        return choisir_fichier(titre=f"Sélectionner l'extract IRIS session {IRIS.cei("Sessions")._codeExport} à employer.",
-                        types_fichiers=[("Fichiers Excel", "*.xlsx")],
-                        dossier_initial=IRIS.cei("Sessions")._output.repertoire, # Pour aller vers mes fichiers concaténés, sinon pour les originaux il faut pointer vers input
-                        texte_bouton_choisir=f"Choisir extract IRIS session {IRIS.cei("Sessions")._codeExport} à nouveau"
-                        )
-
-    @staticmethod
-    def charger_excel_IRIS_sessions(fe_IRIS_sessions:Optional[FichierExcel]=None, chemin_IRIS_sessions:Optional[Path]=None) -> FichierExcel:
-        """
-            Retourne l’extract IRIS sessions s'il n'existe pas déjà.
-            Soit on fournit un FichierExcel, soit un chemin vers ce fichier .xlsx
-
-            Si fe_IRIS_sessions existe (not None), alors on ne fait rien.
-            Si chemin_IRIS_sessions est vide, alors on demande à l'utilisateur de pointer un fichier.
-            On crée un FichierExcel depuis le chemin.
-    
-            :param fe_IRIS_sessions: FichierExcel de l'extract IRIS sessions qu'on souhaite traiter
-            :type fe_IRIS_sessions: FichierExcel
-            :param chemin_IRIS_sessions: Chemin de l'extract IRIS sessions qu'on souhaite traiter
-            :type chemin_IRIS_sessions: Path
-            :return: un FichierExcel de l'extract IRIS Sessions
-            :rtype: FichierExcel
-    
-            :Example:
-    
-            >>> charger_excel_IRIS_sessions(chemin_IRIS_sessions=chemin_input)
-            >>> charger_excel_IRIS_sessions()
-
-    
-            .. seealso:: Rien du tout.
-            .. warning:: Rien du tout.
-            .. note:: Rien du tout.
-            .. todo:: Rien du tout.
-        """
-        if fe_IRIS_sessions is None:
-            timer.debut("Lecture fichier IRIS sessions")
-
-            if chemin_IRIS_sessions is None:
-                chemin_IRIS_sessions = IRIS.choisir_fichier_IRIS_sessions()
-
-            fe_IRIS_sessions = FichierExcel.depuis_fichier(chemin_fichier=chemin_IRIS_sessions)
-            
-            fe_IRIS_sessions._tableaux["Sessions"]._df = IRIS.convertit_types_colonnes_df_sessions(fe_IRIS_sessions)
-
-            timer.fin()
-
-        return fe_IRIS_sessions
-
-    @staticmethod
-    def convertit_types_colonnes_df_sessions(fe_IRIS_sessions:FichierExcel) -> pd.DataFrame:
-        """
-            Convertit les types suivants de l'extract Session de IRIS :
-               - trigrammes ;
-               - code IRIS.
-
-            On le fait car l'import du df convertit en entiers ou en d'autres types certaines colonnes alors que ça ne devrait pas (trigrammes, code IRIS).
-            Il en résulte que des filtres ne fonctionnement pas sans conversion.
-    
-            :param fe_IRIS_sessions: FichierExcel de l'extract IRIS sessions qu'on souhaite traiter
-            :type fe_IRIS_sessions: FichierExcel
-            :return: un DataFrame convertit sur les colonnes
-            :rtype: DataFrame
-    
-            :Example:
-
-            >>> convertit_types_colonnes_df_sessions(fe_IRIS_sessions = fe)
-
-    
-            .. seealso:: Rien du tout.
-            .. warning:: Rien du tout.
-            .. note:: Rien du tout.
-            .. todo:: Rien du tout.
-        """
-
-        df_IRIS_sessions = fe_IRIS_sessions._tableaux["Sessions"]._df  # Alias
-
-        # On convertit
-        df_IRIS_sessions["Trigramme formation"] = df_IRIS_sessions["Trigramme formation"].astype(str)  # Retype "Trigramme formation"
-        df_IRIS_sessions["Code IRIS"] = df_IRIS_sessions["Code IRIS"].astype(str)  # Retype "Code IRIS"
-
-        # On trie
-        df_IRIS_sessions = df_IRIS_sessions.sort_values(by="Date début ses.")  # Trie par "Date début ses."
-
-        return df_IRIS_sessions
 
     @staticmethod
     def verifier_code_IRIS(valeur: Any, type_sortie: Type = str) -> Tuple[bool, Any]:
@@ -926,6 +1050,11 @@ class IRIS:
 
         return codeIRIS
 
+
+
+    # ==========================
+    # === IHM ===
+    # ==========================
     @staticmethod
     def demander_liste_codes_IRIS(message="Pour exclure des sessions : entrez un ou plusieurs code IRIS (numéro à 5 chiffres) séparés par des espaces ou des virgules (ou rien pour passer) : ") -> list[str]:
         while True:
@@ -2352,7 +2481,7 @@ class FdC:
     # ==================================================================================
     # CONSTRUCTEUR
     # ==================================================================================
-    def __init__(self, codeIRIS: Optional[str] = None, chemin_fdc: Optional[Path] = None) -> None:
+    def __init__(self, chemin_fdc: Optional[Path] = None, trigramme_formation: Optional[str] = None) -> None:
         """
         Initialise une instance FdC.
 
@@ -2361,23 +2490,251 @@ class FdC:
             chemin_fdc (Path | None): Chemin vers le fichier Excel de la fiche de coûts.
         """
         # Variables propres à la FdC
-        self._codeIRIS: Optional[str] = codeIRIS
+        self._trigramme_formation: Optional[str] = trigramme_formation
         self._chemin_fdc: Optional[Path] = chemin_fdc  # Chemin de la fiche de coûts
-        #self._fe_evaluations_stagiaires: Optional[FichierExcel] = None  # Objet Excel contenant les données EvalStat stagiaire individuel
 
-        self._nomOnglet_fdc = "Fiche de coûts"
-
-
-        # === Résultat du traitement ===
-        #self._statut_csv: Optional[str] = None  # ex: "Traité", "Exclu - CSV déjà dans fichier global", "Exclu - Code IRIS pas dans Extract IRIS sessions", "Exclu - Problème lecture CSV", "Exclu - CSV vide / Aucun retour"
+        self._fe_fdc: Optional[FichierExcel] = None  # Objet Excel contenant la fiche de coûts
+        self._tableau_fdc:Optional[FichierExcel._TableauExcel] = None
 
 
-    # ==================================================================================
-    # CONSTRUCTEUR ALTERNATIFS
-    # ==================================================================================        
-    #def __
+        # Si aucun fichier input n'est donné, alors on ouvre un filedialog
+        if self._chemin_fdc is None:
+            self._chemin_fdc = FdC.choisir_fdc(self._trigramme_formation)
+            #TODO : else : si j'ai le chemin, je peux récupérer le trigramme
+
+        # On ouvre l'Excel
+        self._fe_fdc, self._tableau_fdc = FdC.charger_excel_IRIS_sessions(fe_fdc=self._fe_fdc, chemin_fdc=self._chemin_fdc)
 
 
+        """ # TODO - Date de modif de la FdC
+        # Pour connaître la date de la fiche de coût (basé sur date de modif)
+        self._dateFdC = datetime.fromtimestamp(self._chemin_fdc.stat().st_mtime)
+        self._sDateFdC = self._dateFdC.strftime("%d/%m/%Y")
+        """
+        
+    def fdc_ref(self, ref:str) -> Any:
+        return self._tableau_fdc.valeur_cellule(ref)
+
+    @property
+    def nomFormation(self) -> str:
+        """
+        Renvoie le nom de la formation (C5)
+        
+        :return: le dataframe de l'Exctract IRIS des sessions
+        :rtype: str
+        """
+        return self.fdc_ref("C5")
+
+    @property
+    def nb_participants_prevus(self) -> int:
+        return self.fdc_ref("C17")
+
+    @property
+    def date_creationFormation(self) -> int:
+        """
+        Retourne l'année de conception de la formation (C9).
+        TODO : on retourne une année alors qu'on pourrait retourner un DateTime
+        
+        :return: l'année de conception de la formation
+        :rtype: int
+        """
+        dateCreationFormation = self.fdc_ref("C9")
+
+        if isinstance(dateCreationFormation, int):
+            dateCreationFormation = dateCreationFormation
+        elif hasattr(dateCreationFormation, 'year'):
+            dateCreationFormation = dateCreationFormation.year
+        else:
+            print(f"Valeur inattendue pour une année : {dateCreationFormation} (type {type(dateCreationFormation)})")
+            dateCreationFormation = 1900
+        return dateCreationFormation
+
+
+        """
+        Renvoie le nom de la formation (C5)
+        
+        :return: le dataframe de l'Exctract IRIS des sessions
+        :rtype: str
+        """
+        return self.fdc_ref("C5")
+
+    @property
+    def min_participants_cea(self) -> int:
+        return self.fdc_ref("M22")
+    
+    @property
+    def min_participants_ee(self) -> int:
+        return self.fdc_ref("N23")
+    
+    @property
+    def min_participants(self) -> str:
+        return f"{self.min_participants_ee} (EE) / {self.min_participants_cea} (CEA)"
+    
+    @property
+    def prevus_participants(self) -> int:
+        return self.fdc_ref("C17")
+
+    def max_participants(self, depassementAutorise:int) -> int:
+        return self.prevus_participants + depassementAutorise
+
+
+    @staticmethod
+    def choisir_fdc(trigramme_formation:str = "") -> Path | None:
+        """
+        Ouvre un filedialog pour demander à l'utilisateur de sélectionner une fiche de coûts.
+        On pointe au mieux sur le répertoire des FdC pour la boîte de dialogue.
+        """
+
+        return choisir_fichier(titre=f"Sélectionner la fiche de coûts à employer.",
+                        types_fichiers=[("Fichiers Excel", "*.xlsx")],
+                        dossier_initial=config.format_path(config.REPERTOIRE_FDC, trigramme_formation=trigramme_formation),
+                        texte_bouton_choisir=f"Choisir FdC à nouveau"
+                        )
+
+
+    @staticmethod
+    def charger_excel_IRIS_sessions(fe_fdc:Optional[FichierExcel]=None, chemin_fdc:Optional[Path]=None) -> Tuple[FichierExcel, FichierExcel._TableauExcel]:
+        """
+            Retourne l’extract IRIS sessions s'il n'existe pas déjà.
+            Soit on fournit un FichierExcel, soit un chemin vers ce fichier .xlsx
+
+            Si fe_IRIS_sessions existe (not None), alors on ne fait rien.
+            Si chemin_IRIS_sessions est vide, alors on demande à l'utilisateur de pointer un fichier.
+            On crée un FichierExcel depuis le chemin.
+    
+            :param fe_IRIS_sessions: FichierExcel de l'extract IRIS sessions qu'on souhaite traiter
+            :type fe_IRIS_sessions: FichierExcel
+            :param chemin_IRIS_sessions: Chemin de l'extract IRIS sessions qu'on souhaite traiter
+            :type chemin_IRIS_sessions: Path
+            :return: un FichierExcel de l'extract IRIS Sessions
+            :rtype: FichierExcel
+    
+            :Example:
+    
+            >>> charger_excel_IRIS_sessions(chemin_IRIS_sessions=chemin_input)
+            >>> charger_excel_IRIS_sessions()
+
+    
+            .. seealso:: Rien du tout.
+            .. warning:: Rien du tout.
+            .. note:: Rien du tout.
+            .. todo:: Rien du tout.
+        """
+        if fe_fdc is None:
+            timer.debut("Lecture fiche de coûts")
+
+            if chemin_fdc is None:
+                chemin_fdc = FdC.choisir_fdc()
+
+            fe_fdc = FichierExcel.depuis_fichier(chemin_fichier=chemin_fdc, nom_onglet="Fiche de coûts")
+            tableau_fdc = fe_fdc._tableaux["Fiche de coûts"]
+            
+            #fe_fdc._tableaux["Fiche de coûts"]._df = IRIS.convertit_types_colonnes_df_sessions(fe_IRIS_sessions)
+
+            timer.fin()
+
+        return fe_fdc, tableau_fdc
+
+    def lire_fdc_bak(self):
+
+        """
+        A partir d'un chemin de fichier Excel (qui se doit d'etre une fiche de couts, on retourne plusieurs dataframes.
+
+        :param s_fdc: Chemin du fichier Excel a ouvrir (se doit d'etre une fiche de coûts)
+        :type s_fdc: string
+        :return: Un DataFrame de l'extract IRIS avec ajouts de colonnes (on a extrait les informations de la colonne 'N° Session' par decoupage)
+        :rtype: DataFrame
+
+        :Example:
+
+        >>> DataFrame.df_sessionsIRIS = lire_fdc("C:\\Users\\fichier.xlsx")
+
+
+        .. seealso:: Rien du tout.
+        .. warning:: Rien du tout.
+        .. note:: Rien du tout.
+        .. todo:: Rien du tout.
+        """
+
+
+
+        """
+        # On charge le fichier fdc si non déjà ouvert
+        self._fe_IRIS_sessions = IRIS.charger_excel_IRIS_sessions(fe_IRIS_sessions=self._fe_IRIS_sessions, chemin_IRIS_sessions=chemin_IRIS_sessions)
+
+
+
+        self._chemin_fdc = filedialog.askopenfilename(title="Sélectionner la dernière fiche de coûts", filetype=[("Fichiers Excel", "*.xlsx")], initialdir=optimiseCheminRepertoire(self._repertoire_fdc_defaut.replace("XXX", self._codeFormation)))
+        if not chemin_fichier_session:
+            log_erreur("click sur cancel du filedialog → Pas de chemin de fiche de coûts")
+        self._dateFdC = datetime.fromtimestamp(self._chemin_fdc.stat().st_mtime)
+        self._sDateFdC = self._dateFdC.strftime("%d/%m/%Y")
+        
+        self._df_fdc_infos, self._df_fdc_couts, self._prixVenteRetenuParParticipant, self._dateCreationFormation, self._dureeJours_fdc, self._osThematique, self._nbCible_fcd = lire_fdc(self._chemin_fdc)
+        """
+
+        nomOnglet_fdc = "Fiche de coûts"
+
+        # Premier tableau : B5:C21 (informations génériques)
+        df_fdc_infos = pd.read_excel(self._chemin_fdc, sheet_name=nomOnglet_fdc, usecols=[1, 2], names=["Critere", "Valeur"], header=3, nrows=17)
+        #print(df_fdc_infos)
+        dateCreationFormation = df_fdc_infos.iloc[4, 1] #C9
+        if isinstance(dateCreationFormation, int):
+            dateCreationFormation = dateCreationFormation
+        elif hasattr(dateCreationFormation, 'year'):
+            dateCreationFormation = dateCreationFormation.year
+        else:
+            print(f"Valeur inattendue pour une année : {dateCreationFormation} (type {type(dateCreationFormation)})")
+            dateCreationFormation = 1900
+
+        dureeJours_fdc = df_fdc_infos.iloc[6, 1] #C11
+        osThematique = df_fdc_infos.iloc[8, 1] #C13
+        nbCible_fcd = df_fdc_infos.iloc[12, 1] #C17
+
+        # Prix de vente défini par le RP (cellule J22)
+        prixVenteRetenuParParticipant = pd.read_excel(self._chemin_fdc, sheet_name=nomOnglet_fdc, usecols=[9], names=["Valeur"], skiprows=20, nrows=1).iloc[0,0]
+        
+        # Deuxième tableau : tableau des coûts (tout compris) et des prix par personne (T1, T2 et T3) : ref K35:N35
+        df_fdc_couts = pd.read_excel(self._chemin_fdc, sheet_name=nomOnglet_fdc, usecols=[10, 11, 12, 13, 14, 15], names=["T1", "T3", "T2", "0.9xT3", "1.1xT3", "Valeur fixée"], header=33, nrows=2).transpose() #Grosse astuce : je mets 2 lignes de plus pour affecter les noms plus facilement et je les recalculerai après
+        df_fdc_couts.rename(columns={0: "Couts fixes et variables nb cible"}, inplace=True) # Pour changer le nom de la colonne après transposition. Coûts prix fixes et prix
+        df_fdc_couts.head() # Requis pour MàJ le nom de la colonne après transposition
+
+        df_fdc_couts.loc["0.9xT3", "Couts fixes et variables nb cible"] = df_fdc_couts.loc["T3", "Couts fixes et variables nb cible"] * 0.9
+        df_fdc_couts.loc["1.1xT3", "Couts fixes et variables nb cible"] = df_fdc_couts.loc["T3", "Couts fixes et variables nb cible"] * 1.1
+        df_fdc_couts.loc["Valeur fixée", "Couts fixes et variables nb cible"] = prixVenteRetenuParParticipant / 1.1 * nbCible_fcd # Astuce : comme c'est une valeur que je n'ai pas, je fais le calcul inverse que pour avoir le montant par session avec aleas
+
+
+        # On ajoute les colonnes montants cibles avec calculs
+        l1 = []
+        l2 = []
+        l3 = []
+        for index, row in df_fdc_couts.iterrows():
+            l1.append(row["Couts fixes et variables nb cible"] * 1.1)
+            l2.append(row["Couts fixes et variables nb cible"] * 1.1 / nbCible_fcd)
+            l3.append(row["Couts fixes et variables nb cible"] * 1.1 / nbCible_fcd / dureeJours_fdc)
+        df_fdc_couts["Montant cible par session avec aléas"] = l1
+        df_fdc_couts["Montant cible par participant"] = l2
+        df_fdc_couts["Montant cible par participant et par jour"] = l3
+
+
+        # On ajoute les colonnes pour calcul nb participants
+        l1 = []
+        l2 = []
+        l3 = []
+        for index, row in df_fdc_couts.iterrows():
+            if row["Montant cible par participant"] != 0 :
+                l1.append(math.ceil(df_fdc_couts.loc["T1", "Montant cible par session avec aléas"] / row["Montant cible par participant"]))
+                l2.append(math.ceil(df_fdc_couts.loc["T2", "Montant cible par session avec aléas"] / row["Montant cible par participant"]))
+                l3.append(math.ceil(df_fdc_couts.loc["T3", "Montant cible par session avec aléas"] / row["Montant cible par participant"]))
+            else :
+                l1.append(0)
+        df_fdc_couts["Min participants T1"] = l1
+        df_fdc_couts["Min participants T2"] = l2
+        df_fdc_couts["Min participants T3"] = l3 
+
+        print(df_fdc_couts)
+
+        return df_fdc_infos, df_fdc_couts, prixVenteRetenuParParticipant, dateCreationFormation, dureeJours_fdc, osThematique, nbCible_fcd
 
 
 
@@ -3211,8 +3568,8 @@ class BilanSession:
 class BilanFormation:
     # === VARIABLES PARTAGÉES ENTRE TOUTES LES INSTANCES
     _fe_IRIS_sessions:Optional[FichierExcel] = None  # Fichier Excel qui contient les extracts IRIS Sessions (ou a minima celles de la période en cours)
-
-
+    _fdc:Optional[FdC] = None  # Objet contenant les données de la fiche de coûts
+    _ventes:Optional[IRIS.Extract_traite] = None
 
 
 
@@ -3258,16 +3615,21 @@ class BilanFormation_V3(BilanFormation):
     def __init__(self, trigramme_formation:str, annee:int):
         super().__init__(trigramme_formation, annee)
 
+        self._recapDonnees:DataFrame = pd.DataFrame(columns=['Source', 'Titre formation', 'Min participants', 'Cible participants', 'Max participants'])
+
         #Liste des champs de fusion du word
         #instance._annee:int = annee
-        self._titreFormation:str #  Sessions
-        #instance._trigramme_formation:str = trigramme_formation
-        self._date_creationFormation:Optional[datetime] = None  # FdC
-        self._rp:str = ""  # Sessions
+
+        self._titreFormation:str = "" #   IRIS Sessions (Session) ou FdC V6.1 : C5
+        #instance._trigramme_formation:str = trigramme_formation # IRIS Sessions (Trigramme formation) ou FdC V6.1 : C8
+        self._date_creationFormation:int = -1  # FdC - V6.1 : C9
+        self._rp:str = ""  # Sessions # IRIS Sessions (Nom responsable pédag. + Prénom responsable pédag.)
         self._rt:str = ""
-        self._min_participants_fdc:int = -1  # FdC
-        self._prevus_participants_fdc:int = -1  # FdC
-        self._max_participants_fdc:int = -1  # FdC
+        self._min_participants_cea:int = -1  # FdC - V6.1 : M22
+        self._min_participants_ee:int = -1  # FdC - V6.1 : N23 selon CEA intra ou non-CEA ou IRIS Sessions (Min.)
+        self._min_participants:str = -1  # FdC - V6.1 : M22 ou N23 selon CEA intra ou non-CEA ou IRIS Sessions (Min.)
+        self._prevus_participants:int = -1  # FdC - V6.1 : C17 ou IRIS Sessions (Max.)
+        self._max_participants:int = -1  # Prévu + dépass autorisé sur IRIS ou IRIS Sessions (Max. + Dépass. autorisé)
 
         self._annee_nm1 = self._annee - 1
         self._annee_np1 = self._annee + 1
@@ -3278,8 +3640,8 @@ class BilanFormation_V3(BilanFormation):
         self._nb_apprenants_nm1:str = ""  # Sessions (str car si multisite il faut spécifier mes différentes valeurs)
         self._nb_apprenants_n:str = ""  # Sessions (str car si multisite il faut spécifier mes différentes valeurs)
 
-        self._prix_nm1:float = -1  # Offre formation / left join avec Sessions sur "Réf. Formation" → On récupère Intitulé de l'offre (des fois plusieurs par trigramme) Type tarif OffreFormation.Montant # Todo rajouter année au traitement / concaténation de OffreFormation
-        self._prix_n:float = -1  # Offre formation / left join avec Sessions sur "Réf. Formation" → On récupère Intitulé de l'offre (des fois plusieurs par trigramme) Type tarif OffreFormation.Montant # Todo rajouter année au traitement / concaténation de OffreFormation
+        self._prix_nm1:float = -1  # Extract ventes
+        self._prix_n:float = -1  # Extract ventes
 
         self._satisfactionGlobale_nm1:float = -1  # EvalStat
         self._satisfactionGlobale_n:float = -1  # EvalStat
@@ -3310,58 +3672,16 @@ class BilanFormation_V3(BilanFormation):
         if (self._df_sessions_filtre is None) :
             log_erreur(f"Aucune session faite en {self._annee} : pas besoin de faire un bilan de formation")
 
-        # On récupère les sessions de l'année n et n-1 depuis l'Extract IRIS sessions (on trie par date pour avoir la plus récente en 1ère ligne)
-        #df_n = self._df_sessions_filtre[["Session", "Date début ses.", "N° Session", "Statut Session", "Lieu principal", "Prénom responsable pédag.", "Nom responsable pédag.", "Nb. Nommés"]].sort_values("Date début ses.", ascending=False)
-        #print("\nAnnée n")
-        #print(df_n)
-
-        #df_nm1 = self._df_sessions_filtre_nm1[["Session", "Date début ses.", "N° Session", "Statut Session", "Lieu principal", "Prénom responsable pédag.", "Nom responsable pédag.", "Nb. Nommés"]].sort_values("Date début ses.", ascending=False)
-        #print("\nAnnée n-1")
-        #print(df_nm1)
-
-
-        # On récupère les
-        """
-        if (self._df_sessions_filtre is not None) and (self._df_sessions_filtre_nm1 is not None): # Evite un future wanring de concaténer avec un df vide
-            df_n_nm1 = pd.concat([self._df_sessions_filtre, self._df_sessions_filtre_nm1], ignore_index=True)
-        elif (self._df_sessions_filtre is None) :
-            log_erreur(f"Aucune session faite en {self._annee} : pas besoin de faire un bilan de formation")
-        elif (self._df_sessions_filtre_nm1 is not None) :
-            df_n_nm1 = self._df_sessions_filtre_nm1
-        else :
-            df_n_nm1 = None
-            log_erreur(f"Aucune session faite ni en {self._annee} ni en {self._annee_nm1} : pas besoin de faire un bilan de formation")
-        """
 
         
-
-
-
-        # Trouver la ligne avec la date la plus récente
-        ligne_plus_recente = self._df_sessions_filtre.iloc[0]
-
-        # Exraire les données stockées sur une ligne
-        [self._titreFormation] = ligne_plus_recente[["Session"]]
-        #[self._titreFormation, self._min_participants_sessions, self._max_participants_sessions, self._depassementAutorise_participants_sessions] = ligne_plus_recente[["Session", "Min.", "Max.", "Dépass. autorisé"]]
         
-        # Pour obtenir la liste des RP et de leurs lieux : grouper et prendre la première occurrence (la plus récente)
-        groupe_rp = self._df_sessions_filtre.groupby("Nom responsable pédag.", as_index=False).first()  # Si je ne mets pas le as_index, alors l'index devient le nom du rp et les données ne peuvent plus être filtrées comme des colonnes normales sur ce critère
 
-        # Formater les informations
-        infos_rp = (
-            groupe_rp["Prénom responsable pédag."] + " " +
-            groupe_rp["Nom responsable pédag."] + " (" +
-            groupe_rp["Lieu principal"] + ")"
-        )
-
-        # Joindre avec des virgules
-        self._rp = ", ".join(infos_rp)
-
-
-
-
-
-
+        # Exraire les données de la session la plus récente
+        ligne_plus_recente = self._df_sessions_filtre.iloc[0]  # Trouver la ligne avec la date la plus récente
+        [self._titreFormation, min_participants_sessions, max_participants_sessions, depassementAutorise_participants_sessions] = ligne_plus_recente[["Session", "Min.", "Max.", "Dépass. autorisé"]]
+        
+        # Liste des RP et de leurs lieux
+        self._rp = BilanFormation_V3.creer_texte_rp(self._df_sessions_filtre)
 
         # Nombre de sessions
         self._nb_sessions_nm1 = BilanFormation_V3.creer_texte_nb_sessions(self._df_sessions_filtre_nm1)
@@ -3371,9 +3691,17 @@ class BilanFormation_V3(BilanFormation):
         self._nb_apprenants_nm1 = BilanFormation_V3.creer_texte_nb_apprenants(self._df_sessions_filtre_nm1)
         self._nb_apprenants_n = BilanFormation_V3.creer_texte_nb_apprenants(self._df_sessions_filtre)
 
+        # Pour comparaison entre sources
+        nouvelle_ligne = pd.DataFrame({
+            'Source': ['IRIS sessions'],
+            'Titre formation': [self._titreFormation],
+            'Min participants': [min_participants_sessions],
+            'Cible participants': [max_participants_sessions],
+            'Max participants': [max_participants_sessions + depassementAutorise_participants_sessions]
+        })
 
-
-
+        # Concaténer le DataFrame temporaire avec le DataFrame existant
+        self._recapDonnees = pd.concat([self._recapDonnees, nouvelle_ligne], ignore_index=True)
 
 
 
@@ -3383,41 +3711,98 @@ class BilanFormation_V3(BilanFormation):
 
         
         # TODO à virer après les phases de test
-        chemin_fdc = Path(r"P:\FORMATIONS_C\948\P05-P06-dossier-conception-referentiel\fiche-de-cout-et-code-de-formation\Fiche de coûts - TEL - Elaboration de scénarios de DEM - 2025.01.24.xlsx")
-
-        """
-        # On charge le fichier fdc si non déjà ouvert
-        self._fe_IRIS_sessions = IRIS.charger_excel_IRIS_sessions(fe_IRIS_sessions=self._fe_IRIS_sessions, chemin_IRIS_sessions=chemin_IRIS_sessions)
-
-
-
-        self._chemin_fdc = filedialog.askopenfilename(title="Sélectionner la dernière fiche de coûts", filetype=[("Fichiers Excel", "*.xlsx")], initialdir=optimiseCheminRepertoire(self._repertoire_fdc_defaut.replace("XXX", self._codeFormation)))
-        if not chemin_fichier_session:
-            log_erreur("click sur cancel du filedialog → Pas de chemin de fiche de coûts")
-        self._dateFdC = datetime.fromtimestamp(self._chemin_fdc.stat().st_mtime)
-        self._sDateFdC = self._dateFdC.strftime("%d/%m/%Y")
+        chemin_fdc = Path(chemin_vers_unc(r"P:\FORMATIONS_C\TEL\P05-P06-dossier-conception-referentiel\fiche-de-cout-et-code-de-formation\Fiche de coûts INSTN - TEL - 2025.xlsx"))
         
-        self._df_fdc_infos, self._df_fdc_couts, self._prixVenteRetenuParParticipant, self._dateCreationFormation, self._dureeJours_fdc, self._osThematique, self._nbCible_fcd = lire_fdc(self._chemin_fdc)
+        # On ouvre la fiche de coûts
+        self._fdc = FdC(chemin_fdc=chemin_fdc)       
+
+        # On récupère les informations souhaitées
+        self._date_creationFormation = self._fdc.date_creationFormation  # FdC - V6.1 : C9
+        self._min_participants_cea = self._fdc.min_participants_cea
+        self._min_participants_ee = self._fdc.min_participants_ee
+        self._min_participants = self._fdc.min_participants
+        self._prevus_participants = self._fdc.prevus_participants
+        self._max_participants = self._fdc.max_participants(depassementAutorise=depassementAutorise_participants_sessions)  # Prévu + dépass autorisé sur IRIS ou IRIS Sessions (Max. + Dépass. autorisé)
+        
+
+        # Pour comparaison entre sources
+        nouvelle_ligne = pd.DataFrame({
+            'Source': ['FdC'],
+            'Titre formation': [self._fdc.nomFormation], 
+            'Min participants': [self._min_participants], 
+            'Cible participants': [self._prevus_participants], 
+            'Max participants': [self._max_participants]
+        })
+
+        # Concaténer le DataFrame temporaire avec le DataFrame existant
+        self._recapDonnees = pd.concat([self._recapDonnees, nouvelle_ligne], ignore_index=True)
+
+        print("Récap des données sur les différents fichiers (vérif. incohérence)")
+        print(self._recapDonnees)
+
+
+
+
+
+
+
+
+        #####
+        # Ventes
+        #####
+
+        """
+        Méthodes pour avoir le prix de la session :
+        Sur R04301 Ventes : 
+        Récupérer pour la session :
+           - Date de début
+           - N° Session
+           - Code IRIS
+           - RP
+           - Type [Formation Inter, Formation Intra]
+           - Lieux Principal
+           - Intitulé Client
+           - Nb Inscriptions
+           - Total HT
+           - Type de tarif (Forfait ; Forfait/Pers.)
+
+        On souhaite afficher le tarif EE :
+        Si 3 premières lettres intitulé Client = CEA, alors Total HT = Total HT/0.9
+
+        
+        Si forfait/pers. alors on calcule le prix unitaire :
+        Si forfait/pers., Total HT = Total HT / Nb Inscriptions
         """
 
+                
+        # TODO à virer après les phases de test
+        chemin_IRIS_ventes = Path(chemin_vers_unc(r"R:\_Echanges\VTE\Prog\IRIS\Extracts complets\R04301_Ventes-COMPLET-2026.02.12.xlsx"))
 
+        # On charge le fichier IRIS Ventes si non déjà ouvert
+        self._ventes = IRIS.Extract_traite(nom_typeExport="Ventes", chemin_IRIS=chemin_IRIS_ventes)
+        
+        # Filtrer le DataFrame sur le "Trigramme formation" = "TEL" et sur les années n et n-1
+        df_filtre = self._ventes.df[(self._ventes.df['Trigramme formation'] == self._trigramme_formation) & (self._ventes.df['Date de début'].dt.year.isin([self._annee-1, self._annee]))]
 
+        # Créer un DataFrame df_travail avec les colonnes spécifiées
+        df_travail = df_filtre[['Date de début', 'N° Session', 'Code IRIS', 'RP', 'Type', 'Lieux Principal', 'Intitulé Client', 'Nb Inscriptions', 'Total HT', 'Type tarif']]
 
+        # Ajouter une colonne "CEA" (booléen) pour tester si les 3 premières lettres de "Intitulé Client" = "CEA"
+        df_travail['CEA'] = df_travail['Intitulé Client'].str[:3] == 'CEA'
 
+        # Ajouter une colonne "Prix HT EE" (si tarif CEA, alors on divise par 0.9 ; si on est sur un forfait/pers., alors on divise par nombre d'inscriptions)
+        df_travail['Prix HT EE'] = df_travail.apply(
+            lambda row: (row['Total HT'] / 0.9 if row['CEA'] else row['Total HT']) / row['Nb Inscriptions'] if row['Type tarif'] == 'Forfait/Pers.' else (row['Total HT'] / 0.9 if row['CEA'] else row['Total HT'])
+            , axis=1)
 
-        self._date_creationFormation:Optional[datetime] = None  # FdC
+        # Arrondir le résultat à l'entier le plus proche
+        df_travail['Prix HT EE'] = df_travail['Prix HT EE'].round()
 
-        self._min_participants_fdc:int = -1  # FdC
-        self._prevus_participants_fdc:int = -1  # FdC
-        self._max_participants_fdc:int = -1  # FdC
+        # Ajouter une colonne "Unité prix" en fonction du "Type de tarif"
+        df_travail['Unité prix'] = df_travail['Type tarif'].apply(lambda x: '€ HT (forfait)' if x == 'Forfait' else '€ HT/pers.')
 
+        print(df_travail[['Date de début', 'N° Session','Intitulé Client', 'CEA', 'Nb Inscriptions', 'Total HT', 'Type tarif', 'Prix HT EE', 'Unité prix']])
 
-
-
-
-        #####
-        # Offre formation / left join avec Sessions
-        #####
         self._prix_nm1:float = -1  # Offre formation / left join avec Sessions sur "Réf. Formation" → On récupère Intitulé de l'offre (des fois plusieurs par trigramme) Type tarif OffreFormation.Montant # Todo rajouter année au traitement / concaténation de OffreFormation
         self._prix_n:float = -1  # Offre formation / left join avec Sessions sur "Réf. Formation" → On récupère Intitulé de l'offre (des fois plusieurs par trigramme) Type tarif OffreFormation.Montant # Todo rajouter année au traitement / concaténation de OffreFormation
 
@@ -3517,18 +3902,20 @@ class BilanFormation_V3(BilanFormation):
         document.write(self._chemin_word_bilan_formation_output)
 
     @staticmethod
-    def creer_texte_nb_sessions(df:DataFrame) -> str:
+    def creer_texte_nb_sessions(df_sessions:DataFrame) -> str:
         """
         Crée le texte de nb_sessions afin d'arriver à ceci : "6 session(s)\n(3 UEM + 3 UECC))
-                
+              
+        :param df_sessions: dataframe sessions IRIS à employer (peut être une sous-partie du df original)
+        :type df_sessions: DataFrame  
         :return: Un texte correspondant à la description
         :rtype: str
         """
         # Calculer le nombre total de sessions pour tous les lieux
-        nombre_sessions_tousLesLieux = df['Lieu principal'].count()
+        nombre_sessions_tousLesLieux = df_sessions['Lieu principal'].count()
 
         # Calculer le nombre de sessions par lieu
-        nombre_sessions_par_lieu = df['Lieu principal'].value_counts()
+        nombre_sessions_par_lieu = df_sessions['Lieu principal'].value_counts()
 
         # Créer le texte souhaité
         if nombre_sessions_tousLesLieux > 1:
@@ -3547,18 +3934,20 @@ class BilanFormation_V3(BilanFormation):
         return texte
 
     @staticmethod
-    def creer_texte_nb_apprenants(df:DataFrame) -> str:
+    def creer_texte_nb_apprenants(df_sessions:DataFrame) -> str:
         """
         Crée le texte de nb_sessions afin d'arriver à ceci : "16 pers.\n(10 UEM + 6 UECC))
         
+        :param df_sessions: dataframe sessions IRIS à employer (peut être une sous-partie du df original)
+        :type df_sessions: DataFrame
         :return: Un texte correspondant à la description
         :rtype: str
         """
         # Calculer le nombre total de personnes dans toutes les sessions
-        nombre_personnes_total = df['Nb. Nommés'].sum()
+        nombre_personnes_total = df_sessions['Nb. Nommés'].sum()
 
         # Calculer le nombre de personnes par lieu
-        nombre_personnes_par_lieu = df.groupby('Lieu principal')['Nb. Nommés'].sum()
+        nombre_personnes_par_lieu = df_sessions.groupby('Lieu principal')['Nb. Nommés'].sum()
 
         # Créer le texte souhaité
         texte_detail = f"\n({' + '.join(f'{count} {config.UNITES[lieu]}' for lieu, count in nombre_personnes_par_lieu.items())})" if len(nombre_personnes_par_lieu) > 1 else ""
@@ -3568,6 +3957,28 @@ class BilanFormation_V3(BilanFormation):
 
         return texte
 
+    @staticmethod
+    def creer_texte_rp(df_sessions:DataFrame) -> str:
+        """
+        Crée le texte des rp afin d'arriver à ceci : "Vincent TESTARD (UEM) ; Antony LEBLED (UECC)"
+        
+        :param df_sessions: dataframe sessions IRIS à employer (peut être une sous-partie du df original)
+        :type df_sessions: DataFrame
+        :return: Un texte correspondant à la description
+        :rtype: str
+        """
+        # Pour obtenir la liste des RP et de leurs lieux : grouper et prendre la première occurrence (la plus récente)
+        groupe_rp = df_sessions.groupby("Nom responsable pédag.", as_index=False).first()  # Si je ne mets pas le as_index, alors l'index devient le nom du rp et les données ne peuvent plus être filtrées comme des colonnes normales sur ce critère
+
+        # Formater les informations
+        infos_rp = (
+            groupe_rp["Prénom responsable pédag."] + " " +
+            groupe_rp["Nom responsable pédag."] + " (" +
+            groupe_rp["Lieu principal"] + ")"
+        )
+
+        # Joindre avec des virgules
+        return ", ".join(infos_rp)
 
 class BilanFormation_VTE:
     """

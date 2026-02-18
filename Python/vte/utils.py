@@ -481,7 +481,7 @@ def log_erreur(message: str, continuer:bool = False) -> None:
 #  Dossiers
 ### --------------------------------------------------------------------
 
-def optimiseCheminRepertoire(path_in) -> str:
+def optimiseCheminRepertoire(path_in:str|Path) -> str|Path:
     """
         Tout le monde n'emploie pas les noms de la GED miroir comme ils devraient.
         Ainsi pour faciliter l'utilisateur, je teste l'existance du repertoire qui devrait fonctionner.
@@ -514,7 +514,10 @@ def optimiseCheminRepertoire(path_in) -> str:
             path_out = "."
         #print(path_out)
 
-    return(path_out)
+    if path_in.isinstance(str) :
+        return(str(path_out))
+    elif path_in.isinstance(Path) :
+        return(Path(path_out))
 
 def ouvrir_dossier(path) -> str:
     if platform.system() == "Windows":
@@ -1603,7 +1606,7 @@ def choisir_fichier(
     root.withdraw()
 
     if dossier_initial is not None:
-        dossier_initial = Path(dossier_initial)
+        dossier_initial = Path(optimiseCheminRepertoire(dossier_initial))
     else:
         dossier_initial = Path.cwd()
 
