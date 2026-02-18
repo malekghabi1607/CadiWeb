@@ -57,6 +57,32 @@ from tkinter import filedialog, Tk
 from screeninfo import get_monitors
 import ctypes
 
+import warnings
+
+
+warnings.filterwarnings("ignore", category=UserWarning, message="Data Validation extension is not supported and will be removed")
+"""
+Le fichier Excel contient des règles de validation de données, par exemple :
+listes déroulantes
+valeurs autorisées (min/max)
+dates valides
+formats personnalisés
+
+openpyxl sait lire la cellule, mais ne sait pas préserver / réécrire correctement ces règles.
+Si on réenregistre le fichier avec openpyxl,
+les validations seront supprimées.
+"""
+warnings.filterwarnings("ignore", category=UserWarning, message="wmf image format is not supported so the image is being dropped")
+"""
+Ton Excel contient une image au format WMF (Windows Metafile) :
+anciens logos
+objets copiés-collés depuis Word / PowerPoint
+graphiques anciens
+
+openpyxl ignore totalement ces images
+elles sont supprimées si le fichier est sauvegardé
+"""
+
 ### --------------------------------------------------------------------
 #  Définitions classes et fonctions génériques
 ### --------------------------------------------------------------------

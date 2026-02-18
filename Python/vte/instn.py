@@ -3624,7 +3624,7 @@ class BilanFormation_V3(BilanFormation):
     def __init__(self, trigramme_formation:str, annee:int):
         super().__init__(trigramme_formation, annee)
 
-        self._recapDonnees:DataFrame = pd.DataFrame(columns=['Source', 'Titre formation', 'Min participants', 'Cible participants', 'Max participants'])
+        self._recapDonnees:DataFrame = pd.DataFrame(columns=['Source', 'Titre formation', 'Min participants', 'Cible participants', 'Max participants', 'Dépassement autorisé'])
 
         #Liste des champs de fusion du word
         #instance._annee:int = annee
@@ -3649,8 +3649,8 @@ class BilanFormation_V3(BilanFormation):
         self._nb_apprenants_nm1:str = ""  # Sessions (str car si multisite il faut spécifier mes différentes valeurs)
         self._nb_apprenants_n:str = ""  # Sessions (str car si multisite il faut spécifier mes différentes valeurs)
 
-        self._prix_nm1:float = -1  # Extract ventes
-        self._prix_n:float = -1  # Extract ventes
+        self._prix_nm1:str = -1  # Extract ventes
+        self._prix_n:str = -1  # Extract ventes
 
         self._satisfactionGlobale_nm1:float = -1  # EvalStat
         self._satisfactionGlobale_n:float = -1  # EvalStat
@@ -3686,8 +3686,10 @@ class BilanFormation_V3(BilanFormation):
         
 
         # Exraire les données de la session la plus récente
-        ligne_plus_recente = self._df_sessions_filtre.iloc[0]  # Trouver la ligne avec la date la plus récente
-        [self._titreFormation, min_participants_sessions, max_participants_sessions, depassementAutorise_participants_sessions] = ligne_plus_recente[["Session", "Min.", "Max.", "Dépass. autorisé"]]
+        ligne_plus_recente = self._df_sessions_filtre.iloc[0][["Session", "Min.", "Max.", "Dépass. autorisé"]]  # Trouver la ligne avec la date la plus récente
+        #print("\nValeurs 'Formation' de la dernière session")
+        #print(pd.DataFrame(ligne_plus_recente.transpose()))
+        [self._titreFormation, min_participants_sessions, max_participants_sessions, depassementAutorise_participants_sessions] = ligne_plus_recente
         
         # Liste des RP et de leurs lieux
         self._rp = BilanFormation_V3.creer_texte_rp(self._df_sessions_filtre)
@@ -3700,16 +3702,15 @@ class BilanFormation_V3(BilanFormation):
         self._nb_apprenants_nm1 = BilanFormation_V3.creer_texte_nb_apprenants(self._df_sessions_filtre_nm1)
         self._nb_apprenants_n = BilanFormation_V3.creer_texte_nb_apprenants(self._df_sessions_filtre)
 
-        # Pour comparaison entre sources
+        # Pour comparaison données entre les différentes sources
         nouvelle_ligne = pd.DataFrame({
             'Source': ['IRIS sessions'],
             'Titre formation': [self._titreFormation],
             'Min participants': [min_participants_sessions],
             'Cible participants': [max_participants_sessions],
-            'Max participants': [max_participants_sessions + depassementAutorise_participants_sessions]
+            'Max participants': [max_participants_sessions + depassementAutorise_participants_sessions],
+            'Dépassement autorisé': [depassementAutorise_participants_sessions]
         })
-
-        # Concaténer le DataFrame temporaire avec le DataFrame existant
         self._recapDonnees = pd.concat([self._recapDonnees, nouvelle_ligne], ignore_index=True)
 
 
@@ -3717,8 +3718,6 @@ class BilanFormation_V3(BilanFormation):
         #####
         # Exploitation de la fiche de coûts
         #####
-
-        
         # TODO à virer après les phases de test
         chemin_fdc = Path(chemin_vers_unc(r"P:\FORMATIONS_C\TEL\P05-P06-dossier-conception-referentiel\fiche-de-cout-et-code-de-formation\Fiche de coûts INSTN - TEL - 2025.xlsx"))
         
@@ -3734,19 +3733,18 @@ class BilanFormation_V3(BilanFormation):
         self._max_participants = self._fdc.max_participants(depassementAutorise=depassementAutorise_participants_sessions)  # Prévu + dépass autorisé sur IRIS ou IRIS Sessions (Max. + Dépass. autorisé)
         
 
-        # Pour comparaison entre sources
+        # Pour comparaison données entre les différentes sources
         nouvelle_ligne = pd.DataFrame({
             'Source': ['FdC'],
             'Titre formation': [self._fdc.nomFormation], 
             'Min participants': [self._min_participants], 
             'Cible participants': [self._prevus_participants], 
-            'Max participants': [self._max_participants]
+            'Max participants': [self._max_participants],
+            'Dépassement autorisé': ""
         })
-
-        # Concaténer le DataFrame temporaire avec le DataFrame existant
         self._recapDonnees = pd.concat([self._recapDonnees, nouvelle_ligne], ignore_index=True)
 
-        print("Récap des données sur les différents fichiers (vérif. incohérence)")
+        print("\nRécap des données sur les différents fichiers (vérif. incohérence)")
         print(self._recapDonnees)
 
 
@@ -3810,10 +3808,17 @@ class BilanFormation_V3(BilanFormation):
         # Ajouter une colonne "Unité prix" en fonction du "Type de tarif"
         df_travail['Unité prix'] = df_travail['Type tarif'].apply(lambda x: '€ HT (forfait)' if x == 'Forfait' else '€ HT/pers.')
 
-        print(df_travail[['Date de début', 'N° Session','Intitulé Client', 'CEA', 'Nb Inscriptions', 'Total HT', 'Type tarif', 'Prix HT EE', 'Unité prix']])
 
-        self._prix_nm1:float = -1  # Offre formation / left join avec Sessions sur "Réf. Formation" → On récupère Intitulé de l'offre (des fois plusieurs par trigramme) Type tarif OffreFormation.Montant # Todo rajouter année au traitement / concaténation de OffreFormation
-        self._prix_n:float = -1  # Offre formation / left join avec Sessions sur "Réf. Formation" → On récupère Intitulé de l'offre (des fois plusieurs par trigramme) Type tarif OffreFormation.Montant # Todo rajouter année au traitement / concaténation de OffreFormation
+        # Vérification que tous les tarifs sont bien les mêmes
+        # J'exclue les lignes si "Prix HT EE" = NaN
+        df_travail = df_travail.dropna(subset=['Prix HT EE'])
+
+        # J'exclue les lignes si "Prix HT EE" = 0
+        df_travail = df_travail[df_travail['Prix HT EE'] != 0]
+
+
+        self._prix_nm1 = self._evaluer_prix_annee(df_travail=df_travail, annee=self._annee_nm1)
+        self._prix_n = self._evaluer_prix_annee(df_travail=df_travail, annee=self._annee)
 
         
 
@@ -3909,6 +3914,38 @@ class BilanFormation_V3(BilanFormation):
             )
         
         document.write(self._chemin_word_bilan_formation_output)
+
+    @staticmethod
+    def _evaluer_prix_annee(df_travail:DataFrame, annee:int) -> str:
+        # Année n
+        df_travail_n = df_travail[(df_travail['Date de début'].dt.year.isin([annee]))]
+
+        if len(df_travail_n["Prix HT EE"].unique()) == 1:
+            prix_annee = f"{df_travail_n.iloc[0]["Prix HT EE"]} {df_travail_n.iloc[0]["Unité prix"]}"
+        else :
+            print(df_travail_n[['Date de début', 'N° Session','Intitulé Client', 'CEA', 'Nb Inscriptions', 'Total HT', 'Type tarif', 'Prix HT EE', 'Unité prix']])
+            # Regrouper les lignes par "Prix HT EE" et "Unité prix"
+            df_travail_n_groupe = df_travail_n.groupby(['Prix HT EE', 'Unité prix'])
+
+            # Initialiser une liste pour stocker les lignes de texte
+            lignes_texte = []
+
+            # Parcourir chaque groupe
+            for (prix, unite), groupe in df_travail_n_groupe:
+                # Créer une liste des éléments pour chaque ligne du groupe
+                elements = []
+                for _, row in groupe.iterrows():
+                    element = f"{row['N° Session']}; {row['Date de début']}; {row['Intitulé Client']}; {row['Nb Inscriptions']}; {row['Total HT']}; {row['Type tarif']}"
+                    elements.append(element)
+
+                # Créer la ligne de texte pour le groupe
+                ligne_texte = f"• {prix} {unite} :\n\t- " + "\n\t- ".join(elements)
+                lignes_texte.append(ligne_texte)
+
+            # Joindre toutes les lignes de texte avec des sauts de ligne
+            prix_annee = "\n".join(lignes_texte)
+
+        return prix_annee
 
     @staticmethod
     def creer_texte_nb_sessions(df_sessions:DataFrame) -> str:
