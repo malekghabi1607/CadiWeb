@@ -430,12 +430,7 @@ class FichierExcel:
                 ws = self._ws
                 self._initialise_cache(ws, "formules")
             else:
-                wb_calcule = load_workbook(
-                    self._fichier,
-                    data_only=True,
-                    read_only=False
-                )
-                ws = wb_calcule[self._nom_onglet]
+                ws = self._parent._charge_worksheet_valeurs(self._nom_onglet)
                 self._initialise_cache(ws, "valeurs")
 
         def _valeur_depuis_cache(
@@ -466,7 +461,7 @@ class FichierExcel:
             fusions = getattr(self, f"_cache_{prefixe}_fusions")
 
             # --- Conversion de la référence Excel ---
-            ligne, colonne = self._convertit_reference_excel(reference)
+            ligne, colonne = self.convertit_reference_excel(reference)
 
             if (
                 ligne < 0 or ligne >= max_ligne or
@@ -803,6 +798,27 @@ class FichierExcel:
                 max_col = self._max_col
             return FichierExcel.definir_rangeExcel(min_row, min_col, max_row, max_col)
 
+        def convertit_reference_excel(self, reference: str) -> tuple[int, int]: 
+            """ 
+            Convertit une référence Excel (ex: 'AB12') en indices Python (base 0). 
+
+            :param reference: Référence Excel 
+            :return: Tuple (ligne, colonne) 
+            """ 
+            
+            match = re.match(r"([A-Z]+)(\d+)", reference.upper())
+            
+            if not match: 
+                raise ValueError(f"Référence Excel invalide : {reference}") 
+            
+            lettres_colonne, ligne = match.groups() 
+            
+            colonne = 0 
+            for lettre in lettres_colonne: 
+                colonne = colonne * 26 + (ord(lettre) - ord("A") + 1) 
+                
+            return int(ligne) - 1, colonne - 1
+
         def change_references_tableauStructure(self, min_row: int, min_col: int, max_row: int, max_col: int, avec_initialiation: bool = True) -> None:
             self._table.ref = self.definir_rangeExcel(min_row, min_col, max_row, max_col)
             if avec_initialiation:
@@ -835,9 +851,6 @@ class FichierExcel:
 
 
 
-
-
-
         # === Méthodes statiques / utilitaires ===
         @staticmethod
         def extraire_plage_str(cle):
@@ -866,6 +879,11 @@ class FichierExcel:
         @property
         def df(self):
             return self._df
+
+        @df.setter
+        def df(self, valeur:DataFrame):
+            self._df = valeur
+
 
         @property
         def nbLignes_avantET(self):
@@ -1259,6 +1277,29 @@ class FichierExcel:
         Usage recommandé : utiliser ce tableau retourné pour appeler ses méthodes de manipulation.
         """
         return self._tableaux.get(nom)
+
+
+    # === Méthodes publiques : recharger un worksheet en mode valeur ===
+    def _charge_worksheet_valeurs(self, nom_onglet: str) -> Worksheet:
+        """
+        Charge un onglet Excel en mode data_only afin d'accéder
+        aux valeurs calculées des cellules.
+
+        :param nom_onglet: Nom de l'onglet à charger
+        :return: Worksheet openpyxl
+        """
+
+        wb = load_workbook(
+            self._chemin_fichier,
+            data_only=True,
+            read_only=False
+        )
+
+        return wb[nom_onglet]
+
+
+
+
 
     @property
     def noms_tableaux(self) -> List[str]:

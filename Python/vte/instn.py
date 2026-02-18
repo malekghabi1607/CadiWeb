@@ -394,18 +394,20 @@ class IRIS:
 
                 match self._nom_typeExport:
                     case "Sessions":
+
                         # On convertit trigramme formation et code_IRIS
-                        self._fe._tableaux["Sessions"]._df = IRIS.convertit_types_colonnes_df_sessions(self._fe)
+                        #self._fe._tableaux["Sessions"]._df = IRIS.convertit_types_colonnes_df_sessions(self._fe)
+                        self.df = IRIS.convertit_types_colonnes_df_sessions(self._fe)
                         
                         # On trie
-                        self._fe = self._fe.sort_values(by="Date début ses.")  # Trie par "Date début ses."
+                        self.df = self.df.sort_values(by="Date début ses.")  # Trie par "Date début ses."
 
                     case "Ventes":
                         # On convertit la colonne "Date de début" en datetime
                         self.df['Date de début'] = pd.to_datetime(self.df['Date de début'])
                         
                         # On trie
-                        self._fe = self._fe.sort_values(by="Date de début")  # Si ventes. Trie par "Date de début"
+                        self.df = self.df.sort_values(by="Date de début")  # Si ventes. Trie par "Date de début"
                 
                 
                 timer.fin()
@@ -422,6 +424,8 @@ class IRIS:
                         texte_bouton_choisir=f"Choisir extract IRIS {str.lower(self._nom_typeExport)} {IRIS.cei(self._nom_typeExport)._codeExport} à nouveau"
                         )
 
+
+        # Getter / Setter
         @property
         def fe(self) -> FichierExcel:
             return self._fe
@@ -430,6 +434,13 @@ class IRIS:
         def df(self) -> DataFrame:
             return self._fe.tableaux[self._nom_typeExport].df
 
+        @df.setter
+        def df(self, valeur:DataFrame):
+            self._fe.tableaux[self._nom_typeExport].df = valeur
+        
+
+
+        
     # ====================
     # === Constructeur ===
     # ====================
@@ -2512,8 +2523,6 @@ class FdC:
         self._sDateFdC = self._dateFdC.strftime("%d/%m/%Y")
         """
         
-    def fdc_ref(self, ref:str) -> Any:
-        return self._tableau_fdc.valeur_cellule(ref)
 
     @property
     def nomFormation(self) -> str:
@@ -2523,11 +2532,11 @@ class FdC:
         :return: le dataframe de l'Exctract IRIS des sessions
         :rtype: str
         """
-        return self.fdc_ref("C5")
+        return self._tableau_fdc["C5"]
 
     @property
     def nb_participants_prevus(self) -> int:
-        return self.fdc_ref("C17")
+        return self._tableau_fdc["C17"]
 
     @property
     def date_creationFormation(self) -> int:
@@ -2538,7 +2547,7 @@ class FdC:
         :return: l'année de conception de la formation
         :rtype: int
         """
-        dateCreationFormation = self.fdc_ref("C9")
+        dateCreationFormation = self._tableau_fdc["C9"]
 
         if isinstance(dateCreationFormation, int):
             dateCreationFormation = dateCreationFormation
@@ -2560,19 +2569,19 @@ class FdC:
 
     @property
     def min_participants_cea(self) -> int:
-        return self.fdc_ref("M22")
+        return self._tableau_fdc["M22"]
     
     @property
     def min_participants_ee(self) -> int:
-        return self.fdc_ref("N23")
+        return self._tableau_fdc["N23"]
     
     @property
     def min_participants(self) -> str:
-        return f"{self.min_participants_ee} (EE) / {self.min_participants_cea} (CEA)"
+        return f"{self.min_participants_ee} pers. (EE) / {self.min_participants_cea} pers. (CEA)"
     
     @property
     def prevus_participants(self) -> int:
-        return self.fdc_ref("C17")
+        return self._tableau_fdc["C17"]
 
     def max_participants(self, depassementAutorise:int) -> int:
         return self.prevus_participants + depassementAutorise
@@ -3779,7 +3788,7 @@ class BilanFormation_V3(BilanFormation):
         chemin_IRIS_ventes = Path(chemin_vers_unc(r"R:\_Echanges\VTE\Prog\IRIS\Extracts complets\R04301_Ventes-COMPLET-2026.02.12.xlsx"))
 
         # On charge le fichier IRIS Ventes si non déjà ouvert
-        self._ventes = IRIS.Extract_traite(nom_typeExport="Ventes", chemin_IRIS=chemin_IRIS_ventes)
+        self._ventes = IRIS.Extract_traite(nom_typeExport="Ventes", chemin=chemin_IRIS_ventes)
         
         # Filtrer le DataFrame sur le "Trigramme formation" = "TEL" et sur les années n et n-1
         df_filtre = self._ventes.df[(self._ventes.df['Trigramme formation'] == self._trigramme_formation) & (self._ventes.df['Date de début'].dt.year.isin([self._annee-1, self._annee]))]
