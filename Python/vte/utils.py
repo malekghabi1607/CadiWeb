@@ -1390,6 +1390,70 @@ def mois_fr_depuis_date(date_val: Union[datetime, str, int, float, pd.Timestamp]
 
     return noms_mois[date_val.month - 1]
 
+def debut_fin_periode(annee:Optional[int]=None, periode:Optional[str]=None) -> Tuple[pd.Timestamp, pd.Timestamp]:
+    """
+    Renvoie 2 dates (date_debut et date_fin d'une période) au format pd.TimeStamp (pour filtrer un dataframe selon cet intervalle).
+
+    L'utilisateur peut définir :
+       - l'année (si non renseigné, alors année en cours) ;
+       - la période ("1er semestre" ou "2nd semestre" ; si non renseigné, alors toute l'année)
+    
+    :param annee: année de l'intervalle (si non renseigné, alors année en cours)
+    :type annee: Optional[int]
+    :param periode: "1er semestre" ou "2nd semestre" (si non renseigné, alors toute l'année)
+    :type periode: Optional[str]
+    :return: date_debut et date_fin de la période
+    :rtype: Tuple[Timestamp, Timestamp]
+    """
+
+    if annee is None:
+        annee = datetime.now().year
+    
+    if periode is None:
+        periode = "Année"
+
+    # Cas par défaut : on ne filtre pas sur la date
+    date_debut = None
+    date_fin = None
+
+    # Définition date de début et de fin de la période choisie par l'utilisateur
+    if periode == "1er semestre":
+        date_debut = pd.Timestamp(f'{annee}-01-01')
+        date_fin = pd.Timestamp(f'{annee}-06-30')
+    elif periode == "2nd semestre":
+        date_debut = pd.Timestamp(f'{annee}-07-01')
+        date_fin = pd.Timestamp(f'{annee}-12-31')
+    elif periode == "Année":
+        date_debut = pd.Timestamp(f'{annee}-01-01')
+        date_fin = pd.Timestamp(f'{annee}-12-31')
+
+    return date_debut, date_fin
+
+def periode(annee:Optional[int]=None, periode:Optional[str]=None) -> Tuple[int, str]:
+    """
+    Renvoie l'année et la période en fonction des arguments.
+    (Met année = année en cours si None et periode="Année" si None).
+
+    L'utilisateur peut définir :
+       - l'année (si non renseigné, alors année en cours) ;
+       - la période ("1er semestre" ou "2nd semestre" ; si non renseigné, alors toute l'année)
+    
+    :param annee: année de la période (si non renseigné, alors année en cours)
+    :type annee: Optional[int]
+    :param periode: "1er semestre" ou "2nd semestre" (si non renseigné, alors toute l'année)
+    :type periode: Optional[str]
+    :return: date_debut et date_fin de la période
+    :rtype: Tuple[int, str]
+    """
+
+    if annee is None:
+        annee = datetime.now().year
+    
+    if periode is None:
+        periode = "Année"
+
+    return annee, periode
+
 
 ### --------------------------------------------------------------------
 #  Chaînes de caractères

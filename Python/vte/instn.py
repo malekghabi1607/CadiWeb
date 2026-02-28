@@ -193,6 +193,12 @@ class Contexte_formation(AbstractContextManager):
         return fe, supprimeDonneesEtRemplace
 
 
+
+    # === GETTER / SETTER ===
+    @property
+    def 
+
+
 # ======================================================================================
 # CLASSE IRIS
 # ======================================================================================
@@ -329,126 +335,20 @@ class IRIS:
         }
 
 
-
-    class Extract_traite:
-        """
-        Classe qui permet d'ouvrir et traiter un Extract IRIS déjà traité
-        """
-        def __init__(self, nom_typeExport:str, chemin:Optional[Path]=None, fe:Optional[FichierExcel]=None):
-            # Type d'export traité
-            self._nom_typeExport:str = nom_typeExport
-
-            # Chemin du fichier Excel IRIS
-            self._chemin:Optional[Path]=None
-            if chemin:
-                self._chemin = chemin
-
-            # Fichier Excel IRIS
-            self._fe:Optional[FichierExcel]=None
-            if fe:
-                self._fe = fe
-
-            self.charger_excel(fe=self._fe, chemin=self._chemin)
-
-        def charger_excel(self, fe:Optional[FichierExcel]=None, chemin:Optional[Path]=None):
-            """
-                Retourne l’extract IRIS Ventes s'il n'existe pas déjà.
-                Soit on fournit un FichierExcel, soit un chemin vers ce fichier .xlsx
-
-                Si fe_ventes existe (not None), alors on ne fait rien.
-                Si chemin_ventes est vide, alors on demande à l'utilisateur de pointer un fichier.
-                On crée un FichierExcel depuis le chemin.
-        
-                :param fe: FichierExcel de l'extract IRIS ventes qu'on souhaite traiter
-                :type fe: FichierExcel
-                :param chemin: Chemin de l'extract IRIS ventes qu'on souhaite traiter
-                :type chemin: Path
-                :return: un FichierExcel de l'extract IRIS ventes
-                :rtype: FichierExcel
-        
-                :Example:
-        
-                >>> charger_excel(chemin_sessions=chemin_input)
-                >>> charger_excel()
-
-        
-                .. seealso:: Rien du tout.
-                .. warning:: Rien du tout.
-                .. note:: Rien du tout.
-                .. todo:: Rien du tout.
-            """
-            if fe is None:
-                timer.debut(f"Lecture fichier IRIS {self._nom_typeExport}")
-
-                # On remplace la valeur par défaut si renseigné par l'utilisateur
-                if chemin is not None:
-                    self._chemin = chemin
-                    
-                # S'il n'y a pas de chemin, alors l'utilisateur le pointe
-                if self._chemin is None:
-                    self._chemin = self.choisir_fichier()
-
-
-                # On ouvre le ficheir IRIS
-                self._fe = FichierExcel.depuis_fichier(chemin_fichier=self._chemin)
-
-                match self._nom_typeExport:
-                    case "Sessions":
-
-                        # On convertit trigramme formation et code_IRIS
-                        #self._fe._tableaux["Sessions"]._df = IRIS.convertit_types_colonnes_df_sessions(self._fe)
-                        self.df = IRIS.convertit_types_colonnes_df_sessions(self._fe)
-                        
-                        # On trie
-                        self.df = self.df.sort_values(by="Date début ses.")  # Trie par "Date début ses."
-
-                    case "Ventes":
-                        # On convertit la colonne "Date de début" en datetime
-                        self.df['Date de début'] = pd.to_datetime(self.df['Date de début'])
-                        
-                        # On trie
-                        self.df = self.df.sort_values(by="Date de début")  # Si ventes. Trie par "Date de début"
-                
-                
-                timer.fin()
-
-        def choisir_fichier(self) -> Path | None:
-            """
-            Ouvre un filedialog pour demander à l'utilisateur de sélectionner un extract IRIS.
-            On pointe au mieux sur le répertoire des extracts IRIS pour la boîte de dialogue.
-            """
-
-            return choisir_fichier(titre=f"Sélectionner l'extract IRIS {str.lower(self._nom_typeExport)} {IRIS.cei(self._nom_typeExport)._codeExport} à employer.",
-                        types_fichiers=[("Fichiers Excel", "*.xlsx")],
-                        dossier_initial=IRIS.cei(self._nom_typeExport)._output.repertoire, # Pour aller vers mes fichiers concaténés, sinon pour les originaux il faut pointer vers input
-                        texte_bouton_choisir=f"Choisir extract IRIS {str.lower(self._nom_typeExport)} {IRIS.cei(self._nom_typeExport)._codeExport} à nouveau"
-                        )
-
-
-        # Getter / Setter
-        @property
-        def fe(self) -> FichierExcel:
-            return self._fe
-
-        @property
-        def df(self) -> DataFrame:
-            return self._fe.tableaux[self._nom_typeExport].df
-
-        @df.setter
-        def df(self, valeur:DataFrame):
-            self._fe.tableaux[self._nom_typeExport].df = valeur
-        
-
-
-        
     # ====================
     # === Constructeur ===
     # ====================
     def __init__(self, typeExport:str):
-
-        # Pour concaténer
+        """
+        Initialise un fichier IRIS traité delin d'un type d'export
+        
+        :param typeExport: spécifie le type d'export. Doit être dans cette liste : ["Sessions", "Formations", "Ventes", "Insciptions"]
+        :type typeExport: str
+        """
         self._typeExport:str = typeExport  # Nom du type d'export : ["Sessions", "Formations", "Ventes", "Insciptions"]
-
+        
+        # Fichier Excel de l'export IRIS
+        self._fe:Optional[FichierExcel] = None
 
     # =================================
     # === Constructeurs alternatifs ===
@@ -492,7 +392,7 @@ class IRIS:
         
         # Si aucun fichier de sortie n'est donnée, alors on prend le chemin par défaut
         if chemin_fichier_sauv is None:
-            chemin_fichier_sauv = instance._cei._output.chemin_fichier
+            chemin_fichier_sauv = instance.cei._output.chemin_fichier
 
         # On convertit en Path
 
@@ -507,7 +407,7 @@ class IRIS:
         
         # On ouvre le modèle et tous ses tableaux structurés
         fe_modele = FichierExcel.depuis_modele(
-                                        chemin_modele=instance._cei._modele.chemin_fichier, 
+                                        chemin_modele=instance.cei._modele.chemin_fichier, 
                                         chemin_fichier_sauv=chemin_fichier_sauv
                                         )
 
@@ -660,17 +560,18 @@ class IRIS:
     # =========================
     def _charger_df_extractsIRIS_originaux(self, chemins_fichiersInput:Path|tuple[Path, ...]) -> pd.DataFrame:
         """
-        Crée le DataFrame pour l'export IRIS.
-        On selectionne la bonne methode en fonction du type d'export
+        Lit le/les extract(s) IRIS et on le/les stocke dans un seul dataframe self._df_tableau
+        (i.e. on concatène si besoin)
 
-        :param chemins_fichiersInput: Chemin(s) du ou des fichiers à traiter
+        :param chemins_fichiersInput: Chemin(s) du ou des fichiers IRIS (.xlsx) à charger dans le dataframe
         :type chemins_fichiersInput: Path|tuple[Path, ...]
 
-        :return: Un DataFrame contenant toutes les données de chemins_fichiersInput concaténées
+        :return: Un DataFrame contenant les données de chemins_fichiersInput concaténées
         :rtype: pd.DataFrame
 
         :example:
-        >>> self.lire_extractIRIS()
+        >>> self._charger_df_extractsIRIS_originaux(Path(r"C:/fichier1.xlsx"))
+        >>> self._charger_df_extractsIRIS_originaux((Path(r"C:/fichier1.xlsx"), Path(r"C:/fichier2.xlsx"))
 
 
         .. seealso:: Rien du tout.
@@ -696,7 +597,7 @@ class IRIS:
                 taille = chemin.stat().st_size  # taille en octets 
                 pbar.set_postfix(file=fichier, progress=f"{i}/{len(chemins_fichiersInput)}")  # Affichage dynamique dans la barre
                 
-                df = pd.read_excel(chemin, skiprows=self._cei._input.nbLignes_avantET)
+                df = pd.read_excel(chemin, skiprows=self.cei._input.nbLignes_avantET)
                 df_list.append(df)  # On ajoute le DataFrame à notre liste de DataFrame
                 
                 # Mise à jour de la barre avec la taille du fichier
@@ -708,11 +609,11 @@ class IRIS:
 
 
         # Extraction des infos depuis "référence formation" ou "n° Iris" (dépend du type d'export)
-        match self._cei._nom_typeExport:
+        match self.cei._nom_typeExport:
             # Cas Sessions ou Inscriptions ou Ventes (sensiblement comme 'Inscription R04500' mais groupé par Client (pas de détail de chaque stagiaire))
             case "Sessions" | "Inscriptions" | "Ventes":
                 # On extrait / retravaille les informations de la colonne 'N° Session'
-                df_colonnes_sup = df_concat_iris['N° Session'].apply(self._extraire_infos_numSessionIRIS)
+                df_colonnes_sup = df_concat_iris['N° Session'].apply(self.extraire_infos_numSessionIRIS)
                 # A cause de certains éléments None ou NaN, Pandas type la colonne en float. Je la retype en Int64 qui permet de stocker des NaN avec des entiers, contrairement au type int standard.
                 df_colonnes_sup['Année'] = df_colonnes_sup['Année'].astype('Int64')
                 #print(df_colonnes_sup)
@@ -720,7 +621,7 @@ class IRIS:
             # Cas Formations
             case "Formations":
                 # On extrait / retravaille les informations de la colonne 'Référence'
-                df_colonnes_sup = df_concat_iris['Référence'].apply(self._extraire_infos_referenceFormationIRIS)
+                df_colonnes_sup = df_concat_iris['Référence'].apply(self.extraire_infos_referenceFormationIRIS)
                 # A cause de certains éléments None ou NaN, Pandas type la colonne en float. Je la retype en Int64 qui permet de stocker des NaN avec des entiers, contrairement au type int standard.
                 df_colonnes_sup['Année'] = df_colonnes_sup['Année'].astype('Int64')
                 #print(df_colonnes_sup)
@@ -733,15 +634,151 @@ class IRIS:
 
 
         # Modification structure du DataFrame (emplacement des colonnes) (dépend du type d'export)
-        if self._dict_exports_IRIS["colonnes_modele"][self._cei._nom_typeExport] is not None:
-            df_concat_iris = df_concat_iris[self._dict_exports_IRIS["colonnes_modele"][self._cei._nom_typeExport]]
+        if self._dict_exports_IRIS["colonnes_modele"][self.cei._nom_typeExport] is not None:
+            df_concat_iris = df_concat_iris[self._dict_exports_IRIS["colonnes_modele"][self.cei._nom_typeExport]]
     
         return df_concat_iris
+
+
+    # =================================
+    # === Méthodes pour les filtres ===
+    # =================================
+    def df_filtre_periode(self, trigramme_formation:Optional[str] = None, annee:Optional[int] = None, periode:Optional[str] = None) -> pd.DataFrame:
+        """
+        Renvoie le dataframe de l'extract IRIS filtré VTE selon plusieurs critères.
+         
+         Les critères dépendent du typé d'export ; pour sessions :
+            - Statut Session != "Annulée" (toujours) ;
+            - Nb. Nommés != 0 (toujours) ;
+            - l'année de la session (si donné en argument) ;
+            - la période de la session (si donné en argument) ;
+            - le trigramme de la formation en cours (si donné en argument).
+
+        Par défaut la période est toute l'année, sinon il faut préciser "1er semestre" ou "2nd semestre".
+
+        #On ouvre et lit l'export sessions IRIS si et seulement si il n'est pas déjà ouvert et lu avant
+        
+        :param trigramme_formation: trigramme filtré. Si non renseigné : pas de filtre sur ce critère.
+        :type trigramme_formation: Optional[str]
+        :param annee: année du filtre. Si non renseignée, alors année en cours.
+        :type annee: Optional[int]
+        :param periode: période du filtre ("1er semestre", "2nd semestre"). Si non renseigné, alors période="Année".
+        :type periode: Optional[str]
+        :return: extract IRIS VTE filtré
+        :rtype: DataFrame
+        """
+        match self._typeExport:
+            case "Sessions":
+                return self.df_filtre_periode_sessions(self, annee=annee, periode=periode, trigramme_formation=trigramme_formation)
+
+    def df_filtre_periode_sessions(self, trigramme_formation:Optional[str] = None, annee:Optional[int] = None, periode:Optional[str] = None) -> pd.DataFrame:
+        """
+        Renvoie le dataframe de l'extract IRIS filtré VTE selon plusieurs critères :
+            - Statut Session != "Annulée" (toujours) ;
+            - Nb. Nommés != 0 (toujours) ;
+            - l'année de la session (si donné en argument) ;
+            - la période de la session (si donné en argument) ;
+            - le trigramme de la formation en cours (si donné en argument).
+
+        Par défaut la période est toute l'année, sinon il faut préciser "1er semestre" ou "2nd semestre".
+
+        #On ouvre et lit l'export sessions IRIS si et seulement si il n'est pas déjà ouvert et lu avant
+        
+        :param trigramme_formation: trigramme filtré. Si non renseigné : pas de filtre sur ce critère.
+        :type trigramme_formation: Optional[str]
+        :param annee: année du filtre. Si non renseignée, alors année en cours.
+        :type annee: Optional[int]
+        :param periode: période du filtre ("1er semestre", "2nd semestre"). Si non renseigné, alors période="Année".
+        :type periode: Optional[str]
+        :return: extract IRIS VTE filtré
+        :rtype: DataFrame
+        """
+        #TODO à faire gaffe à la fin :
+        # if annee is None : annee = self._annee
+
+        # On ouvre et lit l'export sessions IRIS si et seulement si il n'est pas déjà ouvert et lu avant
+        #self.charger_excel_IRIS()
+
+        # Application du pré-filtre immuable : statut (session != annulé) et (Nb. nommés != 0)
+        df_sessions_filtre = self.df[
+            (self.df['Statut Session'] != "Annulée") &
+            (self.df['Nb. Nommés'] != 0)
+        ]
+        #print(self.df_sessions_filtre)
+
+
+        # Si trigramme en argument, alors on filtre sur le trigramme
+        if trigramme_formation is not None:
+            df_sessions_filtre = df_sessions_filtre[
+                (df_sessions_filtre['Trigramme formation'] == trigramme_formation)
+            ]
+            #print(self.df_sessions_filtre)
+
+        # Si données temporelles (année ou période ou les deux)
+        if periode is not None:
+            # Si période en argument, alors on filtre sur la période (plus restrictif que l'année)
+            date_debut, date_fin = debut_fin_periode(annee=annee, periode=periode)
+            df_sessions_filtre = df_sessions_filtre[
+                (df_sessions_filtre['Date début ses.'] >= date_debut) &
+                (df_sessions_filtre['Date début ses.'] <= date_fin)
+            ]   
+        elif annee is not None:
+            df_sessions_filtre = df_sessions_filtre[
+                (df_sessions_filtre['Année début ses.'] == annee)
+            ]
+        #print(self.df_sessions_filtre)
+
+
+        # On trie
+        df_sessions_filtre.sort_values("Date début ses.", ascending=False)
+
+        return df_sessions_filtre
 
 
 
     # ==========================
     # === Méthodes pour ouvir un extract existant IRIS Session (excel VTE qui concatène plusieurs natifs)  ===
+    # Avant j'avais des méthodes externes (cf. ci-dessous) mais j'ai voulu intégrer _fe en variable d'instance
+    # Il en résulte que je peux en faire des fonctions de classe non statiques
+    # Les anciennes mléthodes sont ci-après
+    # ==========================
+    def convertit_types_colonnes_df(self):
+        """
+            L'import du df convertit en entiers ou en d'autres types certaines colonnes alors que ça ne devrait pas (ex. : trigrammes, code IRIS sur l'extract sessions).
+            
+            Il en résulte que des filtres ne fonctionnement pas sans conversion.
+            On convertit donc des colonnes à cette fin.
+            
+            Ex. sur l'extract Session de IRIS :
+               - trigrammes -> str;
+               - code IRIS -> str (? Pourquoi str et pas int).
+    
+            :Example:
+
+            >>> convertit_types_colonnes_df()
+
+    
+            .. seealso:: Rien du tout.
+            .. warning:: Rien du tout.
+            .. note:: Rien du tout.
+            .. todo:: Rien du tout.
+        """
+        # Les conversion dépendent du type d'extract à cause des noms des colonnes
+        match self._typeExport:
+            case "Sessions":
+                self.df["Trigramme formation"] = self.df["Trigramme formation"].astype(str)  # Retype "Trigramme formation"
+                self.df["Code IRIS"] = self.df["Code IRIS"].astype(str)  # Retype "Code IRIS"
+
+            case "Ventes":
+                # On convertit la colonne "Date de début" en datetime
+                self.df['Date de début'] = pd.to_datetime(self.df['Date de début'])
+
+
+    # ==========================
+    # === Méthodes statiques pour ouvir un extract existant IRIS Session (excel VTE qui concatène plusieurs natifs)  ===
+    # Anciennes méthodes avant que je ne mette _fe en variable d'instance.
+    # TODO : à transférer à priori s'il reste des anciens appels
+    # TODO à vérifier : est-ce que ces fonctions n'étaient utiles que pour IRIS_traite (avant que je ne la fasse) → Soit supprimer, soit adapter pour IRIS non traités
     # ==========================
     @staticmethod
     def choisir_fichier_IRIS_sessions() -> Path | None:
@@ -759,7 +796,7 @@ class IRIS:
     @staticmethod
     def charger_excel_IRIS_sessions(fe_IRIS_sessions:Optional[FichierExcel]=None, chemin_IRIS_sessions:Optional[Path]=None) -> FichierExcel:
         """
-            Retourne l’extract IRIS sessions s'il n'existe pas déjà.
+            Retourne l’extract IRIS sessions (excel VTE qui concatène plusieurs natifs) s'il n'existe pas déjà.
             Soit on fournit un FichierExcel, soit un chemin vers ce fichier .xlsx
 
             Si fe_IRIS_sessions existe (not None), alors on ne fait rien.
@@ -784,6 +821,8 @@ class IRIS:
             .. note:: Rien du tout.
             .. todo:: Rien du tout.
         """
+        
+        # Vérifie existance de fe_IRIS sinon on le charge
         if fe_IRIS_sessions is None:
             timer.debut("Lecture fichier IRIS sessions")
 
@@ -791,7 +830,7 @@ class IRIS:
             if chemin_IRIS_sessions is None:
                 chemin_IRIS_sessions = IRIS.choisir_fichier_IRIS_sessions()
 
-            # On ouvre le fichier IRIS session
+            # On charge le fichier IRIS session
             fe_IRIS_sessions = FichierExcel.depuis_fichier(chemin_fichier=chemin_IRIS_sessions)
             
             # Alias
@@ -854,7 +893,7 @@ class IRIS:
         return IRIS._dict_exports_IRIS["ConfigExportIRIS"][typeExport]
     
     @staticmethod
-    def _extraire_infos_numSessionIRIS(numSession:str) -> pd.Series:
+    def extraire_infos_numSessionIRIS(numSession:str) -> pd.Series:
         """
         Fonction pour extraire les colonnes à partir de la colonne 'Référence'. Je dois faire une fonction interne car j'emploie Split qui ne s'applique que sur des string. Je dois donc faire appel à cette fonction ligne par ligne et donc créer une fonction que j'appelle par DataFrame[colonne].apply().
 
@@ -936,7 +975,7 @@ class IRIS:
         })
 
     @staticmethod
-    def _extraire_infos_referenceFormationIRIS(referenceFormation:str) -> pd.Series:
+    def extraire_infos_referenceFormationIRIS(referenceFormation:str) -> pd.Series:
         """
         Fonction pour extraire les colonnes à partir de la colonne 'Référence'. Je dois faire une fonction interne car j'emploie Split qui ne s'applique que sur des string. Je dois donc faire appel à cette fonction ligne par ligne et donc créer une fonction que j'appelle par DataFrame[colonne].apply().
         """
@@ -1097,11 +1136,85 @@ class IRIS:
 
 
     # =========================
-    # === Propriétés === 
+    # ===  GETTER / SETTER  === 
     # =========================
     @property
-    def _cei(self) -> ConfigExportIRIS:
+    def cei(self) -> ConfigExportIRIS:
+        """
+        Config export IRIS de l'instance
+        (contient toutes les propriétés de référence de ces exports : chemins input IRIS natifs, output VTE, type d'export...)
+        
+        :return: Description
+        :rtype: ConfigExportIRIS
+        """
         return self._dict_exports_IRIS["ConfigExportIRIS"][self._typeExport]
+
+    @property
+    def typeExport(self) -> str:
+        """
+        Type de l'export IRIS
+        """
+        return self._typeExport
+    
+    @property
+    def fe(self) -> FichierExcel:
+        """
+        retourne le fichier Excel de l'objet
+        
+        :return: fichier Excel de l'objet
+        :rtype: FichierExcel
+        """
+        return self._fe
+
+    @fe.setter
+    def fe(self, valeur:FichierExcel):
+        """
+        Modifie le fichier Excel de l'objet.
+        
+        :param valeur: nouveau fichier Excel
+        :type valeur: FichierExcel
+        """
+        self._fe = valeur
+
+    @property
+    def df(self) -> pd.DataFrame:
+        """
+        DataFrame de _fe._tableaux[self._typeExport]._df (ex. : _fe._tableaux["Sessions"]._df)
+        
+        :return: DataFrame de _fe._tableaux[self._typeExport]._df (ex. : _fe._tableaux["Sessions"]._df)
+        :rtype: DataFrame
+        """
+        return self._fe._tableaux[self._typeExport]._df
+
+    @df.setter
+    def df(self, valeur:pd.DataFrame):
+        """
+        Remplace le DataFrame de self._fe._tableaux[self._typeExport]._df par un nouveau DataFrame
+        
+        :param valeur: DataFrame devant écraser l'ancien dans self._fe._tableaux[self._typeExport]._df
+        :type valeur: pd.DataFrame
+        """
+        self._fe._tableaux[self._typeExport]._df = valeur
+
+    @property
+    def chemin(self) -> Path:
+        """
+        Renvoie le chemin du fichier Excel de l'instance
+        
+        :return: le chemin du fichier Excel de l'instance
+        :rtype: Path
+        """
+        return self._fe.chemin_fichier
+
+    @chemin.setter
+    def chemin(self, valeur:Path):
+        """
+        Change la valeur du chemin du fichier Excel
+        
+        :param valeur: chemin à remplacer
+        :type valeur: Path
+        """
+        self._fe.chemin_fichier = valeur
 
 
     # ============================
@@ -1133,554 +1246,175 @@ class IRIS:
             )
     """
 
-class FichierIRIS_BAK:
-    "C'est la classe qui contient l'environnement pour bosser sur des fichiers Exports IRIS"
+class IRIS_traite(IRIS):
+    """
+    Classe qui permet d'ouvrir et traiter un Extract IRIS déjà traité
+    """
+    def __init__(self, typeExport:str, chemin:Optional[Path]=None, fe:Optional[FichierExcel]=None):
+        # On initialise la classe mère
+        super().__init__(typeExport=typeExport)
 
-    # === VARIABLES DE CLASSE ===
-    # --- Paramètres d'environnement - exports IRIS
+        # Type d'export traité
+        self.typeExport = typeExport
 
-    _dict_DE_IRIS = {}
-    _dict_DE_IRIS["CodesExports"] = {
-        "Sessions" : "R04110",
-        "Formations" : "R0304",
-        "Ventes" : "R04301",
-        "Inscriptions" : "R04500",
-        }
-    _dict_DE_IRIS["PropExportIRIS"] = {
-        "Sessions" : IRIS._SESSIONS, 
-        "Formations" : IRIS._FORMATIONS,
-        "Ventes" : IRIS._VENTES,
-        "Inscriptions" : IRIS._INSCRIPTIONS
-        }
-    _dict_DE_IRIS["Fichiers"] = {
-        "Sessions" : config_extractsIRIS._tSessions,
-        "Formations" : config_extractsIRIS._tFormations,
-        "Ventes" : config_extractsIRIS._tVentes,
-        "Inscriptions" : config_extractsIRIS._tInscriptions
-        }
-
-
-    # Association colonnes excel avec command control Word
-
-    # --- Paramètres utilisateur
-
-    # --- Autres variables de la classe
-    # Type d'export
-    _nom_typeExport:str
-    _codeExport:str
-
-    # Informations génériques sur les exports, modèles et output (dépend du type d'export)
-    _input:InfosExportsIRIS  # Informations input données
-    _modele:InfosExportsIRIS  # Informations sur le modèle Excel à employer pour remplir l'output
-    _output:InfosExportsIRIS  # Informations output
-
-    _df_tableau:Optional[pd.DataFrame] = None  # dataframe du fichier IRIS
-    _df_chemins:Optional[pd.DataFrame] = None  # dateframe des chemins CSV à traiter
-
-    # === CONSTRUCTEUR ===
-    def __init__(self, prop:ConfigExportIRIS, chemins_fichiersInput:Optional[Path|tuple[Path, ...]]=None):
-        # Type d'export
-        self._nom_typeExport = prop._nom_typeExport
-        self._codeExport = prop._codeExport
-
-        # Informations génériques sur les exports, modèles et output (dépend du type d'export)
-        self._input = prop._input  # Informations input données
-        self._modele = prop._modele  # Informations sur le modèle Excel à employer pour remplir l'output
-        self._output = prop._output  # Informations output
-
-        self._chemins_fichiersInput:Tuple[Path, ...]
-        # S'il n'y a pas de chemin_fichiersInput de donné, c'est qu'il faut les sélectionner manuellement
-        if not chemins_fichiersInput:
-            self._choisirFichiers_filedialog()
-        else:
-            self._chemins_fichiersInput = convertir_tuple_path(chemins_fichiersInput)
-
-
-    @classmethod
-    def avecLecture(cls, propExportIRIS:ConfigExportIRIS, chemins_fichiersInput:Optional[Path|tuple[Path, ...]]=None) -> IRIS:
+        # TODO : pas sûr d'en avoir besoin : redondant avec fe Chemin du fichier Excel IRIS
         """
-        On lit le/les extract(s) IRIS et on le/les stocke dans un seul dataframe self._df_tableau
+        self._chemin:Optional[Path]=None
+        if chemin:
+            self._chemin = chemin"""
+
+        # Fichier Excel IRIS déjà traité
+        if fe:
+            self._fe = fe
+
+        # On ouvre le fichier IRIS s'il n'existe pas encore
+        self.charger_excel(fe=self._fe, chemin=chemin)
+
+    def charger_excel(self, fe:Optional[FichierExcel]=None, chemin:Optional[Path]=None):
         """
-        instance = cls(prop=propExportIRIS, chemins_fichiersInput=chemins_fichiersInput)
-        instance._lire_extractIRIS()
-        return instance
+            Charge dans _fe l’extract IRIS traité (excel VTE qui concatène plusieurs natifs) s'il n'existe pas déjà.
+            Soit on fournit un FichierExcel, soit un chemin vers ce fichier .xlsx
 
-
-    @classmethod
-    def avecEcritureOutputDefaut(cls, propExportIRIS:ConfigExportIRIS, chemins_fichiersInput:Optional[Path|tuple[Path, ...]]=None) -> IRIS:
-        
-        instance = cls.avecLecture(propExportIRIS, chemins_fichiersInput)
-
-        # On récupère le chemin du modèle à ouvrir
-        chemin_fichier = instance._modele.chemin_fichier
-        #nom_onglet = instance._output.nom_onglet
-
-        # Création du chemin pour l'output
-        chemin_fichier_output = instance._output.chemin_fichier
-        
-
-
-        # On ouvre le modèle et tous ses tableaux structurés
-        #fe_modele = FichierExcel.depuis_fichier(chemin_fichier=chemin_fichier)
-        fe_modele = FichierExcel.depuis_modele(chemin_modele=chemin_fichier, chemin_fichier_sauv=chemin_fichier_output)
-
-        # On copie le DataFrame instance._df_tableau (le dataframe créé par cls.avecLecture) avec les nouvelles données dans le modèle
-        fe_modele._tableaux[instance._nom_typeExport].ecrit_dataFrame_dans_tableauStructure(instance._df_tableau, supprimeDonneesEtRemplace=True)
-        
-        # On écrit les références des fichiers copiés dans le tableau structuré "Imports"
-        instance._df_chemins = pd.DataFrame(instance._chemins_fichiersInput, columns=['Chemin fichier'])
-        fe_modele._tableaux["Imports"].ecrit_dataFrame_dans_tableauStructure(df=instance._df_chemins, supprimeDonneesEtRemplace=True)
-        
-        #On enregistre et on ferme (par précaution car copieformat xlwings sauvegarde)
-        fe_modele.save()    
-        fe_modele.close()
-
-        return instance
- 
-
-
-    # === Méthodes internes ===
-    def _choisirFichiers_filedialog(self):
-        # Lister/sélectionner les documents à concaténer
-        cheminsExcel_str = filedialog.askopenfilenames(title="Sélectionner les fichiers " + self._nom_typeExport + " (" + self._codeExport + ") Excel à concaténer", filetype=[("Fichiers Excel", "*.xlsx")], initialdir=self._input.repertoire)
-        # Gestion du cas où il y a non-sélection de fichiers
-        if not cheminsExcel_str:
-            vlog("click sur cancel du filedialog → Pas de chemins de fichier")
-        
-        self._chemins_fichiersInput = tuple(Path(p) for p in cheminsExcel_str)
-        
-    def _lire_extractIRIS(self):
-        """
-        Crée le DataFrame pour l'export IRIS. On le stocke dans self._df_tableau
-        On selectionne la bonne methode en fonction du type d'export
-
-        :Example:
-        >>> self.lire_extractIRIS()
-
-
-        .. seealso:: Rien du tout.
-        .. warning:: Rien du tout.
-        .. note:: Rien du tout.
-        .. todo:: Rien du tout.
-        """
-
-        # Initialisation : on crée un DataFrame vide pour recevoir (peut-être) des infos que l'on traitera et qui nécessitera d'adjoindre des colonnes à self.__df_tableau
-        df_colonnes_sup = None
-
-        # On parcourt le tuple des fichiers à lire
-        df_list = [] # Liste des DataFrame qui contiendra chaque fichier Excel séparément
-        taille_totale = sum(os.path.getsize(fichier) for fichier in self._chemins_fichiersInput) # Calcul taille totale pour barre de progression
-
-        with tqdm(total=taille_totale, unit='o', unit_scale=True, desc=Fore.CYAN+"Lecture des fichiers Excel" + Style.RESET_ALL) as pbar:
-            #for i, ifichier in enumerate((os.path.basename(chemin) for chemin in self._chemins_fichiersInput), 1):
-            for i, chemin in enumerate(self._chemins_fichiersInput, 1):
-                # Données pour tqdm
-                fichier = chemin.name
-                taille = chemin.stat().st_size  # taille en octets 
-                pbar.set_postfix(file=fichier, progress=f"{i}/{len(self._chemins_fichiersInput)}")  # Affichage dynamique dans la barre
-                
-                df = pd.read_excel(chemin, skiprows=self._input.nbLignes_avantET)
-                df_list.append(df)  # On ajoute le DataFrame à notre liste de DataFrame
-                
-                # Mise à jour de la barre avec la taille du fichier
-                pbar.update(taille)
-
-        # Concaténation finale (note : toute la fin de la méthode se fait quasi-instantanément)
-        self._df_tableau = pd.concat(df_list, ignore_index=True) 
-
-        # Selon le type d'export à traiter, on va faire des traitements spécifiques (extraction d'info des colonnes référence formation ou n° Iris)
-        match self._codeExport:
-            # Cas Sessions ou Inscriptions ou Ventes (sensiblement comme 'Inscription R04500' mais groupé par Client (pas de détail de chaque stagiaire))
-            case "R04110" | "R04500" | "R04301":
-                # On extrait / retravaille les informations de la colonne 'N° Session'
-                df_colonnes_sup = self._df_tableau['N° Session'].apply(self._extraire_infos_numSessionIRIS)
-                # A cause de certains éléments None ou NaN, Pandas type la colonne en float. Je la retype en Int64 qui permet de stocker des NaN avec des entiers, contrairement au type int standard.
-                df_colonnes_sup['Année'] = df_colonnes_sup['Année'].astype('Int64')
-                #print(df_colonnes_sup)
-
-            # Cas Formations
-            case "R0304":
-                # On extrait / retravaille les informations de la colonne 'Référence'
-                df_colonnes_sup = self._df_tableau['Référence'].apply(self._extraire_infos_referenceFormationIRIS)
-                # A cause de certains éléments None ou NaN, Pandas type la colonne en float. Je la retype en Int64 qui permet de stocker des NaN avec des entiers, contrairement au type int standard.
-                df_colonnes_sup['Année'] = df_colonnes_sup['Année'].astype('Int64')
-                #print(df_colonnes_sup)
-
-        # Ajouter les colonnes supplémentaires au DataFrame principal ssi le DataFrame df_colonnes_sup exite
-        if df_colonnes_sup is not None:
-            self._df_tableau = pd.concat([self._df_tableau, df_colonnes_sup], axis=1)
+            Si self._fe existe (not None), alors on ne fait rien.
+            Si chemin est vide, alors on demande à l'utilisateur de pointer un fichier.
+            On crée un FichierExcel depuis le chemin et on le met dans _fe.
     
-    def _extraire_infos_numSessionIRIS(self, reference:str) -> pd.Series:
-        """
-        Fonction pour extraire les colonnes à partir de la colonne 'Référence'. Je dois faire une fonction interne car j'emploie Split qui ne s'applique que sur des string. Je dois donc faire appel à cette fonction ligne par ligne et donc créer une fonction que j'appelle par DataFrame[colonne].apply().
-
-        Exemples de cas à traiter  :
-        #S-04934-FI1516-1512-GI_VBE_GBO
-        #S-05251-FI1516-1510-AMS-LCH-CLE
-        #S-05246-F1516-1510-OPE-HGR-NNO
-        #S-04178-FC15-604-SES-CCO
-
-        ANCIENNE METHODE DE TRAITEMENT
-        self.__df_tableau['Numéro IRIS'] = self.__df_tableau['N° Session'].astype(str).str[2:7]
-        self.__df_tableau['Type formation'] = self.__df_tableau['N° Session'].astype(str).str[8:10]
-        self.__df_tableau['Trigramme AF'] = self.__df_tableau['N° Session'].astype(str).str[-3:] #tout sauf 3 derniers caract
-        self.__df_tableau['Trigramme RP'] = self.__df_tableau['N° Session'].astype(str).str[-7:-4] #De -7 à -4
-        self.__df_tableau['Trigramme formation'] = self.__df_tableau['N° Session'].astype(str).str[-11:-8]        
-        """
-        # Vérifier que la référence est une chaîne de caractères
-        if not isinstance(reference, str):
-            #print("Problème : la référence n'est pas une instance : ")
-            #print(reference)
-            return pd.Series({
-                'Trigramme formation': None,
-                'Code IRIS': None,
-                'Type de formation': None,
-                'Année': None,
-                'Trigramme RP': None,
-                'Trigramme AF': None,
-                '3ème élément de la référence': None
-            })
-
-        blocs = reference.split('-')
-
-        # Sécurité : vérifier qu'on n'a pas plus de 8 blocs
-        if len(blocs) > 8:
-            print("Problème : il y a plus de 8 blocs : ")
-            print(reference)
-            return pd.Series({
-                'Trigramme formation': None,
-                'Code IRIS': None,
-                'Type de formation': None,
-                'Année': None,
-                'Trigramme RP': None,
-                'Trigramme AF': None,
-                '3ème élément de la référence': None
-            })
-
-        # Traitement commun aux cas 6, 7 et 8 blocs
-        # le blocs[0] c'est "S" ça sert à rien
-        code_IRIS = blocs[1] if len(blocs) >= 2 else None
-        #print(reference)
-        if len(blocs) > 2:
-            type_formation = blocs[2][:2]
-            annee_match = re.search(r'\d+', blocs[2][2:])
-            annee = int(annee_match.group()) if annee_match else None
-        else :
-            type_formation = None
-            annee = None
-
-        if len(blocs) > 5:
-            trigramme_AF = blocs[-1].rstrip('_')
-            trigramme_RP = blocs[-2].rstrip('_')
-            trigramme = blocs[-3].rstrip('_')
-        else:
-            trigramme_RP = None
-            trigramme_AF = None
-            trigramme = None
-
-        # 3e élément uniquement si on a 7 ou 8 blocs
-        troisieme_bloc = '-'.join(blocs[3:-3]) if len(blocs) in [7, 8] else None
-        
-        return pd.Series({
-            'Trigramme formation': trigramme,
-            'Code IRIS': code_IRIS,
-            'Type de formation': type_formation,
-            'Année': annee,
-            'Trigramme RP': trigramme_RP,
-            'Trigramme AF': trigramme_AF,
-            '3ème élément de la référence': troisieme_bloc
-        })
-
-    def _extraire_infos_referenceFormationIRIS(self, reference:str) -> pd.Series:
-        """
-        Fonction pour extraire les colonnes à partir de la colonne 'Référence'. Je dois faire une fonction interne car j'emploie Split qui ne s'applique que sur des string. Je dois donc faire appel à cette fonction ligne par ligne et donc créer une fonction que j'appelle par DataFrame[colonne].apply().
-        """
-        
-        # Vérifier que la référence est une chaîne de caractères
-        if not isinstance(reference, str):
-            #print("Problème : la référence n'est pas une instance : ")
-            #print(reference)
-            return pd.Series({
-                'Trigramme formation': None,
-                'Type de formation': None,
-                'Année': None,
-                'Unité de formation': None,
-                '3ème élément de la référence': None
-            })
-
-        blocs = reference.split('-')
-
-        # Sécurité : vérifier qu'on a au moins 4 blocs
-        if len(blocs) < 3:
-            print("Problème : il y a moins de 3 blocs : ")
-            print(reference)
-            return pd.Series({
-                'Trigramme formation': None,
-                'Type de formation': None,
-                'Année': None,
-                'Unité de formation': None,
-                '3ème élément de la référence': None
-            })
-
-        # Traitement commun aux cas 3 et 4+ blocs
-        type_formation = blocs[0][:2]
-        annee_match = re.search(r'\d+', blocs[0][2:])
-        annee = int(annee_match.group()) if annee_match else None
-
-        trigramme = blocs[1].rstrip('_')
-        unite_formation = blocs[-1].rstrip('_')
-
-        # 3e élément uniquement si on a 4 blocs ou plus
-        troisieme_bloc = '-'.join(blocs[2:-1]) if len(blocs) > 3 else None
-        
-        return pd.Series({
-            'Trigramme formation': trigramme,
-            'Type de formation': type_formation,
-            'Année': annee,
-            'Unité de formation': unite_formation,
-            '3ème élément de la référence': troisieme_bloc
-        })
-   
-
-
-    # === Méthodes externes ===
-    # = Mise à jours de tous les exports
-    @staticmethod
-    def mettreAJourTousLesExportsIRIS_auto(tuple_types:Tuple[str]) -> None:
-        """
-        Permet de créer un seul fichier Excel à partir de plusieurs exports d'IRIS.
-        Les fichiers à traités sont initialisés par la fonction initialisationListeFichiersExportsIRIS() qui permet à l'utilisateur de tout lister à la main (ça peut être plus pratique dans certains cas afin d'éviter de passer par une sélection manuelle)
-        
-        Les fichiers output sont des modèles avec les mêmes colonnes que les extracts d'IRIS mais avec de meilleures formes (format, couleurs...) + des colonnes adjointes à la fin pour extraire et séparer les infos du n° de session ou de la référence de la formation (ex. : trigramme formation, trigramme RP, trigramme AF...)
-
-        Les tuples des fichiers Excel à traiter sont enregistrés dans des instances de TravauxFichiersIRIS et on emploie les méthodes de cette classe
-
-        :param tuple_types: tuple de strings avec les noms des extracts 
-        :type donnees: Tuple[str, ...]
-
-        :Example:
-        
-        >>> mettreAJourTousLesExportsIRIS_auto(("Formations", ))
-        >>> mettreAJourTousLesExportsIRIS_auto(("Formations", "Sessions", "Ventes", "Inscriptions"))
-
-
-        .. seealso:: Rien du tout.
-        .. warning:: Si une seule valeur pour tuple_types, bien mettre sous cette forme : ("Formations",) car sans la virgule Python interprête juste comme un string
-        .. note:: Rien du tout.
-        .. todo:: Rien du tout.
-        """
-
-        # On traite à la suite
-        for clef in IRIS._dict_DE_IRIS["CodesExports"].keys():
-            if clef in tuple_types:
-                print(Style.BRIGHT + Fore.YELLOW + "\nTraitement des exports " + clef)
-                fichiers_formates = ["\n\t" + f for f in IRIS._dict_DE_IRIS["Fichiers"][clef]]
-                print("Liste des fichiers traités : " + ", ".join(fichiers_formates))
-                chemins_fichiersInput = tuple((IRIS._dict_DE_IRIS["PropExportIRIS"][clef]._input.repertoire / nom) for nom in IRIS._dict_DE_IRIS["Fichiers"][clef])
-                IRIS.avecEcritureOutputDefaut(IRIS._dict_DE_IRIS["PropExportIRIS"][clef], chemins_fichiersInput=chemins_fichiersInput)
-
-    @staticmethod
-    def mettreAJourTousLesExportsIRIS_fileDialog(tuple_types:Tuple[str, ...]):
-        """
-        Permet de créer un seul fichier Excel à partir de plusieurs exports d'IRIS.
-        Les fichiers à traités sont sélectionnés à la suite par l'utilisateur à travers un filedialog dans l'ordre du doctionnaire d'entrée, puis tous les fichiers sont traités successivement après.
-        
-        Les fichiers output sont des modèles avec les mêmes colonnes que les extracts d'IRIS mais avec de meilleures formes (format, couleurs...) + des colonnes adjointes à la fin pour extraire et séparer les infos du n° de session ou de la référence de la formation (ex. : trigramme formation, trigramme RP, trigramme AF...)
-
-        Les tuples des fichiers Excel à traiter sont enregistrés dans des instances de ExtractIRIS et on emploie les méthodes de cette classe
-
-        :param tuple_types: tuple de strings avec les noms des extracts 
-        :type donnees: Tuple[str, ...]
-
-        :Example:
-        >>> mettreAJourTousLesExportsIRIS_fileDialog(("Formations", ))
-        >>> mettreAJourTousLesExportsIRIS_fileDialog(("Formations", "Sessions", "Ventes", "Inscriptions"))
-
-
-        .. seealso:: Rien du tout.
-        .. warning:: Si une seule valeur pour tuple_types, bien mettre sous cette forme : ("Formations",) car sans la virgule Python interprête juste comme un string
-        .. note:: Rien du tout.
-        .. todo:: Rien du tout.
-        """
-        # On fait choisir les fichiers à l'utilisateur
-        dict_traitements = {}
-        for clef, codeIRIS in IRIS._dict_DE_IRIS["CodesExports"].items():
-            if clef in tuple_types:
-                traitement = IRIS(IRIS._dict_DE_IRIS["PropExportIRIS"][clef])
-                dict_traitements[clef] = traitement
-
-        # On traite à la suite
-        for clef in dict_traitements.keys():
-            print(Style.BRIGHT + Fore.YELLOW + "\nTraitement des exports " + clef)
-            fichiers_formates = ["\n\t" + f for f in dict_traitements[clef]._chemins_fichiersInput]
-            print("Liste des fichiers traités : " + ", ".join(fichiers_formates))
-            #print("Liste des fichiers traités : " + ", ".join(dictEI[clef].nomsFichiers_exportIRIS))
-            #dict_traitements[clef].lire_extractIRIS()
-            #dict_traitements[clef].ecrit_dataFrame_dans_tableauStructure(df=instance._df_chemins, supprimeDonneesEtRemplace=True)
-            IRIS.avecEcritureOutputDefaut(IRIS._dict_DE_IRIS["PropExportIRIS"][clef], chemins_fichiersInput=dict_traitements[clef]._chemins_fichiersInput)
-
-
-
-
-    # = Outils
-    @staticmethod
-    def choisir_fichier_iris_sessions() -> Path | None:
-        """
-        Ouvre un filedialog pour demander à l'utilisateur de sélectionner un extract IRIS sessions.
-        On pointe au mieux sur le répertoire des extracts IRIS pour la boîte de dialogue.
-        """
-
-        return choisir_fichier(titre=f"Sélectionner l'extract IRIS session {config.IRIS_SESSIONS._codeExport} à employer.",
-                        types_fichiers=[("Fichiers Excel", "*.xlsx")],
-                        dossier_initial=config.IRIS_SESSIONS._output.repertoire, # Pour aller vers mes ficheirs concaténés, sinon pour les originaux il faut pointer vers input
-                        texte_bouton_choisir=f"Choisir extract IRIS session {config.IRIS_SESSIONS._codeExport} à nouveau"
-                        )
+            :param fe: FichierExcel de l'extract IRIS que l'on souhaite traiter
+            :type fe: FichierExcel
+            :param chemin: Chemin de l'extract IRIS que l'on souhaite traiter
+            :type chemin: Path
     
-    @staticmethod
-    def charger_excel_IRIS_sessions(fe_IRIS_sessions:Optional[FichierExcel]=None) -> FichierExcel:
+            :Example:
+    
+            >>> charger_excel(chemin=chemin_input)
+            >>> charger_excel()
+
+    
+            .. seealso:: Rien du tout.
+            .. warning:: Rien du tout.
+            .. note:: Rien du tout.
+            .. todo:: Rien du tout.
         """
-        Retourne l’extract IRIS sessions s'il n'existe pas déjà.
-        """
-        if fe_IRIS_sessions is None:
-            timer.debut("Lecture fichier IRIS sessions")
-            chemin_iris_sessions = IRIS.choisir_fichier_iris_sessions()
-            fe_IRIS_sessions = FichierExcel.depuis_fichier(chemin_fichier=chemin_iris_sessions)
+        if fe is None:
+            timer.debut(f"Lecture fichier IRIS {self._typeExport.lower()}")
+
+            # On remplace la valeur par défaut si renseigné par l'utilisateur
+            if chemin is not None:
+                self.chemin = chemin
+                
+            # S'il n'y a pas de chemin, alors l'utilisateur le pointe
+            if self.chemin is None:
+                self.chemin = self.choisir_fichier()
+
+            # On ouvre le fichier IRIS s'il n'existe pas encore
+            self._fe = FichierExcel.depuis_fichier(chemin_fichier=self.chemin)
+
+            # Conversions des colonnes si besoin (l'import du df convertit en entiers ou en d'autres types certaines colonnes alors que ça ne devrait pas (ex. : trigrammes, code IRIS))
+            self.convertit_types_colonnes_df()
+
+            # On trie # TODO : pour l'instant ça marche avec tous mes types (sessions et ventes ; j'ai pas testé avec les autres)
+            self.df = self.df.sort_values(by="Date début ses.")  # Trie par "Date début ses."
+
             timer.fin()
 
-        return fe_IRIS_sessions
-
-    @staticmethod
-    def verifier_code_iris(valeur: Any, type_sortie: Type = str) -> Tuple[bool, Any]:
+    def choisir_fichier(self) -> Path | None:
         """
-        Vérifie si une valeur correspond à un entier à 5 chiffres (code IRIS).
+        Ouvre un filedialog pour demander à l'utilisateur de sélectionner un extract IRIS VTE (excel VTE qui concatène plusieurs natifs).
+        On pointe au mieux sur le répertoire des extracts IRIS pour la boîte de dialogue.
+    
+        :return: Le chemin du fichier IRIS pointé par l'utilisateur
+        :rtype: Path
 
-        Args:
-            valeur (Any):
-                La valeur à tester. Peut être de n'importe quel type (int, float, str, etc.).
-            type_sortie (Type, optionnel):
-                Le type dans lequel renvoyer la valeur si elle est valide.
-                Par défaut : str.
-                Autres valeurs possibles : int, float, etc.
+        :example:
 
-        Returns:
-            Tuple[bool, Any]:
-                - Le premier élément est un booléen indiquant si la valeur est un entier à 5 chiffres.
-                - Le second élément est la valeur convertie dans le type demandé (ou None si invalide).
+        >>> choisir_fichier_IRIS()
 
-        Exemple:
-            >>> verifier_code_iris(12345)
-            (True, '12345')
 
-            >>> verifier_code_iris("01234")
-            (True, '01234')
-
-            >>> verifier_code_iris("9999")
-            (False, None)
-
-            >>> verifier_code_iris("12345.0")
-            (True, '12345')
-
-            >>> verifier_code_iris("abcde")
-            (False, None)
-
-            >>> verifier_code_iris("67890", int)
-            (True, 67890)
-
-        Remarques:
-            - Les zéros initiaux sont conservés si le type de sortie est `str`.
-            - Les valeurs numériques flottantes représentant un entier à 5 chiffres (ex: "12345.0") sont acceptées.
-            - Si la valeur ne correspond pas à 5 chiffres, la fonction renvoie (False, None).
+        .. seealso:: Rien du tout.
+        .. warning:: Rien du tout
+        .. note:: Rien du tout
+        .. todo:: Rien du tout.
         """
-        # Conversion en chaîne pour analyse initiale
-        if isinstance(valeur, str):
-            str_val = valeur.strip()
-        else:
-            try:
-                # On convertit float -> int -> str pour éviter les ".0"
-                str_val = str(int(float(valeur)))
-            except (ValueError, TypeError):
-                return False, None
 
-        # Vérifie qu'on a bien 5 chiffres
-        if str_val.isdigit() and len(str_val) == 5:
-            try:
-                valeur_convertie = type_sortie(str_val)
-            except Exception:
-                return False, None
-            return True, valeur_convertie
+        return choisir_fichier(titre=f"Sélectionner l'extract IRIS {str.lower(self._typeExport)} {self.cei(self._typeExport)._codeExport} à employer.",
+                    types_fichiers=[("Fichiers Excel", "*.xlsx")],
+                    dossier_initial=self.cei(self._typeExport)._output.repertoire, # Pour aller vers mes fichiers concaténés, sinon pour les originaux il faut pointer vers input
+                    texte_bouton_choisir=f"Choisir extract IRIS {str.lower(self._typeExport)} {self.cei(self._typeExport)._codeExport} à nouveau"
+                    )
 
-        return False, None
-
-    @staticmethod
-    def extraire_code_iris_depuis_chemin(chemin:Path|str) -> str:
+    def demande_sessions_a_exclure(self, trigramme_formation:str = None, annee:Optional[int] = None, periode:Optional[str] = None) -> Tuple[pd.DataFrame, List[int]]:
         """
-        Récupère le numéro IRIS depuis un chemin (a priori chemin CSV) si pas possible on demande le code à l'utilisateur
+        Demande à l'utilisateur les sessions qu'il souhaite exclure de la période choisie :
+           - on applique un filtre sur une période + trigramme au dataframe de l'extract IRIS
+           - on affiche le résultat
+           - l'utilisateur définit les codes IRIS qu'il veut exclure
+        
+        On retourne :
+           - un dataframe df_sessions_filtre à jour
+           - #la liste des codes IRIS retenus (plus maintenant : pour l'avoir on peut faire df_filtre["Code IRIS"].tolist())
+           - la liste des codes IRIS exclus
+        
+        :param trigramme_formation: trigramme de la formation à filtrer
+        :type trigramme_formation: str
+        :param annee: année à filtrer
+        :type annee: Optional[int]
+        :param periode: période à filtrer
+        :type periode: Optional[str]
+        :return: un dataframe df_sessions_filtre à jour, la liste des codes IRIS exclus
+        :rtype: Tuple[pd.Dataframe, List[int]]
         """
-        match = re.search(r"\b\d{5}\b", str(chemin))
-        if match:
-            codeIRIS = match.group(0)
+
+        # Liste des sessions qui seront exclues pâr l'utilisateur
+        codes_sessions_exclues_par_utilisateur = []
+
+        # Renseigne les valeurs par défaut de période et année si None
+        annee, periode = periode(annee, periode)
+
+        # On filtre sur le trigramme et la période demandée
+        df_filtre = self.df_filtre_periode(trigramme_formation=trigramme_formation, annee=annee, periode=periode)
+
+        # On affiche à l'utilisateur les sessions et dates et statuts 
+        vlog.print("Info", f"\nListe des sessions {trigramme_formation} dans {self.chemin.name} - {periode} {annee}", style=["jaune"])
+
+        # Adaptation format date
+        df_filtre['Date début ses.'] = pd.to_datetime(df_filtre['Date début ses.']).dt.strftime("%d/%m/%Y")
+        df_filtre['Date fin ses.'] = pd.to_datetime(df_filtre['Date fin ses.']).dt.strftime("%d/%m/%Y")
+
+        print(tabulate(
+            df_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Nommés', 'Statut Session', 'N° Session']], 
+            headers='keys', 
+            tablefmt='pretty', 
+            showindex=False
+        ))
+        
+        # On demande à l'utilisateur les sessions qu'il veut exclure
+        exclusionSessions = self.demander_liste_codes_IRIS()
+        if exclusionSessions:  # si la liste n'est pas vide
+            # On trace l'exclusion des sessions
+            codes_sessions_exclues_par_utilisateur = df_filtre.loc[df_filtre["Code IRIS"].isin(exclusionSessions), "N° Session"].unique().tolist()
+            #for session_exclue in exclusionSessions:
+            #    codes_sessions_exclues_par_utilisateur.append(df_filtre.loc[df_filtre["Code IRIS"] == session_exclue, "N° Session"].iloc[0])
+
+            # On met à jour _df_sessions_filtre en enlevant les sessions exclues
+            df_filtre = df_filtre[~df_filtre['Code IRIS'].isin(exclusionSessions)]
         else:
-            codeIRIS = str(demander_code(typeCode="Code IRIS", chemin=chemin))
+            # la liste est vide, on ne filtre rien, on garde tout
+            pass
 
-        return codeIRIS
+        # On affiche à l'utilisateur les sessions finalement retenues
+        vlog.print("Info", "\nSessions retenues pour le bilan :", style=["jaune"])
+        print(tabulate(
+            df_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Nommés', 'Statut Session', 'N° Session']], 
+            headers='keys', 
+            tablefmt='pretty', 
+            showindex=False
+        ))
 
-    @staticmethod
-    def demander_liste_codes_iris(message="Pour exclure des sessions : entrez un ou plusieurs code IRIS (numéro à 5 chiffres) séparés par des espaces (ou rien pour passer) : ") -> list[str]:
-        while True:
-            entree = input(message).strip()
-            if not entree:
-                # Pas de saisie => retourner liste vide
-                return []
 
-            # On met mes codes IRIS dans une liste de str
-            #valeurs = [v.strip() for v in entree.replace(',', ' ').split()]
+        # pour avoir la liste des codes IRIS retenus : df_filtre["Code IRIS"].tolist()
 
-            # Vérifier que toutes les valeurs sont des entiers
-            #try:
-            #    entiers = [int(v) for v in valeurs]
-            #    return entiers
-            #except ValueError:
-            #    print("Erreur : veuillez entrer uniquement des nombres entiers, séparés par des espaces ou des virgules.")
-
-            # On met mes codes IRIS dans une liste de str en vrifiant que toutes les valeurs sont des entiers
-            try:
-                # On teste le typage en int
-                l_entiers = [int(v.strip()) for v in entree.replace(',', ' ').split()]
-                # On reconvertit en str avant sortie méthode
-                l_str = [str(v) for v in l_entiers]
-                return l_str
-
-            except ValueError:
-                print("Erreur : veuillez entrer uniquement des nombres entiers, séparés par des espaces ou des virgules.")
-                IRIS.demander_liste_codes_iris()
-    
-    
-    
-    
-    # === Affichage ===
-    def __str__(self):
-        if self._chemins_fichiersInput:
-            # Pour aff_repertoire et chemin 
-            aff_cheminsFichiers = ""
-            for cfichier in self._chemins_fichiersInput:
-                aff_cheminsFichiers = aff_cheminsFichiers + "\n    " + cfichier
-        else:
-            aff_cheminsFichiers = "Aucun fichier spécifié"
-
-        # Pour aff_df
-        from io import StringIO
-        buffer = StringIO()
-        if self._df_tableau is not None:
-            print(self._df_tableau, file=buffer)
-            aff_df = buffer.getvalue()
-        else:
-            aff_df = "Non défini"
-
-        return (
-            f"TravauxFichiersIRIS\n"
-            f"  Chemins fichiers à exploiter : {aff_cheminsFichiers}\n"
-            f"  df_tableau :\n{aff_df}"
-            )
+        # On retourne les codes_IRIS des sessions retenues + exploitationBilan 
+        return df_filtre, codes_sessions_exclues_par_utilisateur
 
 
 
@@ -2755,6 +2489,9 @@ class BilanSession:
     """
     C'est la classe qui contient tous les éléments de ma formation pour mon bilan de session V3
     """
+    
+    # TODO : Une fois fini BilanFormation, il faudra que j'adapte cette classe pour employer la nouvelle classe IRIS et ses méthodes associées
+
     # === VARIABLES PARTAGÉES ENTRE TOUTES LES INSTANCES
     _chemin_excel_IRIS_sessions:Optional[Path] = None
     # Récupération du dernier export (extract IRIS le plus récent dans le répertoire)
@@ -2960,6 +2697,7 @@ class BilanSession:
         Cette méthode met à jour _fe_IRIS_sessions et _df_sessions.
         """
 
+        # TODO il faudra que je vire ces anciennes méthodes statiques par celles de la classe IRIS : charger_excel_IRIS_VTE
         # Vérifie existance de fe_IRIS sinon on le charge
         cls._fe_IRIS_sessions = IRIS.charger_excel_IRIS_sessions(fe_IRIS_sessions=cls._fe_IRIS_sessions)
 
@@ -3576,43 +3314,32 @@ class BilanSession:
 # ======================================================================================
 class BilanFormation:
     # === VARIABLES PARTAGÉES ENTRE TOUTES LES INSTANCES
-    _fe_IRIS_sessions:Optional[FichierExcel] = None  # Fichier Excel qui contient les extracts IRIS Sessions (ou a minima celles de la période en cours)
-    _fdc:Optional[FdC] = None  # Objet contenant les données de la fiche de coûts
-    _ventes:Optional[IRIS.Extract_traite] = None
+    _sessions:Optional[IRIS_traite] = None  # Fichier Excel qui contient les extracts IRIS Sessions (ou a minima celles de la période en cours) → Plusieurs bilan peuvent être fait à partir de cet extract, c'est donc une variable de classe
+    _ventes:Optional[IRIS_traite] = None  # Fichier Excel qui contient les extracts IRIS Ventes (ou a minima celles de la période en cours) → Plusieurs bilan peuvent être fait à partir de cet extract, c'est donc une variable de classe
 
-
+    #_df_sessions_filtre:Optional[pd.DataFrame] = None
 
     def __init__(self, trigramme_formation:str, annee:int):
+        # Données de l'utilisateur
         self._annee:int = annee
         self._trigramme_formation:str = trigramme_formation
+
+        # Données pour récupérer les informations nécessaires au bilan
+        self_fdc:Optional[FdC] = None  # Objet contenant les données de la fiche de coûts → Un seul bilan peuvt être fait à partir de cet extract, c'est donc une variable d'instance
+
+
+        self._chemin_word_bilan_output: Optional[Path] = None  # Chemin de sauvegarde du bilan de formation
 
 
     # =========================
     # === Propriétés === 
     # =========================
     @property
-    def _df_sessions(self) -> pd.DataFrame:
-        """
-        Renvoie le dataframe de l'Exctract IRIS des sessions
-        
-        :return: le dataframe de l'Exctract IRIS des sessions
-        :rtype: DataFrame
-        """
-        return self._fe_IRIS_sessions._tableaux[IRIS._SESSIONS._nom_typeExport]._df
-
-    @property
-    def _df_sessions_filtre(self) -> pd.DataFrame:
-        """
-        _df_sessions filtré sur le trigramme et l'année de début de session
-        """
-        return self._df_sessions[(self._df_sessions['Trigramme formation'] == self._trigramme_formation) & (self._df_sessions['Année début ses.'] == self._annee) & (self._df_sessions['Statut Session'] != "Annulée")].sort_values("Date début ses.", ascending=False)
-    
-    @property
     def _df_sessions_filtre_nm1(self) -> pd.DataFrame:
         """
         _df_sessions filtré sur le trigramme et l'année de début de session moins 1 (stats n-1)
         """
-        return self._df_sessions[(self._df_sessions['Trigramme formation'] == self._trigramme_formation) & (self._df_sessions['Année début ses.'] == self._annee-1) & (self._df_sessions['Statut Session'] != "Annulée")].sort_values("Date début ses.", ascending=False)
+        return self._sessions.df[(self._sessions.df['Trigramme formation'] == self._trigramme_formation) & (self._sessions.df['Année début ses.'] == self._annee-1) & (self._sessions.df['Statut Session'] != "Annulée")].sort_values("Date début ses.", ascending=False)
 
 class BilanFormation_V3(BilanFormation):
     """
@@ -3621,7 +3348,7 @@ class BilanFormation_V3(BilanFormation):
     TODO j'en suis là
     ? Exploiter export formation plutôt que export sessions pour les valeurs par défaut nmin/max...
     """
-    def __init__(self, trigramme_formation:str, annee:int):
+    def __init__(self, trigramme_formation:str, annee:int) -> None:
         super().__init__(trigramme_formation, annee)
 
         self._recapDonnees:DataFrame = pd.DataFrame(columns=['Source', 'Titre formation', 'Min participants', 'Cible participants', 'Max participants', 'Dépassement autorisé'])
@@ -3666,24 +3393,58 @@ class BilanFormation_V3(BilanFormation):
 
 
 
+    @classmethod
+    def bilanUnique(cls, trigramme_formation:str, annee:int) -> None:
+        
+        instance = cls(trigramme_formation, annee)
+
+        # On teste la pré-existance du bilan Word
+        continuer = tester_existance_fichier(instance.chemin_word_bilan_output)
+
+        if continuer:
+            
+            instance._sessions = IRIS_traite(typeExport="Sessions")
+            
+            # Ouverture / création du dataframe de l'extract IRIS sessions filtré selon la période demandée
+            # Filtre appliqué dans méthode demande_sessions_a_exclure
+            #df_filtre = instance._sessions.df_filtre_periode(trigramme_formation=trigramme_formation, annee=annee)
+
+            # On met à jour df_sessions_filtre selon les sessions que souhaite garder / exclure l'utilisateur
+            df_filtre, liste_codes_IRIS_exclus = instance._sessions.demande_sessions_a_exclure(trigramme_formation=trigramme_formation, annee=annee)
+            #print("\nÉtat de Excel sessions filtré sur période et trigramme :")
+            #pprint(instance._df_sessions_filtre)
+
+            # S'il n'y a plus de session à lire dans _df_sessions_filtre, alors il n'y a plus de raison de faire le bilan
+            if len(df_filtre) != 0 :
+                # On met à jour l'Excel evalstat de la formation si des sessions demandées par l'utilisateur ne s'y trouvent pas
+                instance._maj_evalstat_formation()
+
+                # On calcule les stats
+                instance._calculer_stats_criteres()
+                #pprint(instance._stats_stagiaires)
+
+                # On construit le bilan de session (bilan de session V3)
+                instance._bilanSessionV3()
+
+                # On ouvre le word
+                FichierWord.depuisFichier(chemin_fichier=instance._chemin_word_bilan_session_output, charger_contentControl=False, afficherWord=True)
+
+                # On envoie un mail au chef d'unité pour la signature du pdf
+                instance._envoyer_mail_chef_unite()
+
+
+            else:
+                vlog.print("Info", f"⚠️ Toutes les sessions sont exclues : il n'y a plus de raison de faire le bilan de session.")
+        
+        else:
+            print("❌  Bilan de session déjà existant → Arrêt du traitement du bilan par l'utilisateur")
+
+
 
 
         #####
         # Exploitation de l'extract IRIS sessions
         #####
-        
-        # TODO à virer après les phases de test
-        chemin_IRIS_sessions = Path(r"R:\_Echanges\VTE\Prog\IRIS\Extracts complets\TESTS - TEL - R04110_Sessions-COMPLET.xlsx")
-
-        # On charge le fichier IRIS Sessions si non déjà ouvert
-        self._fe_IRIS_sessions = IRIS.charger_excel_IRIS_sessions(fe_IRIS_sessions=self._fe_IRIS_sessions, chemin_IRIS_sessions=chemin_IRIS_sessions)
-        
-        if (self._df_sessions_filtre is None) :
-            log_erreur(f"Aucune session faite en {self._annee} : pas besoin de faire un bilan de formation")
-
-
-        
-        
 
         # Exraire les données de la session la plus récente
         ligne_plus_recente = self._df_sessions_filtre.iloc[0][["Session", "Min.", "Max.", "Dépass. autorisé"]]  # Trouver la ligne avec la date la plus récente
@@ -3757,7 +3518,6 @@ class BilanFormation_V3(BilanFormation):
         #####
         # Ventes
         #####
-
         """
         Méthodes pour avoir le prix de la session :
         Sur R04301 Ventes : 
@@ -3780,13 +3540,11 @@ class BilanFormation_V3(BilanFormation):
         Si forfait/pers. alors on calcule le prix unitaire :
         Si forfait/pers., Total HT = Total HT / Nb Inscriptions
         """
-
-                
         # TODO à virer après les phases de test
         chemin_IRIS_ventes = Path(chemin_vers_unc(r"R:\_Echanges\VTE\Prog\IRIS\Extracts complets\R04301_Ventes-COMPLET-2026.02.12.xlsx"))
 
         # On charge le fichier IRIS Ventes si non déjà ouvert
-        self._ventes = IRIS.Extract_traite(nom_typeExport="Ventes", chemin=chemin_IRIS_ventes)
+        self._ventes = IRIS.IRIS_traite(nom_typeExport="Ventes", chemin=chemin_IRIS_ventes)
         
         # Filtrer le DataFrame sur le "Trigramme formation" = "TEL" et sur les années n et n-1
         df_filtre = self._ventes.df[(self._ventes.df['Trigramme formation'] == self._trigramme_formation) & (self._ventes.df['Date de début'].dt.year.isin([self._annee-1, self._annee]))]
@@ -3827,6 +3585,13 @@ class BilanFormation_V3(BilanFormation):
         #####
         # Exploitation de EvalStat
         #####
+
+        # On récupère la liste des codes IRIS des sessions qui seront traités dans ce bilan
+
+        # On met à jour les ficheirs EvalStat s'ils ne sont pas déjà traités
+        fe_evaluations_formation, statuts_csv = EvalStat.depuis_liste_codes_IRIS(self._codes_IRIS, fe_IRIS_sessions=self._sessions.fe)
+
+
         self._satisfactionGlobale_nm1:float = -1  # EvalStat
         self._satisfactionGlobale_n:float = -1# EvalStat
         self._satisfactionGlobale_n_com:str = -1# EvalStat
@@ -3914,6 +3679,7 @@ class BilanFormation_V3(BilanFormation):
             )
         
         document.write(self._chemin_word_bilan_formation_output)
+
 
     @staticmethod
     def _evaluer_prix_annee(df_travail:DataFrame, annee:int) -> str:
@@ -4025,6 +3791,22 @@ class BilanFormation_V3(BilanFormation):
 
         # Joindre avec des virgules
         return ", ".join(infos_rp)
+
+
+    # =========================
+    # ===  GETTER / SETTER  === 
+    # =========================
+    @property
+    def chemin_word_bilan_output(self) -> Path:
+        """
+        Renvoie le chemin de sortie du bilan de formation.
+        Cette donnée est stockée dans le fichier de config (valeur par défaut).
+        
+        :return: Chemin de sortie du bilan de formation.
+        :rtype: Path
+        """
+        return config.format_path(config.CHEMIN_WORD_BILAN_FORMATION_OUTPUT, trigramme_formation=self._trigramme_formation, annee=self._annee)
+
 
 class BilanFormation_VTE:
     """
