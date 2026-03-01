@@ -1,3 +1,14 @@
+from __future__ import annotations
+
+from collections import defaultdict
+from pathlib import Path
+from typing import Optional
+
+from vte import config
+from vte.utils import *
+from vte.utils_instn import recupere_trig_formation_depuis_chemin, demander_code
+from vte.office import FichierExcel
+from vte.iris import IRIS
 
 
 # ======================================================================================
