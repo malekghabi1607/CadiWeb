@@ -1,6 +1,7 @@
 from typing import Optional
 
 from vte.fdc import FdC
+from vte.session import Session
 
 # ======================================================================================
 # CLASSE FORMATION
@@ -22,9 +23,16 @@ class Formation:
         #self.bilans_session:Optional[dict[int, dict[int, BilanSession]]] = {}  #bilans_session[2025][0] : Index1 = année du bilan ; Index2 = période du bilan (1 = 1er semestre ; 2 = 2nd semestre ; 0 = annuel)
 
         # Une formation a une ou plusieurs sessions
-        #self.sessions:Optional[dict[int, Session]] = {}  # Index = code IRIS de la formation
+        self._sessions:Optional[dict[int, Session]] = {}  # Index = code IRIS de la formation
 
 
+
+
+    # =========================
+    # === METHODES EXTERNES ===
+    # =========================
+    def ajout_session(self, code_IRIS:int):
+        self._sessions[code_IRIS] = Session(code_IRIS=code_IRIS)
 
 
     # =========================
@@ -39,3 +47,15 @@ class Formation:
         :rtype: int
         """
         return self._trigramme_formation
+    
+    
+    @property
+    def sessions(self) -> dict[int, Session]:
+        """
+        Renvoie le dictionnaire des sessions de la formation.
+        
+        :return: le dictionnaire des sessions de la formation.
+        :rtype: dict[int, Session]
+        """
+        return self._sessions
+    

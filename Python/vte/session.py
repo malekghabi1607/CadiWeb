@@ -1,6 +1,12 @@
+from typing import Optional
+
+from vte.evalStat import EvalStat
+
 # ======================================================================================
 # CLASSE SESSION
 # ======================================================================================
+
+
 class Session:
     def __init__(self, code_IRIS: int):
         self._code_IRIS:int = code_IRIS

@@ -1,3 +1,19 @@
+from __future__ import annotations
+from dataclasses import dataclass
+from datetime import date
+from pathlib import Path
+from tkinter.ttk import Style
+from typing import List, Optional, Tuple
+
+from colorama import Fore
+import pandas as pd
+import tqdm
+
+from vte import config, config_extractsIRIS
+from vte.office import FichierExcel
+from vte.utils import *
+from vte.utils_instn import demander_code
+
 
 # ======================================================================================
 # CLASSE IRIS
@@ -155,7 +171,7 @@ class IRIS:
     # =================================
     @classmethod
     def concatener_exportsIRIS_typeUnique(cls, typeExport:str, chemins_fichiersInput:Optional[str|Path|Tuple[str|Path]] = None, chemin_fichier_sauv:Optional[Path]=None) -> None:
-        """
+        r"""
         Crée un fichier Excel unique à partir de plusieurs exports IRIS.
 
         Sauvegarde soit à un endroit en argument soit à sa place par défaut (donné dans config)
