@@ -1,10 +1,6 @@
 from typing import Optional
 
-from fdc import *
-from EvalStat import *
-from bilanFormation import *
-from bilanSession import *
-from vte.session import *
+from vte.fdc import FdC
 
 # ======================================================================================
 # CLASSE FORMATION
@@ -27,3 +23,19 @@ class Formation:
 
         # Une formation a une ou plusieurs sessions
         #self.sessions:Optional[dict[int, Session]] = {}  # Index = code IRIS de la formation
+
+
+
+
+    # =========================
+    # === GETTERS / SETTERS ===
+    # =========================
+    @property
+    def trigramme_formation(self) -> str:
+        """
+        Renvoie le trigramme de la formation.
+        
+        :return: le trigramme de la formation
+        :rtype: int
+        """
+        return self._trigramme_formation

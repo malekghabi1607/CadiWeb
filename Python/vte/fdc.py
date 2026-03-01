@@ -1,8 +1,23 @@
 
-
 # ======================================================================================
 # CLASSE FDC
 # ======================================================================================
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from vte.formation import Formation
+
+
+from pathlib import Path
+from typing import Optional
+
+from vte import config
+from vte.utils import *
+from vte.office import FichierExcel
+from vte.utils_instn import recupere_trig_formation_depuis_chemin
+
+
 class FdC:
     """
     Classe qui gère tous les éléments relatifs aux fiches de coûts INSTN
@@ -10,14 +25,15 @@ class FdC:
 
     
     # === VARIABLES DE CLASSE COMMUNES À TOUTES LES INSTANCES ===
+    _NOM_ONGLET_TABLEAU = "Fiche de coûts"
 
 
 
 
-    # ==================================================================================
-    # CONSTRUCTEUR
-    # ==================================================================================
-    def __init__(self, chemin_fdc: Optional[Path] = None, trigramme_formation: Optional[str] = None) -> None:
+    # ====================
+    # === CONSTRUCTEUR ===
+    # ====================
+    def __init__(self, formation: Optional[Formation] = None, fe: Optional[FichierExcel] = None) -> None:
         """
         Initialise une instance FdC.
 
@@ -26,42 +42,161 @@ class FdC:
             chemin_fdc (Path | None): Chemin vers le fichier Excel de la fiche de coûts.
         """
         # Variables propres à la FdC
-        self._trigramme_formation: Optional[str] = trigramme_formation
-        self._chemin_fdc: Optional[Path] = chemin_fdc  # Chemin de la fiche de coûts
+        self._formation:Optional[Formation] = None  # Trigramme de la formation ; nécessaire uniquement pour facilite la sélection du fichier de FdC (pré-sélection répertoire)
+        self._fe: Optional[FichierExcel] = None  # Objet Excel contenant la fiche de coûts
 
-        self._fe_fdc: Optional[FichierExcel] = None  # Objet Excel contenant la fiche de coûts
-        self._tableau_fdc:Optional[FichierExcel._TableauExcel] = None
+        # On initialise les variables de l'instance avec les arguments
+        if formation is not None: self._formation = formation
+        if fe is not None: self._fe = fe
 
+        # Chargement de la FdC
+        self._charger_fdc()
 
-        # Si aucun fichier input n'est donné, alors on ouvre un filedialog
-        if self._chemin_fdc is None:
-            self._chemin_fdc = FdC.choisir_fdc(self._trigramme_formation)
-            #TODO : else : si j'ai le chemin, je peux récupérer le trigramme
-
-        # On ouvre l'Excel
-        self._fe_fdc, self._tableau_fdc = FdC.charger_excel_IRIS_sessions(fe_fdc=self._fe_fdc, chemin_fdc=self._chemin_fdc)
-
-
-        """ # TODO - Date de modif de la FdC
-        # Pour connaître la date de la fiche de coût (basé sur date de modif)
-        self._dateFdC = datetime.fromtimestamp(self._chemin_fdc.stat().st_mtime)
-        self._sDateFdC = self._dateFdC.strftime("%d/%m/%Y")
+        
+    # =========================
+    # === METHODES INTERNES ===
+    # =========================
+    def _choisir_fdc(self) -> Path | None:
         """
+        Ouvre un filedialog pour demander à l'utilisateur de sélectionner une fiche de coûts.
+        On pointe au mieux sur le répertoire des FdC pour la boîte de dialogue.
+        
+        :return: le chemin de la fiche de coûts
+        :rtype: Path | None
+        """
+
+        return choisir_fichier(titre=f"Sélectionner la fiche de coûts à employer.",
+                        types_fichiers=[("Fichiers Excel", "*.xlsx")],
+                        dossier_initial=config.format_path(config.REPERTOIRE_FDC, trigramme_formation=self.trigramme_formation),
+                        texte_bouton_choisir=f"Choisir FdC à nouveau"
+                        )
+
+    def _charger_fdc(self):
+        """
+        Charge l'Excel de la fiche de coûts dans l'instance.
+        Si aucun fichier Excel n'est dans l'instance (i.e. pas de chemin pour la FdC), alors on ouvre un filedialog
+        """
+
+        if self._fe is not None:
+            #  Soit le tableau avec la clef existent déjà : pas besoin de le recharger
+            if self.nom_onglet in self._fe.tableaux:
+                pass
+            else:  # Sinon _fe a été initialisé à minima (juste le chemin) et il faut le charger
+                timer.debut("Chargement fiche de coûts")
+                self._fe = FichierExcel.depuis_fichier(chemin_fichier=self.chemin, nom_onglet=self.nom_onglet)
+                timer.fin()
+        elif self._fe is None:  # Si aucun fichier Excel n'est dans l'instance (i.e. pas de chemin pour la FdC), alors on ouvre un filedialog
+            chemin = self._choisir_fdc()
+            if chemin is not None:
+                timer.debut("Chargement fiche de coûts")
+                self._fe = FichierExcel.depuis_fichier(chemin_fichier=chemin, nom_onglet=self.nom_onglet)
+                timer.fin()
+            else:
+                vlog.log_erreur("Le fichier FdC n'a pas été sélectionné")
+        else: # Pas besoin de le charger
+            vlog.log_erreur("Je suis sorti des conditions sans avoir chargé ma FdC")
+       
         
 
+    
+
+
+    # =========================
+    # === METHODES EXTERNES ===
+    # =========================
+
+    def max_participants(self, depassementAutorise:int) -> int:
+        """
+        Évalue le nombre maximum de participants (nb prévu + dépassement autorisé)
+        
+        :param depassementAutorise: nb de personnes autorisés pour le dépassement
+        :type depassementAutorise: int
+        :return: le nombre maximum de participants (nb prévu + dépassement autorisé)
+        :rtype: int
+        """
+        return self.prevus_participants + depassementAutorise
+
+
+
+    # =========================
+    # === GETTERS / SETTERS ===
+    # =========================
     @property
-    def nomFormation(self) -> str:
+    def trigramme_formation(self) -> str|None:
+        """
+        Renvoie le trigramme de la formation.
+        On la lit soit :
+           - depuis l'instance Formation ;
+           - en l'extrayant depuis le chemin du fichier Excel de la fiche de coûts
+        
+        Si _formation et _fe sont None les 2, alors on renvoie None
+
+        :return: le trigramme de la formation
+        :rtype: int|None
+        """
+        if self._formation is not None:
+            return self._formation.trigramme_formation
+        elif self._fe is not None:
+            return recupere_trig_formation_depuis_chemin(self._fe.chemin_fichier)
+        else :
+            return None
+    
+    @property
+    def chemin(self) -> Path:
+        """
+        Renvoie le chemin de la fiche de coûts.
+        
+        :return: le chemin de la fiche de coûts
+        :rtype: Path
+        """
+        return self._fe.chemin_fichier
+
+    @property
+    def nom_onglet(self) -> str:
+        return self._NOM_ONGLET_TABLEAU
+
+    @property
+    def tableau(self) -> FichierExcel._TableauExcel:
+        #fe_fdc._tableaux["Fiche de coûts"]
+        return self._fe.tableaux[self.nom_onglet]
+
+    @property
+    def date_derniere_modification(self) -> str:
+        """
+        Extrait la date de la fiche de coût à partir de la dernière date de modif (valeur système windows)
+        
+        :return: la date de la fiche de coût à partir de la dernière date de modif (valeur système windows)
+        :rtype: str
+        """
+        dateFdC = datetime.fromtimestamp(self.chemin.stat().st_mtime)
+        sDateFdC = dateFdC.strftime("%d/%m/%Y")
+        return sDateFdC
+
+
+
+
+    # ========================================================
+    # === GETTERS données FdC (lié à la version de la FdC) ===
+    # ========================================================
+    @property
+    def nom_formation(self) -> str:
         """
         Renvoie le nom de la formation (C5)
         
-        :return: le dataframe de l'Exctract IRIS des sessions
+        :return: le nom de la formation tel que donné dans la fiche de coûts
         :rtype: str
         """
-        return self._tableau_fdc["C5"]
+        return self.tableau["C5"]
 
     @property
     def nb_participants_prevus(self) -> int:
-        return self._tableau_fdc["C17"]
+        """
+        Renvoie le nombre de participants prévus (C17)
+        
+        :return: le nombre de participants prévus tel que donné dans la fiche de coûts
+        :rtype: int
+        """
+        return self.tableau["C17"]
 
     @property
     def date_creationFormation(self) -> int:
@@ -72,7 +207,7 @@ class FdC:
         :return: l'année de conception de la formation
         :rtype: int
         """
-        dateCreationFormation = self._tableau_fdc["C9"]
+        dateCreationFormation = self.tableau["C9"]
 
         if isinstance(dateCreationFormation, int):
             dateCreationFormation = dateCreationFormation
@@ -83,92 +218,40 @@ class FdC:
             dateCreationFormation = 1900
         return dateCreationFormation
 
-
-        """
-        Renvoie le nom de la formation (C5)
-        
-        :return: le dataframe de l'Exctract IRIS des sessions
-        :rtype: str
-        """
-        return self.fdc_ref("C5")
-
     @property
     def min_participants_cea(self) -> int:
-        return self._tableau_fdc["M22"]
+        """
+        Renvoie le nombre min de participants prévus pour les CEA (M22)
+        
+        :return: le nombre min de participants tel que donné dans la fiche de coûts
+        :rtype: int
+        """
+        return self.tableau["M22"]
     
     @property
     def min_participants_ee(self) -> int:
-        return self._tableau_fdc["N23"]
+        """
+        Renvoie le nombre min de participants prévus pour les EE (N23)
+        
+        :return: le nombre min de participants tel que donné dans la fiche de coûts
+        :rtype: int
+        """
+        return self.tableau["N23"]
     
     @property
     def min_participants(self) -> str:
+        """
+        Renvoie le nombre min de participants prévus pour les EE et CEA.
+        
+        :return: le nombre min de participants EE et CEA tel que donné dans la fiche de coûts
+        :rtype: str
+        """
         return f"{self.min_participants_ee} pers. (EE) / {self.min_participants_cea} pers. (CEA)"
     
-    @property
-    def prevus_participants(self) -> int:
-        return self._tableau_fdc["C17"]
 
-    def max_participants(self, depassementAutorise:int) -> int:
-        return self.prevus_participants + depassementAutorise
-
-
-    @staticmethod
-    def choisir_fdc(trigramme_formation:str = "") -> Path | None:
-        """
-        Ouvre un filedialog pour demander à l'utilisateur de sélectionner une fiche de coûts.
-        On pointe au mieux sur le répertoire des FdC pour la boîte de dialogue.
-        """
-
-        return choisir_fichier(titre=f"Sélectionner la fiche de coûts à employer.",
-                        types_fichiers=[("Fichiers Excel", "*.xlsx")],
-                        dossier_initial=config.format_path(config.REPERTOIRE_FDC, trigramme_formation=trigramme_formation),
-                        texte_bouton_choisir=f"Choisir FdC à nouveau"
-                        )
-
-
-    @staticmethod
-    def charger_excel_IRIS_sessions(fe_fdc:Optional[FichierExcel]=None, chemin_fdc:Optional[Path]=None) -> Tuple[FichierExcel, FichierExcel._TableauExcel]:
-        """
-            Retourne l’extract IRIS sessions s'il n'existe pas déjà.
-            Soit on fournit un FichierExcel, soit un chemin vers ce fichier .xlsx
-
-            Si fe_IRIS_sessions existe (not None), alors on ne fait rien.
-            Si chemin_IRIS_sessions est vide, alors on demande à l'utilisateur de pointer un fichier.
-            On crée un FichierExcel depuis le chemin.
-    
-            :param fe_IRIS_sessions: FichierExcel de l'extract IRIS sessions qu'on souhaite traiter
-            :type fe_IRIS_sessions: FichierExcel
-            :param chemin_IRIS_sessions: Chemin de l'extract IRIS sessions qu'on souhaite traiter
-            :type chemin_IRIS_sessions: Path
-            :return: un FichierExcel de l'extract IRIS Sessions
-            :rtype: FichierExcel
-    
-            :Example:
-    
-            >>> charger_excel_IRIS_sessions(chemin_IRIS_sessions=chemin_input)
-            >>> charger_excel_IRIS_sessions()
-
-    
-            .. seealso:: Rien du tout.
-            .. warning:: Rien du tout.
-            .. note:: Rien du tout.
-            .. todo:: Rien du tout.
-        """
-        if fe_fdc is None:
-            timer.debut("Lecture fiche de coûts")
-
-            if chemin_fdc is None:
-                chemin_fdc = FdC.choisir_fdc()
-
-            fe_fdc = FichierExcel.depuis_fichier(chemin_fichier=chemin_fdc, nom_onglet="Fiche de coûts")
-            tableau_fdc = fe_fdc._tableaux["Fiche de coûts"]
-            
-            #fe_fdc._tableaux["Fiche de coûts"]._df = IRIS.convertit_types_colonnes_df_sessions(fe_IRIS_sessions)
-
-            timer.fin()
-
-        return fe_fdc, tableau_fdc
-
+    # ==========================================================================
+    # === ANCIENNE METHODE DE LECTURE DE LA FDC (lié à la version de la FdC) ===
+    # ==========================================================================
     def lire_fdc_bak(self):
 
         """

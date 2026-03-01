@@ -1,93 +1,17 @@
+from __future__ import annotations
+
+from vte.utils import *
+
+from pathlib import Path
+import re
+from typing import Optional
+
+
 
 
 ### --------------------------------------------------------------------
-#  Fonctions globales INSTN
+#  Fonctions utilitaires globales INSTN
 ### --------------------------------------------------------------------
-
-def lire_fdc(chemin_fdc):
-
-    """
-    A partir d'un chemin de fichier Excel (qui se doit d'etre une fiche de couts, on retourne plusieurs dataframes.
-
-    :param s_fdc: Chemin du fichier Excel a ouvrir (se doit d'etre une fiche de coûts)
-    :type s_fdc: string
-    :return: Un DataFrame de l'extract IRIS avec ajouts de colonnes (on a extrait les informations de la colonne 'N° Session' par decoupage)
-    :rtype: DataFrame
-
-    :Example:
-
-    >>> DataFrame.df_sessionsIRIS = lire_fdc("C:\\Users\\fichier.xlsx")
-
-
-    .. seealso:: Rien du tout.
-    .. warning:: Rien du tout.
-    .. note:: Rien du tout.
-    .. todo:: Rien du tout.
-    """
-
-    nomOnglet_fdc = "Fiche de coûts"
-
-    # Premier tableau : B5:C21 (informations génériques)
-    df_fdc_infos = pd.read_excel(chemin_fdc, sheet_name=nomOnglet_fdc, usecols=[1, 2], names=["Critere", "Valeur"], header=3, nrows=17)
-    #print(df_fdc_infos)
-    dateCreationFormation = df_fdc_infos.iloc[4, 1] #C9
-    if isinstance(dateCreationFormation, int):
-        dateCreationFormation = dateCreationFormation
-    elif hasattr(dateCreationFormation, 'year'):
-        dateCreationFormation = dateCreationFormation.year
-    else:
-        print(f"Valeur inattendue pour une année : {dateCreationFormation} (type {type(dateCreationFormation)})")
-        dateCreationFormation = 1900
-
-    dureeJours_fdc = df_fdc_infos.iloc[6, 1] #C11
-    osThematique = df_fdc_infos.iloc[8, 1] #C13
-    nbCible_fcd = df_fdc_infos.iloc[12, 1] #C17
-
-    # Prix de vente défini par le RP (cellule J22)
-    prixVenteRetenuParParticipant = pd.read_excel(chemin_fdc, sheet_name=nomOnglet_fdc, usecols=[9], names=["Valeur"], skiprows=20, nrows=1).iloc[0,0]
-    
-    # Deuxième tableau : tableau des coûts (tout compris) et des prix par personne (T1, T2 et T3) : ref K35:N35
-    df_fdc_couts = pd.read_excel(chemin_fdc, sheet_name=nomOnglet_fdc, usecols=[10, 11, 12, 13, 14, 15], names=["T1", "T3", "T2", "0.9xT3", "1.1xT3", "Valeur fixée"], header=33, nrows=2).transpose() #Grosse astuce : je mets 2 lignes de plus pour affecter les noms plus facilement et je les recalculerai après
-    df_fdc_couts.rename(columns={0: "Couts fixes et variables nb cible"}, inplace=True) # Pour changer le nom de la colonne après transposition. Coûts prix fixes et prix
-    df_fdc_couts.head() # Requis pour MàJ le nom de la colonne après transposition
-
-    df_fdc_couts.loc["0.9xT3", "Couts fixes et variables nb cible"] = df_fdc_couts.loc["T3", "Couts fixes et variables nb cible"] * 0.9
-    df_fdc_couts.loc["1.1xT3", "Couts fixes et variables nb cible"] = df_fdc_couts.loc["T3", "Couts fixes et variables nb cible"] * 1.1
-    df_fdc_couts.loc["Valeur fixée", "Couts fixes et variables nb cible"] = prixVenteRetenuParParticipant / 1.1 * nbCible_fcd # Astuce : comme c'est une valeur que je n'ai pas, je fais le calcul inverse que pour avoir le montant par session avec aleas
-
-
-    # On ajoute les colonnes montants cibles avec calculs
-    l1 = []
-    l2 = []
-    l3 = []
-    for index, row in df_fdc_couts.iterrows():
-        l1.append(row["Couts fixes et variables nb cible"] * 1.1)
-        l2.append(row["Couts fixes et variables nb cible"] * 1.1 / nbCible_fcd)
-        l3.append(row["Couts fixes et variables nb cible"] * 1.1 / nbCible_fcd / dureeJours_fdc)
-    df_fdc_couts["Montant cible par session avec aléas"] = l1
-    df_fdc_couts["Montant cible par participant"] = l2
-    df_fdc_couts["Montant cible par participant et par jour"] = l3
-
-
-    # On ajoute les colonnes pour calcul nb participants
-    l1 = []
-    l2 = []
-    l3 = []
-    for index, row in df_fdc_couts.iterrows():
-        if row["Montant cible par participant"] != 0 :
-            l1.append(math.ceil(df_fdc_couts.loc["T1", "Montant cible par session avec aléas"] / row["Montant cible par participant"]))
-            l2.append(math.ceil(df_fdc_couts.loc["T2", "Montant cible par session avec aléas"] / row["Montant cible par participant"]))
-            l3.append(math.ceil(df_fdc_couts.loc["T3", "Montant cible par session avec aléas"] / row["Montant cible par participant"]))
-        else :
-            l1.append(0)
-    df_fdc_couts["Min participants T1"] = l1
-    df_fdc_couts["Min participants T2"] = l2
-    df_fdc_couts["Min participants T3"] = l3 
-
-    print(df_fdc_couts)
-
-    return df_fdc_infos, df_fdc_couts, prixVenteRetenuParParticipant, dateCreationFormation, dureeJours_fdc, osThematique, nbCible_fcd
-
 
 def recupere_trig_formation_depuis_chemin(chemin:Optional[Path] = None) -> str:
     """
@@ -157,7 +81,7 @@ def demander_code(typeCode:str, info:Optional[Path] = None) -> int|str:
             print("Cas trigramme formation")
             nbCaracteres = 3
         case _:
-            log_erreur(f"cas non valide : soit 'IRIS' soit 'Trigramme formation', demandé : {typeCode} → exit()")
+            vlog.log_erreur(f"cas non valide : soit 'IRIS' soit 'Trigramme formation', demandé : {typeCode} → exit()")
             exit()
 
         
@@ -178,7 +102,7 @@ def demander_code(typeCode:str, info:Optional[Path] = None) -> int|str:
 
     def annuler():
         fenetre.destroy()
-        log_erreur(f"{typeCode} non renseigné → exit()")
+        vlog.log_erreur(f"{typeCode} non renseigné → exit()")
         exit()
 
     code = None
@@ -318,7 +242,7 @@ def demander_code_avec_renommage(typeCode:str, chemin:Path, renommage:Optional[C
             print("Cas trigramme formation")
             nbCaracteres = 3
         case _:
-            log_erreur(f"cas non valide : soit 'IRIS' soit 'Trigramme formation', demandé : {typeCode} → exit()")
+            vlog.log_erreur(f"cas non valide : soit 'IRIS' soit 'Trigramme formation', demandé : {typeCode} → exit()")
             exit()
 
         
@@ -345,14 +269,14 @@ def demander_code_avec_renommage(typeCode:str, chemin:Path, renommage:Optional[C
             renommage(chemin)  # On appelle le callback
         except Exception as e:
             tk.messagebox.showerror("Erreur", f"Impossible de renommer le fichier :\n{e}")
-            log_erreur("Erreur", f"Impossible de renommer le fichier :\n{e}")
+            vlog.log_erreur("Erreur", f"Impossible de renommer le fichier :\n{e}")
             return  # Ne pas fermer la fenêtre si erreur
 
         fenetre.destroy()
 
     def annuler():
         fenetre.destroy()
-        log_erreur(f"{typeCode} non renseigné pour {chemin} → exit()")
+        vlog.log_erreur(f"{typeCode} non renseigné pour {chemin} → exit()")
         exit()
 
     code = None
@@ -418,21 +342,3 @@ def demander_code_avec_renommage(typeCode:str, chemin:Path, renommage:Optional[C
 
 
 
-
-### --------------------------------------------------------------------
-#  Initialisations variables globales communes
-### --------------------------------------------------------------------
-
-# Requis pour avoir des ConfExportIRIS dans config.py (dinon références circulaires à l'import)
-#initialiser_fichierConfig_ExportIRIS_standards()
-
-# Pour couleur barres de progression
-#colorama.init(autoreset=True)
-# forcer la conversion ANSI dans toutes les consoles
-colorama.init(autoreset=True, convert=True, strip=False)
-
-# Pour chrono des fonctions
-timer = Timer()
-
-# Pour message de sortie applis externes
-vlog = Vlog()

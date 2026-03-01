@@ -45,6 +45,8 @@ import shutil
 
 from tabulate import tabulate
 
+
+
 ### --------------------------------------------------------------------
 #  Tests (log et timer)
 ### --------------------------------------------------------------------
@@ -514,10 +516,14 @@ def optimiseCheminRepertoire(path_in:str|Path) -> str|Path:
             path_out = "."
         #print(path_out)
 
-    if path_in.isinstance(str) :
-        return(str(path_out))
-    elif path_in.isinstance(Path) :
-        return(Path(path_out))
+    # Ancienne manière de typer la sortie comme à l'entrée
+    # if isinstance(path_in, str) :
+    #     return(str(path_out))
+    # elif isinstance(path_in, Path) :
+    #     return(Path(path_out))
+
+    # Nouvelle manière de typer la sortie comme à l'entrée
+    return type(path_in)(path_out)
 
 def ouvrir_dossier(path) -> str:
     if platform.system() == "Windows":
@@ -1723,7 +1729,7 @@ def choisir_fichier(
             root.destroy()
             sys.exit()
 
-def tester_existance_fichier(chemin_fichier: Path) -> bool:
+def verifier_existance_fichier(chemin_fichier: Path) -> bool:
     """
     Teste l'existence d'un fichier Word et propose à l'utilisateur
     une interface Tkinter plus lisible et au premier plan.
@@ -2401,3 +2407,26 @@ def copierFormat_xlwings(chemin_fichier, nom_ws, range_modele, range_cible) -> N
     wb.close()
     app.quit()
 
+
+
+
+
+
+
+### --------------------------------------------------------------------
+#  Initialisations variables globales communes
+### --------------------------------------------------------------------
+
+# Requis pour avoir des ConfExportIRIS dans config.py (dinon références circulaires à l'import)
+#initialiser_fichierConfig_ExportIRIS_standards()
+
+# Pour couleur barres de progression
+#colorama.init(autoreset=True)
+# forcer la conversion ANSI dans toutes les consoles
+colorama.init(autoreset=True, convert=True, strip=False)
+
+# Pour chrono des fonctions
+timer = Timer()
+
+# Pour message de sortie applis externes
+vlog = Vlog()
