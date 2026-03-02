@@ -125,31 +125,44 @@ class IRIS:
     # ===========================
     # === Variables de classe ===
     # ===========================
-    _SESSIONS:ConfigExportIRIS = ConfigExportIRIS(**config.IRIS_SESSIONS_PARAMS)
+    _SESSIONS = ConfigExportIRIS(**config.IRIS_SESSIONS_PARAMS)
     _FORMATIONS = ConfigExportIRIS(**config.IRIS_FORMATIONS_PARAMS)
     _VENTES = ConfigExportIRIS(**config.IRIS_VENTES_PARAMS)
     _INSCRIPTIONS = ConfigExportIRIS(**config.IRIS_INSCRIPTIONS_PARAMS)
 
+    DICT_EXPORTS_IRIS = {
+        """
+        Dictionnaire (clefs = [ ; ]) :
+        - "ConfigExportIRIS" : propriétés des Exports IRIS (chemins, modèles, nb lignes avant tableau...). Ces données sont renseignées pour :
+                - les inputs (natifs IRIS) ;
+                - les modèles à employer (qui sont peuplés par les inputs) ;
+                - les output (fichiers traités / concaténés).
+        - "chemins_fichiersInput" : liste des chemins des fichiers natifs IRIS à concaténer pour obtenir les fichiers output
+        - "colonnes_modele" : je ne suis plus sûr : soit liste soit ordre soit nouveau nom pour le modèle versus l'input
+        """
 
-    _dict_exports_IRIS = {}
-    _dict_exports_IRIS["ConfigExportIRIS"] = {
-        "Sessions" : _SESSIONS, 
-        "Formations" : _FORMATIONS,
-        "Ventes" : _VENTES,
-        "Inscriptions" : _INSCRIPTIONS
-        }
-    _dict_exports_IRIS["chemins_fichiersInput"] = {
-        "Sessions" : config_extractsIRIS._tSessions,
-        "Formations" : config_extractsIRIS._tFormations,
-        "Ventes" : config_extractsIRIS._tVentes,
-        "Inscriptions" : config_extractsIRIS._tInscriptions
-        }
-    _dict_exports_IRIS["colonnes_modele"] = {
-        "Sessions" : None,
-        "Formations" : None,
-        "Ventes" : None,
-        "Inscriptions" : config_extractsIRIS._colonnes_modele_inscriptions
-        }
+        "ConfigExportIRIS": {
+            "Sessions": _SESSIONS,
+            "Formations": _FORMATIONS,
+            "Ventes": _VENTES,
+            "Inscriptions": _INSCRIPTIONS,
+        },
+
+
+        "chemins_fichiersInput": {
+            "Sessions": config_extractsIRIS._tSessions,
+            "Formations": config_extractsIRIS._tFormations,
+            "Ventes": config_extractsIRIS._tVentes,
+            "Inscriptions": config_extractsIRIS._tInscriptions,
+        },
+
+        "colonnes_modele": {
+            "Sessions": None,
+            "Formations": None,
+            "Ventes": None,
+            "Inscriptions": config_extractsIRIS._colonnes_modele_inscriptions,
+        },
+    }
 
 
     # ====================

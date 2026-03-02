@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional, Tuple
 
-from vte.domain.fichiers.iris import IRIS
+from vte.domain.iris import IRIS
 from vte.utils.utils import convertir_tuple_path, convertir_tuple_str
 
 

@@ -4,16 +4,16 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 from tkinter.ttk import Style
-from typing import List, Optional, Tuple, Any, Type
+from typing import Iterable, List, Optional, Tuple, Any, Type
 
 import pandas as pd
 import tqdm
 from colorama import Fore
 
+from vte.core import config, config_extractsIRIS
 from vte.utils.office import FichierExcel
 from vte.utils.utils import *
 from vte.utils.utils_instn import demander_code
-from vte.core.iris_referentiel import DICT_EXPORTS_IRIS
 
 # ======================================================================================
 # CLASSE IRIS
@@ -37,16 +37,22 @@ class ConfigExportIRIS:
     Configuration d'un type d'export IRIS.
     Contient les propriétés input, modèle, output.
     """
-    def __init__(self, nom_typeExport: str, codeExport: str,
+    def __init__(self,
+                 nom_typeExport: str,
+                 codeExport: str,
+
                  repertoire_input: Path,
                  nom_onglet_input: str = "Data",
                  nbLignes_avantET_input: int = 0,
-                 repertoire_modele: Optional[Path] = None,
+
+                 repertoire_modele: Optional[Path] = config.REPERTOIRES_MODELES, 
                  nom_fichier_modele: Optional[str | Path] = None,
                  ordre_colonnes_modele: Optional[List[str]] = None,
-                 repertoire_output: Optional[Path] = None,
+
+                 repertoire_output: Optional[Path] = config.REPERTOIRE_EXCEL_IRIS_OUTPUT,
                  nom_fichier_output: Optional[str | Path] = None):
 
+        # Type d'export
         self._nom_typeExport = nom_typeExport
         self._codeExport = codeExport
 
@@ -57,28 +63,52 @@ class ConfigExportIRIS:
                 f"{codeExport}_{nom_typeExport}-COMPLET-{date.today():%Y.%m.%d}.xlsx"
             )
 
-        self._input = InfosExportsIRIS(
-            repertoire_input, None, nom_onglet_input, nbLignes_avantET_input, None
+        # Informations input données (i.e. extracts natifs d'IRIS)
+        self._input:InfosExportsIRIS = InfosExportsIRIS(
+            repertoire=repertoire_input, # TODO est-ce qu'avec Path je suis obligé d'avoir les 2 ?
+            chemin_fichier=None,
+            nom_onglet=nom_onglet_input,
+            nbLignes_avantET=nbLignes_avantET_input,
+            ordre_colonne = None
+            )
+
+        # Informations sur le modèle Excel à employer pour remplir l'output
+        self._modele:InfosExportsIRIS = InfosExportsIRIS(
+            repertoire=repertoire_modele,
+            chemin_fichier=(repertoire_modele / nom_fichier_modele) if repertoire_modele else None,
+            nom_onglet=nom_typeExport,
+            nbLignes_avantET=None,
+            ordre_colonne = ordre_colonnes_modele
+            )
+
+        # Informations output
+        self._output:InfosExportsIRIS = InfosExportsIRIS(
+            repertoire=repertoire_output,
+            chemin_fichier=(repertoire_output / nom_fichier_output) if repertoire_output else None,
+            nom_onglet=nom_typeExport,
+            nbLignes_avantET=None,
+            ordre_colonne = None
+            )
+
+    # === Affichage ===
+    def __str__(self):
+        def afficher_infos(nom_section, obj):
+            lignes = [f"  {nom_section} :"]
+            for champ, valeur in vars(obj).items():
+                if valeur is not None:
+                    # Appliquer gris clair uniquement sur les détails
+                    lignes.append(f"    {Style.DIM}{Fore.LIGHTWHITE_EX}{champ:<17}: {valeur}{Style.RESET_ALL}")
+            return "\n".join(lignes)
+
+        type_export_str = f"  Type export : {self._nom_typeExport} ({self._codeExport})"
+
+        return (
+            f"PropExportIRIS\n"
+            f"{type_export_str}\n"
+            f"{afficher_infos('Input', self._input)}\n"
+            f"{afficher_infos('Modèle', self._modele)}\n"
+            f"{afficher_infos('Output', self._output)}"
         )
-
-        self._modele = InfosExportsIRIS(
-            repertoire_modele,
-            (repertoire_modele / nom_fichier_modele) if repertoire_modele else None,
-            nom_typeExport,
-            None,
-            ordre_colonnes_modele
-        )
-
-        self._output = InfosExportsIRIS(
-            repertoire_output,
-            (repertoire_output / nom_fichier_output) if repertoire_output else None,
-            nom_typeExport,
-            None,
-            None
-        )
-
-
-
 
 
 # ======================================================================================
@@ -91,7 +121,46 @@ class IRIS:
     """
 
     # Variables de classe
-    _dict_exports_IRIS = DICT_EXPORTS_IRIS
+    _SESSIONS = ConfigExportIRIS(**config.IRIS_SESSIONS_PARAMS)
+    _FORMATIONS = ConfigExportIRIS(**config.IRIS_FORMATIONS_PARAMS)
+    _VENTES = ConfigExportIRIS(**config.IRIS_VENTES_PARAMS)
+    _INSCRIPTIONS = ConfigExportIRIS(**config.IRIS_INSCRIPTIONS_PARAMS)
+
+    """
+    Dictionnaire (clefs = [ ; ]) :
+    - "ConfigExportIRIS" : propriétés des Exports IRIS (chemins, modèles, nb lignes avant tableau...). Ces données sont renseignées pour :
+            - les inputs (natifs IRIS) ;
+            - les modèles à employer (qui sont peuplés par les inputs) ;
+            - les output (fichiers traités / concaténés).
+    - "chemins_fichiersInput" : liste des chemins des fichiers natifs IRIS à concaténer pour obtenir les fichiers output
+    - "colonnes_modele" : je ne suis plus sûr : soit liste soit ordre soit nouveau nom pour le modèle versus l'input
+    """
+    DICT_EXPORTS_IRIS = {
+
+
+        "ConfigExportIRIS": {
+            "Sessions": _SESSIONS,
+            "Formations": _FORMATIONS,
+            "Ventes": _VENTES,
+            "Inscriptions": _INSCRIPTIONS,
+        },
+
+
+        "chemins_fichiersInput": {
+            "Sessions": config_extractsIRIS._tSessions,
+            "Formations": config_extractsIRIS._tFormations,
+            "Ventes": config_extractsIRIS._tVentes,
+            "Inscriptions": config_extractsIRIS._tInscriptions,
+        },
+
+        "colonnes_modele": {
+            "Sessions": None,
+            "Formations": None,
+            "Ventes": None,
+            "Inscriptions": config_extractsIRIS._colonnes_modele_inscriptions,
+        },
+    }
+
 
     # ====================
     # === Constructeur ===
@@ -105,16 +174,6 @@ class IRIS:
         """
         self._typeExport = typeExport  # Nom du type d'export : ["Sessions", "Formations", "Ventes", "Insciptions"]
         self._fe: Optional[FichierExcel] = None  # Fichier Excel de l'export IRIS
-
-
-
-
-
-
-
-
-
-
 
 
     # ==========================
@@ -428,7 +487,7 @@ class IRIS:
         :return: Description
         :rtype: ConfigExportIRIS
         """
-        return IRIS._dict_exports_IRIS["ConfigExportIRIS"][self._typeExport]
+        return IRIS.DICT_EXPORTS_IRIS["ConfigExportIRIS"][self._typeExport]
 
     @property
     def typeExport(self) -> str:
@@ -478,6 +537,14 @@ class IRIS:
         self._fe._tableaux[self._typeExport]._df = valeur
 
     @property
+    def tableau_donnees_iris(self) -> FichierExcel._TableauExcel:
+        return self._fe._tableaux[self.typeExport]
+    
+    @property
+    def tableau_fichiers_importes(self) -> FichierExcel._TableauExcel:
+        return self._fe._tableaux["Imports"]
+
+    @property
     def chemin(self) -> Path:
         """
         Renvoie le chemin du fichier Excel de l'instance
@@ -498,33 +565,76 @@ class IRIS:
         self._fe.chemin_fichier = valeur
 
 
-class IRIS_natifs(IRIS):
-    def __init__(self, typeExport:str, chemin:Optional[Path]=None, fe:Optional[FichierExcel]=None):
+class IRIS_natif(IRIS):
+    """
+    Classe qui gère les extracts IRIS natifs
+    """
+    # =====================
+    # === CONSTRUCTEURS ===
+    # =====================
+    def __init__(self, typeExport:str):
         # On initialise la classe mère
         super().__init__(typeExport=typeExport)
 
-        # Type d'export traité
-        self.typeExport = typeExport
+    @classmethod
+    def avec_traitement(cls, typeExport:str, chemins_fichiersInput:Optional[str|Path|Iterable[str|Path]] = None, chemin_fichier_sauv:Optional[Path]=None) -> IRIS_natif:
+        r"""
+        Crée un fichier Excel unique à partir de plusieurs exports IRIS natifs.
 
-   
+        Si pas de chemins_input, alors on ouvre un filedialog.
+
+        Sauvegarde soit à un endroit en argument soit à sa place par défaut (donné dans config)
+        Les fichiers générés reprennent les colonnes d'origine mais avec de meilleures formes (format, couleurs...) + des colonnes adjointes à la fin pour extraire et séparer les infos du n° de session ou de la référence de la formation (ex. : trigramme formation, trigramme RP, trigramme AF...)
+
+        :param typeExport: spécifie le type d'export. Doit être dans cette liste : ["Sessions", "Formations", "Ventes", "Insciptions"]
+        :type typeExport: str
+        :param chemins_fichiersInput: Chemin(s) du ou des fichiers à traiter. Si None, on ouvre un filedialog
+        :type chemins_fichiersInput: str|Path|Iterable[str|Path]
+        :param chemin_fichier_sauv: Chemin de savegarde si l'utilisateur ne veut pas employer celui qui est dans la config
+        :type chemin_fichier_sauv: Path
+
+        :return: un objet IRIS_natif
+        :rtype: IRIS_natif
+
+        :example:
+
+        >>> avec_traitement(chemins_fichiersInput=(r'.\R04110_Sessions-2021 FINAL.xlsx', r'.\R04110_Sessions-2022 FINAL.xlsx'))
+        >>> avec_traitement(chemins_fichiersInput=(r'.\R04110_Sessions-2021 FINAL.xlsx', r'.\R04110_Sessions-2022 FINAL.xlsx'), chemin_fichier_sauv=Path(r"C:/fichier_out.xlsx"))
+
+
+        .. seealso:: Rien du tout.
+        .. warning:: On ne doit traiter que des extracts IRIS du même type (sessions, formation...)
+        .. note:: Remplace complètement l'ancien fichier (pas de mise à jour incrémentale)
+        .. todo:: Rien du tout.
+        """
+        instance = cls(typeExport)
+        instance._creer_export_IRIS(
+            chemins_fichiersInput=chemins_fichiersInput,
+            chemin_fichier_sauv=chemin_fichier_sauv
+            )
+        return instance
+    
 
     # =========================
     # === Méthodes internes ===
     # =========================
-    def _charger_df_extractsIRIS_originaux(self, chemins_fichiersInput:Path|tuple[Path, ...]) -> pd.DataFrame:
-        """
-        Lit le/les extract(s) IRIS et on le/les stocke dans un seul dataframe self._df_tableau
-        (i.e. on concatène si besoin)
+    def _charger_iris_natifs(self, chemins_fichiersInput:Optional[Path|Iterable[Path]]=None) -> tuple[pd.DataFrame, tuple[Path]]:
+        r"""
+        Lit le/les extract(s) IRIS et on génère dans un seul dataframe
+        On concatène si besoin
+        Si pas de chemins en input, alors on ouvre un filedialog.
 
-        :param chemins_fichiersInput: Chemin(s) du ou des fichiers IRIS (.xlsx) à charger dans le dataframe
-        :type chemins_fichiersInput: Path|tuple[Path, ...]
+        :param chemins_fichiersInput: Chemin(s) du ou des fichiers IRIS natifs (.xlsx) à charger dans le dataframe. Si None, on ouvre un filedialog
+        :type chemins_fichiersInput: Optional[Path|Iterable[Path]]
 
-        :return: Un DataFrame contenant les données de chemins_fichiersInput concaténées
-        :rtype: pd.DataFrame
+        :return: 2 variables:
+           - un DataFrame contenant les données de chemins_fichiersInput concaténées
+           - un tuple des chemins concaténés
+        :rtype: tuple[pd.DataFrame, tuple[Path]]
 
         :example:
-        >>> self._charger_df_extractsIRIS_originaux(Path(r"C:/fichier1.xlsx"))
-        >>> self._charger_df_extractsIRIS_originaux((Path(r"C:/fichier1.xlsx"), Path(r"C:/fichier2.xlsx"))
+        >>> self._charger_iris_natifs(Path(r"C:/fichier1.xlsx"))
+        >>> self._charger_iris_natifs((Path(r"C:/fichier1.xlsx"), Path(r"C:/fichier2.xlsx"))
 
 
         .. seealso:: Rien du tout.
@@ -532,16 +642,34 @@ class IRIS_natifs(IRIS):
         .. note:: Rien du tout.
         .. todo:: Rien du tout.
         """
-        # Initialisation : on crée un DataFrame vide pour recevoir (peut-être) des infos que l'on traitera et qui nécessitera d'adjoindre des colonnes à self.__df_tableau
-        df_colonnes_sup = None
 
-        if isinstance(chemins_fichiersInput, Path):
-            chemins_fichiersInput = (chemins_fichiersInput,)
+        # ===
+        # === GESTION DES FICHIERS D'ENTREE ===
+        # ===
+        # Si aucun fichier input n'est donné, alors on ouvre un filedialog
+        if chemins_fichiersInput is None:
+            chemins_fichiersInput = IRIS_natif.choisir_fichiers(self.typeExport)
 
+        # On convertit en Tuple[Path]
+        chemins_fichiersInput = convertir_tuple_path(chemins_fichiersInput)
+
+        # On enlève les raccourcis réseau système (dépendant de l'utilisateur) pour mettre le chemin réel (\\harmonie\instn\uem...)
+        chemins_fichiersInput = tuple(chemin_vers_unc(chemin) for chemin in chemins_fichiersInput)
+
+        # Affichage de la liste des fichiers à traiter
+        print(Style.BRIGHT + Fore.YELLOW + "\nTraitement des exports " + self.typeExport)
+        chemins_fichiersInput_str = [f"\n\t{f}" for f in chemins_fichiersInput]
+        print("Liste des fichiers à concaténer : " + ", ".join(chemins_fichiersInput_str))
+
+
+        # ===
+        # === CHARGEMENT DES DATAFRAMES & CONCATENATION ===
+        # ===
         # On parcourt le tuple des fichiers à lire
         df_list = [] # Liste des DataFrame qui contiendra chaque fichier Excel séparément
         taille_totale = sum(fichier.stat().st_size for fichier in chemins_fichiersInput) # Calcul taille totale pour barre de progression
 
+        print()  # Pour avoir une ligne à écraser avec le tqdm
         with tqdm(total=taille_totale, unit='o', unit_scale=True, desc=Fore.CYAN+"Lecture des fichiers Excel" + Style.RESET_ALL) as pbar:
             #for i, ifichier in enumerate((os.path.basename(chemin) for chemin in chemins_fichiersInput), 1):
             for i, chemin in enumerate(chemins_fichiersInput, 1):
@@ -560,9 +688,12 @@ class IRIS_natifs(IRIS):
         df_concat_iris = pd.concat(df_list, ignore_index=True) 
 
 
-
+        # ===
+        # === EXTRACTION INFOS DEPUIS N°IRIS ET REFERENCE FORMATION & AJOUT COLONNES ===
+        # ===
         # Extraction des infos depuis "référence formation" ou "n° Iris" (dépend du type d'export)
-        match self.cei._nom_typeExport:
+        df_colonnes_sup = None  # Si on extrait des données depuis "référence formation" ou "n° Iris", alors on devra ajouter des colonnes au df initial
+        match self.typeExport:
             # Cas Sessions ou Inscriptions ou Ventes (sensiblement comme 'Inscription R04500' mais groupé par Client (pas de détail de chaque stagiaire))
             case "Sessions" | "Inscriptions" | "Ventes":
                 # On extrait / retravaille les informations de la colonne 'N° Session'
@@ -583,21 +714,95 @@ class IRIS_natifs(IRIS):
         if df_colonnes_sup is not None:
             df_concat_iris = pd.concat([df_concat_iris, df_colonnes_sup], axis=1)
 
-
-
-
         # Modification structure du DataFrame (emplacement des colonnes) (dépend du type d'export)
-        if self._dict_exports_IRIS["colonnes_modele"][self.cei._nom_typeExport] is not None:
-            df_concat_iris = df_concat_iris[self._dict_exports_IRIS["colonnes_modele"][self.cei._nom_typeExport]]
+        if IRIS.DICT_EXPORTS_IRIS["colonnes_modele"][self.typeExport] is not None:
+            df_concat_iris = df_concat_iris[IRIS.DICT_EXPORTS_IRIS["colonnes_modele"][self.typeExport]]
     
-        return df_concat_iris
 
+
+        return df_concat_iris, chemins_fichiersInput
+
+    def _ecrire_et_sauver_df_dans_excel(self, df:pd.DataFrame, chemins_natifs_iris:tuple[Path], chemin_fichier_sauv:Optional[Path]=None) -> None:
+        r"""
+        Écrit et sauve un df issu d'extracts IRIS natifs dans un fichier Excel issu d'un modèle.
+        Si chemin_fichier_sauv n'est pas donné, alors on emploie la valeur par défaut qui est dans cei.
+        Nota : on sauvegarde également dans ce fichier la liste des chemins ayant servi à faire ce fichier (onglet "Imports")
+
+        Example:
+        >>> self._ecrire_et_sauver_df_dans_excel(df, chemins_natifs_iris)
+        >>> self._ecrire_et_sauver_df_dans_excel(df, chemins_natifs_iris, Path(r"C:/fichier_out.xlsx"))
+
+        Args:
+            df (pd.DataFrame): le DataFrame des extracts IRIS natifs concaténés
+            chemins_natifs_iris (tuple[Path]): tuple des chemins ayant servi à faire df
+            chemin_fichier_sauv (Optional[Path]): chemin de sauvegarde du fichier. Si chemin_fichier_sauv n'est pas donné, alors on emploie la valeur par défaut qui est dans cei.
+        """
+        # Si aucun fichier de sortie n'est donnée, alors on prend le chemin par défaut
+        if chemin_fichier_sauv is None:
+            chemin_fichier_sauv = self.cei._output.chemin_fichier
+ 
+        # On ouvre le modèle et tous ses tableaux structurés
+        self._fe = FichierExcel.depuis_modele(
+                                        chemin_modele=self.cei._modele.chemin_fichier, 
+                                        chemin_fichier_sauv=chemin_fichier_sauv
+                                        )
+
+        # On copie le DataFrame df avec les nouvelles données dans le modèle (on écrase les anciennes données car depuis modèle, donc tableau vide)
+        self.tableau_donnees_iris.ecrit_dataFrame_dans_tableauStructure(df, supprimeDonneesEtRemplace=True, remplace_df_par_nouveau=True)
+
+        # On écrit les références des fichiers copiés dans le tableau structuré "Imports". Nota : openpyxl ne prend pas en charge les Path donc on passe avec des str
+        df_chemins = pd.DataFrame([str(chemin) for chemin in chemins_natifs_iris], columns=['Chemin fichier'])
+        self.tableau_fichiers_importes.ecrit_dataFrame_dans_tableauStructure(df=df_chemins, supprimeDonneesEtRemplace=True, remplace_df_par_nouveau=True)
+
+        #On enregistre et on ferme (par précaution car copieformat xlwings sauvegarde)
+        self._fe.save()    
+        self._fe.close()
+
+    def _creer_export_IRIS(self, chemins_fichiersInput:Optional[str|Path|Iterable[str|Path]] = None, chemin_fichier_sauv:Optional[Path]=None) -> None:
+        r"""
+        Crée un fichier Excel unique à partir de plusieurs exports IRIS natifs.
+
+        Si pas de chemins_input, alors on ouvre un filedialog.
+
+        Sauvegarde soit à un endroit en argument soit à sa place par défaut (donné dans config)
+        Les fichiers générés reprennent les colonnes d'origine mais avec de meilleures formes (format, couleurs...) + des colonnes adjointes à la fin pour extraire et séparer les infos du n° de session ou de la référence de la formation (ex. : trigramme formation, trigramme RP, trigramme AF...)
+
+        :param chemins_fichiersInput: Chemin(s) du ou des fichiers à traiter. Si None, on ouvre un filedialog
+        :type chemins_fichiersInput: str|Path|Iterable[str|Path]
+        :param chemin_fichier_sauv: Chemin de savegarde si l'utilisateur ne veut pas employer celui qui est dans la config
+        :type chemin_fichier_sauv: Path
+
+        :return: Ne retourne rien
+        :rtype: None
+
+        :example:
+
+        >>> creer_export_IRIS(chemins_fichiersInput=(r'.\R04110_Sessions-2021 FINAL.xlsx', r'.\R04110_Sessions-2022 FINAL.xlsx'))
+        >>> creer_export_IRIS(chemins_fichiersInput=(r'.\R04110_Sessions-2021 FINAL.xlsx', r'.\R04110_Sessions-2022 FINAL.xlsx'), chemin_fichier_sauv=Path(r"C:/fichier_out.xlsx"))
+
+
+        .. seealso:: Rien du tout.
+        .. warning:: On ne doit traiter que des extracts IRIS du même type (sessions, formation...)
+        .. note:: Remplace complètement l'ancien fichier (pas de mise à jour incrémentale)
+        .. todo:: Rien du tout.
+        """
+        
+        # On lit le/les extract(s) IRIS et on le/les charge dans un seul dataframe
+        df_concat_iris, chemins_natifs_iris = self._charger_iris_natifs(chemins_fichiersInput=chemins_fichiersInput)
+
+        # On écrit et on sauve dans un nouvel Excel issu d'un modèle
+        self._ecrire_et_sauver_df_dans_excel(
+            df=df_concat_iris, 
+            chemins_natifs_iris=chemins_natifs_iris, 
+            chemin_fichier_sauv=chemin_fichier_sauv
+            ) 
+        
 
     # ===========
     # === IHM ===
     # ===========
     @staticmethod
-    def choisir_fichier(typeExport:str) -> Path | List[Path]:
+    def choisir_fichiers(typeExport:str) -> Path | List[Path]:
         """
         Ouvre un filedialog pour demander à l'utilisateur de sélectionner un ou plusieurs extract IRIS natifs.
         On pointe au mieux sur le répertoire des extracts IRIS pour la boîte de dialogue.
@@ -625,9 +830,6 @@ class IRIS_traite(IRIS):
     def __init__(self, typeExport:str, chemin:Optional[Path]=None, fe:Optional[FichierExcel]=None):
         # On initialise la classe mère
         super().__init__(typeExport=typeExport)
-
-        # Type d'export traité
-        self.typeExport = typeExport
 
         # TODO : pas sûr d'en avoir besoin : redondant avec fe Chemin du fichier Excel IRIS
         """
