@@ -70,7 +70,7 @@ class ConfigExportIRIS:
             nom_onglet=nom_onglet_input,
             nbLignes_avantET=nbLignes_avantET_input,
             ordre_colonne = None
-            )
+        )
 
         # Informations sur le modèle Excel à employer pour remplir l'output
         self._modele:InfosExportsIRIS = InfosExportsIRIS(
@@ -79,7 +79,7 @@ class ConfigExportIRIS:
             nom_onglet=nom_typeExport,
             nbLignes_avantET=None,
             ordre_colonne = ordre_colonnes_modele
-            )
+        )
 
         # Informations output
         self._output:InfosExportsIRIS = InfosExportsIRIS(
@@ -569,6 +569,13 @@ class IRIS_natif(IRIS):
     """
     Classe qui gère les extracts IRIS natifs
     """
+    
+    # TODO : ci-après
+    """
+    après traitement des N° session, le code_IRIS est un str dans le fichier Excel.
+    C'est "Normal" car quand on a des exceptions de mauvais nommage (et donc le regEx merde) on peut peut se retrouver avec des lettres qui trainent et donc on n'a pas un entier.
+    Voir si traitable
+    """
     # =====================
     # === CONSTRUCTEURS ===
     # =====================
@@ -648,7 +655,7 @@ class IRIS_natif(IRIS):
         # ===
         # Si aucun fichier input n'est donné, alors on ouvre un filedialog
         if chemins_fichiersInput is None:
-            chemins_fichiersInput = IRIS_natif.choisir_fichiers(self.typeExport)
+            chemins_fichiersInput = self._choisir_fichiers()
 
         # On convertit en Tuple[Path]
         chemins_fichiersInput = convertir_tuple_path(chemins_fichiersInput)
@@ -801,22 +808,18 @@ class IRIS_natif(IRIS):
     # ===========
     # === IHM ===
     # ===========
-    @staticmethod
-    def choisir_fichiers(typeExport:str) -> Path | List[Path]:
+    def _choisir_fichiers(self) -> Path | List[Path]:
         """
         Ouvre un filedialog pour demander à l'utilisateur de sélectionner un ou plusieurs extract IRIS natifs.
         On pointe au mieux sur le répertoire des extracts IRIS pour la boîte de dialogue.
-
-        Args:
-            typeExport (str): type d'export à faire sélectionner
 
         Returns:
             Path | List[Path]: Le ou les chemins des fichiers IRIS natifs pointés par l'utilisateur
         """
         return choisir_fichier(
-            titre=f"Sélectionner un ou plusieurs fichiers Extract IRIS {IRIS.cei(typeExport)._nom_typeExport} ({IRIS.cei(typeExport)._codeExport})",
+            titre=f"Sélectionner un ou plusieurs fichiers Extract IRIS {self.cei._nom_typeExport} ({self.cei._codeExport})",
             types_fichiers=[("Fichiers Excel", "*.xlsx")],
-            dossier_initial=IRIS.cei(typeExport)._input.repertoire,
+            dossier_initial=self.cei._input.repertoire,
             multi_fichiers=True
         )
 

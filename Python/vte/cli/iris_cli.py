@@ -39,25 +39,28 @@ def iris_natif_avec_creationExport(iris_natif_session):
         chemins_fichiersInput=iris_natif_session["chemins"],
         chemin_fichier_sauv=iris_natif_session["chemin_output"]
         )
-    
-    print("\n")
-    print(iris.fe.chemin_fichier)
-    assert iris.df["N° Session"].iloc[-1] == "S-15820-FC25-46C-DHE-ACD"
-    assert iris.fe.chemin_fichier == iris_natif_session["chemin_output"]
-
-def iris_natif_avec_creationExport(iris_natif_session):
-    iris = IRIS_natif.avec_traitement(
-        typeExport=iris_natif_session["typeExport"],
-        chemins_fichiersInput=iris_natif_session["chemins"],
-        chemin_fichier_sauv=iris_natif_session["chemin_output"]
-        )
     print(iris.df["N° Session"])
     print(iris.df["N° Session"].iloc[-1] == "S-15820-FC25-46C-DHE-ACD")
     print(iris.fe.chemin_fichier == iris_natif_session["chemin_output"])
     print(len(iris_natif_session["chemins"]) == len(iris.tableau_fichiers_importes.df))
 
+def iris_natif_avec_creationExport_sans_fichiersInput(iris_natif_session):
+    iris = IRIS_natif.avec_traitement(
+        typeExport=iris_natif_session["typeExport"],
+        chemin_fichier_sauv=iris_natif_session["chemin_output"]
+        )
+    print(iris.df["N° Session"])
+    print(iris.df["N° Session"].iloc[-1] == "S-15820-FC25-46C-DHE-ACD")
+    print(iris.fe.chemin_fichier == iris_natif_session["chemin_output"])
+
+
+
+# ============
+# === MAIN ===
+# ============
+
 def main():
-    iris_natif_avec_creationExport(iris_natif_session)
+    iris_natif_avec_creationExport_sans_fichiersInput(iris_natif_session)
 
 if __name__ == "__main__":
     #test07()
