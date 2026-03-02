@@ -1,6 +1,6 @@
 import pytest
 
-from vte.utils import *
+from vte.utils.utils import *
 
 # ---------- TESTS ----------
 

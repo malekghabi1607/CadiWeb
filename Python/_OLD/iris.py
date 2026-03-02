@@ -591,6 +591,114 @@ class IRIS:
                 self.df['Date de début'] = pd.to_datetime(self.df['Date de début'])
 
 
+    # ==========================
+    # === Méthodes statiques pour ouvir un extract existant IRIS Session (excel VTE qui concatène plusieurs natifs)  ===
+    # Anciennes méthodes avant que je ne mette _fe en variable d'instance.
+    # TODO : à transférer à priori s'il reste des anciens appels
+    # TODO à vérifier : est-ce que ces fonctions n'étaient utiles que pour IRIS_traite (avant que je ne la fasse) → Soit supprimer, soit adapter pour IRIS non traités
+    # ==========================
+    @staticmethod
+    def choisir_fichier_IRIS_sessions() -> Path | None:
+        """
+        Ouvre un filedialog pour demander à l'utilisateur de sélectionner un extract IRIS sessions.
+        On pointe au mieux sur le répertoire des extracts IRIS pour la boîte de dialogue.
+        """
+
+        return choisir_fichier(titre=f"Sélectionner l'extract IRIS session {IRIS.cei("Sessions")._codeExport} à employer.",
+                        types_fichiers=[("Fichiers Excel", "*.xlsx")],
+                        dossier_initial=IRIS.cei("Sessions")._output.repertoire, # Pour aller vers mes fichiers concaténés, sinon pour les originaux il faut pointer vers input
+                        texte_bouton_choisir=f"Choisir extract IRIS session {IRIS.cei("Sessions")._codeExport} à nouveau"
+                        )
+
+    @staticmethod
+    def charger_excel_IRIS_sessions(fe_IRIS_sessions:Optional[FichierExcel]=None, chemin_IRIS_sessions:Optional[Path]=None) -> FichierExcel:
+        """
+            Retourne l’extract IRIS sessions (excel VTE qui concatène plusieurs natifs) s'il n'existe pas déjà.
+            Soit on fournit un FichierExcel, soit un chemin vers ce fichier .xlsx
+
+            Si fe_IRIS_sessions existe (not None), alors on ne fait rien.
+            Si chemin_IRIS_sessions est vide, alors on demande à l'utilisateur de pointer un fichier.
+            On crée un FichierExcel depuis le chemin.
+    
+            :param fe_IRIS_sessions: FichierExcel de l'extract IRIS sessions qu'on souhaite traiter
+            :type fe_IRIS_sessions: FichierExcel
+            :param chemin_IRIS_sessions: Chemin de l'extract IRIS sessions qu'on souhaite traiter
+            :type chemin_IRIS_sessions: Path
+            :return: un FichierExcel de l'extract IRIS Sessions
+            :rtype: FichierExcel
+    
+            :Example:
+    
+            >>> charger_excel_IRIS_sessions(chemin_IRIS_sessions=chemin_input)
+            >>> charger_excel_IRIS_sessions()
+
+    
+            .. seealso:: Rien du tout.
+            .. warning:: Rien du tout.
+            .. note:: Rien du tout.
+            .. todo:: Rien du tout.
+        """
+        
+        # Vérifie existance de fe_IRIS sinon on le charge
+        if fe_IRIS_sessions is None:
+            timer.debut("Lecture fichier IRIS sessions")
+
+            # S'il n'y a pas de chemin, alors l'utilisateur le pointe
+            if chemin_IRIS_sessions is None:
+                chemin_IRIS_sessions = IRIS.choisir_fichier_IRIS_sessions()
+
+            # On charge le fichier IRIS session
+            fe_IRIS_sessions = FichierExcel.depuis_fichier(chemin_fichier=chemin_IRIS_sessions)
+            
+            # Alias
+            df_IRIS_sessions = fe_IRIS_sessions._tableaux["Sessions"]._df
+            
+            # On convertit trigramme formation et code_IRIS
+            df_IRIS_sessions = IRIS.convertit_types_colonnes_df_sessions(fe_IRIS_sessions)
+
+            # On trie
+            df_IRIS_sessions = df_IRIS_sessions.sort_values(by="Date début ses.")  # Trie par "Date début ses."
+            
+            
+            timer.fin()
+
+        return fe_IRIS_sessions
+
+    @staticmethod
+    def convertit_types_colonnes_df_sessions(fe_IRIS_sessions:FichierExcel) -> pd.DataFrame:
+        """
+            Convertit les types suivants de l'extract Session de IRIS :
+               - trigrammes ;
+               - code IRIS.
+
+            On le fait car l'import du df convertit en entiers ou en d'autres types certaines colonnes alors que ça ne devrait pas (trigrammes, code IRIS).
+            Il en résulte que des filtres ne fonctionnement pas sans conversion.
+    
+            :param fe_IRIS_sessions: FichierExcel de l'extract IRIS sessions qu'on souhaite traiter
+            :type fe_IRIS_sessions: FichierExcel
+            :return: un DataFrame convertit sur les colonnes
+            :rtype: DataFrame
+    
+            :Example:
+
+            >>> convertit_types_colonnes_df_sessions(fe_IRIS_sessions = fe)
+
+    
+            .. seealso:: Rien du tout.
+            .. warning:: Rien du tout.
+            .. note:: Rien du tout.
+            .. todo:: Rien du tout.
+        """
+
+        df_IRIS_sessions = fe_IRIS_sessions._tableaux["Sessions"]._df  # Alias
+
+        # On convertit
+        df_IRIS_sessions["Trigramme formation"] = df_IRIS_sessions["Trigramme formation"].astype(str)  # Retype "Trigramme formation"
+        df_IRIS_sessions["Code IRIS"] = df_IRIS_sessions["Code IRIS"].astype(str)  # Retype "Code IRIS"
+
+        return df_IRIS_sessions
+
+
 
 
 

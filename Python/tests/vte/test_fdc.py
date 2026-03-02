@@ -1,4 +1,4 @@
-from vte.formation import Formation
+from vte.domain.formation import Formation
 from vte.fdc import *
 
 import pytest
