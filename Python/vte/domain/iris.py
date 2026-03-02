@@ -176,45 +176,6 @@ class IRIS:
         self._fe: Optional[FichierExcel] = None  # Fichier Excel de l'export IRIS
 
 
-    # ==========================
-    # === Méthodes pour ouvir un extract existant IRIS Session (excel VTE qui concatène plusieurs natifs)  ===
-    # Avant j'avais des méthodes externes (cf. ci-dessous) mais j'ai voulu intégrer _fe en variable d'instance
-    # Il en résulte que je peux en faire des fonctions de classe non statiques
-    # Les anciennes mléthodes sont ci-après
-    # ==========================
-    def convertit_types_colonnes_df(self):
-        """
-            L'import du df convertit en entiers ou en d'autres types certaines colonnes alors que ça ne devrait pas (ex. : trigrammes, code IRIS sur l'extract sessions).
-            
-            Il en résulte que des filtres ne fonctionnement pas sans conversion.
-            On convertit donc des colonnes à cette fin.
-            
-            Ex. sur l'extract Session de IRIS :
-               - trigrammes -> str;
-               - code IRIS -> str (? Pourquoi str et pas int).
-    
-            :Example:
-
-            >>> convertit_types_colonnes_df()
-
-    
-            .. seealso:: Rien du tout.
-            .. warning:: Rien du tout.
-            .. note:: Rien du tout.
-            .. todo:: Rien du tout.
-        """
-        # Les conversion dépendent du type d'extract à cause des noms des colonnes
-        match self._typeExport:
-            case "Sessions":
-                self.df["Trigramme formation"] = self.df["Trigramme formation"].astype(str)  # Retype "Trigramme formation"
-                self.df["Code IRIS"] = self.df["Code IRIS"].astype(str)  # Retype "Code IRIS"
-
-            case "Ventes":
-                # On convertit la colonne "Date de début" en datetime
-                self.df['Date de début'] = pd.to_datetime(self.df['Date de début'])
-
-
-
     # ================================================
     # === Méthodes statiques de traitement d'infos ===
     # ================================================
@@ -565,6 +526,9 @@ class IRIS:
         self._fe.chemin_fichier = valeur
 
 
+# ======================================================================================
+# CLASSE IRIS (objet fichier) pour les extracts IRIS natifs (héritage de IRIS)
+# ======================================================================================
 class IRIS_natif(IRIS):
     """
     Classe qui gère les extracts IRIS natifs
@@ -817,42 +781,55 @@ class IRIS_natif(IRIS):
             Path | List[Path]: Le ou les chemins des fichiers IRIS natifs pointés par l'utilisateur
         """
         return choisir_fichier(
-            titre=f"Sélectionner un ou plusieurs fichiers Extract IRIS {self.cei._nom_typeExport} ({self.cei._codeExport})",
+            titre=f"Sélectionner un ou plusieurs fichiers Extract IRIS {str.lower(self._typeExport)} ({self.cei._codeExport})",
             types_fichiers=[("Fichiers Excel", "*.xlsx")],
             dossier_initial=self.cei._input.repertoire,
+            texte_bouton_choisir=f"Choisir extract IRIS {str.lower(self._typeExport)} {self.cei._codeExport} à nouveau",
             multi_fichiers=True
         )
 
 
 
-
+# ======================================================================================
+# CLASSE IRIS (objet fichier) pour les IRIS traités (héritage de IRIS)
+# ======================================================================================
 class IRIS_traite(IRIS):
     """
     Classe qui permet d'ouvrir et traiter un Extract IRIS déjà traité
     """
     def __init__(self, typeExport:str, chemin:Optional[Path]=None, fe:Optional[FichierExcel]=None):
+        """
+        Constructeur d'un fichier IRIS déjà traité
+
+        En entrée on donne soit le chemin, soit fe. Si les 2 sont donnés, on priorise fe.
+
+        :param typeExport: spécifie le type d'export. Doit être dans cette liste : ["Sessions", "Formations", "Ventes", "Insciptions"]
+        :type typeExport: str
+        :param chemin: Chemin de l'Excel IRIS à ouvrir
+        :type chemin: Optional[Path]
+        :param fe: Fichier Excel 
+        :type fe: Optional[FichierExcel]
+        """
         # On initialise la classe mère
         super().__init__(typeExport=typeExport)
 
-        # TODO : pas sûr d'en avoir besoin : redondant avec fe Chemin du fichier Excel IRIS
-        """
-        self._chemin:Optional[Path]=None
-        if chemin:
-            self._chemin = chemin"""
-
-        # Fichier Excel IRIS déjà traité
-        if fe:
-            self._fe = fe
+        # On affecte les arguments aux variables d'instance
+        self._typeExport = typeExport
+        self._fe = fe
 
         # On ouvre le fichier IRIS s'il n'existe pas encore
-        self.charger_excel(fe=self._fe, chemin=chemin)
+        self._charger_excel(fe=self._fe, chemin=chemin)
 
-    def charger_excel(self, fe:Optional[FichierExcel]=None, chemin:Optional[Path]=None):
+
+    # =========================
+    # === Méthodes internes ===
+    # =========================
+    def _charger_excel(self, fe:Optional[FichierExcel]=None, chemin:Optional[Path]=None):
         """
             Charge dans _fe l’extract IRIS traité (excel VTE qui concatène plusieurs natifs) s'il n'existe pas déjà.
             Soit on fournit un FichierExcel, soit un chemin vers ce fichier .xlsx
 
-            Si self._fe existe (not None), alors on ne fait rien.
+            Si self._fe existe (not None), alors on ne fait rien (l'Excel est déjà chargé).
             Si chemin est vide, alors on demande à l'utilisateur de pointer un fichier.
             On crée un FichierExcel depuis le chemin et on le met dans _fe.
     
@@ -874,52 +851,23 @@ class IRIS_traite(IRIS):
         """
         if fe is None:
             timer.debut(f"Lecture fichier IRIS {self._typeExport.lower()}")
-
-            # On remplace la valeur par défaut si renseigné par l'utilisateur
-            if chemin is not None:
-                self.chemin = chemin
                 
             # S'il n'y a pas de chemin, alors l'utilisateur le pointe
-            if self.chemin is None:
-                self.chemin = self.choisir_fichier()
+            if chemin is None:
+                chemin = self._choisir_fichier()
 
             # On ouvre le fichier IRIS s'il n'existe pas encore
-            self._fe = FichierExcel.depuis_fichier(chemin_fichier=self.chemin)
+            self._fe = FichierExcel.depuis_fichier(chemin_fichier=chemin)
 
             # Conversions des colonnes si besoin (l'import du df convertit en entiers ou en d'autres types certaines colonnes alors que ça ne devrait pas (ex. : trigrammes, code IRIS))
-            self.convertit_types_colonnes_df()
+            self._convertit_types_colonnes_df()
 
             # On trie # TODO : pour l'instant ça marche avec tous mes types (sessions et ventes ; j'ai pas testé avec les autres)
             self.df = self.df.sort_values(by="Date début ses.")  # Trie par "Date début ses."
 
             timer.fin()
 
-    def choisir_fichier(self) -> Path | None:
-        """
-        Ouvre un filedialog pour demander à l'utilisateur de sélectionner un extract IRIS VTE (excel VTE qui concatène plusieurs natifs).
-        On pointe au mieux sur le répertoire des extracts IRIS pour la boîte de dialogue.
-    
-        :return: Le chemin du fichier IRIS pointé par l'utilisateur
-        :rtype: Path
-
-        :example:
-
-        >>> choisir_fichier_IRIS()
-
-
-        .. seealso:: Rien du tout.
-        .. warning:: Rien du tout
-        .. note:: Rien du tout
-        .. todo:: Rien du tout.
-        """
-
-        return choisir_fichier(titre=f"Sélectionner l'extract IRIS {str.lower(self._typeExport)} {self.cei(self._typeExport)._codeExport} à employer.",
-                    types_fichiers=[("Fichiers Excel", "*.xlsx")],
-                    dossier_initial=self.cei(self._typeExport)._output.repertoire, # Pour aller vers mes fichiers concaténés, sinon pour les originaux il faut pointer vers input
-                    texte_bouton_choisir=f"Choisir extract IRIS {str.lower(self._typeExport)} {self.cei(self._typeExport)._codeExport} à nouveau"
-                    )
-
-    def demande_sessions_a_exclure(self, trigramme_formation:str = None, annee:Optional[int] = None, periode:Optional[str] = None) -> Tuple[pd.DataFrame, List[int]]:
+    def _demande_sessions_a_exclure(self, trigramme_formation:str = None, annee:Optional[int] = None, periode:Optional[str] = None) -> Tuple[pd.DataFrame, List[int]]:
         """
         Demande à l'utilisateur les sessions qu'il souhaite exclure de la période choisie :
            - on applique un filtre sur une période + trigramme au dataframe de l'extract IRIS
@@ -941,7 +889,7 @@ class IRIS_traite(IRIS):
         :rtype: Tuple[pd.Dataframe, List[int]]
         """
 
-        # Liste des sessions qui seront exclues pâr l'utilisateur
+        # Liste des sessions qui seront exclues par l'utilisateur
         codes_sessions_exclues_par_utilisateur = []
 
         # Renseigne les valeurs par défaut de période et année si None
@@ -993,9 +941,43 @@ class IRIS_traite(IRIS):
         # On retourne les codes_IRIS des sessions retenues + exploitationBilan 
         return df_filtre, codes_sessions_exclues_par_utilisateur
 
-    # =================================
+    def _convertit_types_colonnes_df(self):
+        """
+            L'import du df convertit en entiers ou en d'autres types certaines colonnes alors que ça ne devrait pas (ex. : trigrammes, code IRIS sur l'extract sessions).
+            
+            Il en résulte que des filtres ne fonctionnement pas sans conversion.
+            On convertit donc des colonnes à cette fin.
+            
+            Ex. sur l'extract Session de IRIS :
+               - trigrammes -> str;
+               - code IRIS -> str (? Pourquoi str et pas int).
+    
+            :Example:
+
+            >>> convertit_types_colonnes_df()
+
+    
+            .. seealso:: Rien du tout.
+            .. warning:: Rien du tout.
+            .. note:: Rien du tout.
+            .. todo:: Rien du tout.
+        """
+        # Les conversion dépendent du type d'extract à cause des noms des colonnes
+        match self._typeExport:
+            case "Sessions":
+                self.df["Trigramme formation"] = self.df["Trigramme formation"].astype(str)  # Retype "Trigramme formation"
+                self.df["Code IRIS"] = self.df["Code IRIS"].astype(str)  # Retype "Code IRIS"
+
+            case "Ventes":
+                # On convertit la colonne "Date de début" en datetime
+                self.df['Date de début'] = pd.to_datetime(self.df['Date de début'])
+
+
+
+
+    # ==============================
     # === Méthodes filtrer le df ===
-    # =================================
+    # ==============================
     def df_filtre_periode(self, trigramme_formation:Optional[str] = None, annee:Optional[int] = None, periode:Optional[str] = None) -> pd.DataFrame:
         """
         Renvoie le dataframe de l'extract IRIS filtré VTE selon plusieurs critères.
@@ -1088,6 +1070,36 @@ class IRIS_traite(IRIS):
         return df_sessions_filtre
 
 
+
+    # ===========
+    # === IHM ===
+    # ===========
+
+    def _choisir_fichier(self) -> Path | None:
+        """
+        Ouvre un filedialog pour demander à l'utilisateur de sélectionner un extract IRIS VTE (excel VTE qui concatène plusieurs natifs).
+        On pointe au mieux sur le répertoire des extracts IRIS pour la boîte de dialogue.
+    
+        :return: Le chemin du fichier IRIS pointé par l'utilisateur
+        :rtype: Path
+
+        :example:
+
+        >>> choisir_fichier_IRIS()
+
+
+        .. seealso:: Rien du tout.
+        .. warning:: Rien du tout
+        .. note:: Rien du tout
+        .. todo:: Rien du tout.
+        """
+
+        return choisir_fichier(
+                    titre=f"Sélectionner l'extract IRIS {str.lower(self._typeExport)} {self.cei._codeExport} à employer.",
+                    types_fichiers=[("Fichiers Excel", "*.xlsx")],
+                    dossier_initial=self.cei._output.repertoire, # Pour aller vers mes fichiers concaténés, sinon pour les originaux il faut pointer vers input
+                    texte_bouton_choisir=f"Choisir extract IRIS {str.lower(self._typeExport)} {self.cei._codeExport} à nouveau"
+                    )
 
 
 # ==========================
