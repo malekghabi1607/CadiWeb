@@ -1,5 +1,5 @@
 from vte.domain.iris import *
-
+from vte.services.iris_services import *
 
 
 # ======================================================================================
@@ -82,7 +82,6 @@ def iris_traite_charge_avec_fe_vide(de_iris_traite_session):
     print(iris.fe.chemin_fichier)  # = None
     print(iris.fe.chemin_fichier is None)
 
-
 def iris_traite_charge_avec_fe(de_iris_traite_session):
     iris = IRIS_traite(
         typeExport=de_iris_traite_session["typeExport"],
@@ -92,8 +91,6 @@ def iris_traite_charge_avec_fe(de_iris_traite_session):
     print(iris.fe)
     print(iris.fe.chemin_fichier)  # = de_iris_traite_session["chemin"]
     print(iris.fe.chemin_fichier == de_iris_traite_session["chemin"])
-
-
 
 def iris_traite_charge_avec_chemin(de_iris_traite_session):
     iris = IRIS_traite(
@@ -110,8 +107,6 @@ def iris_traite_charge_avec_chemin(de_iris_traite_session):
     print(iris.fe.chemin_fichier == de_iris_traite_session["chemin"])
     print(len(iris.tableau_fichiers_importes.df) == de_iris_traite_session["Nb fichiers import"])
 
-
-
 def iris_traite_charge_sans_chemin(de_iris_traite_session):
     iris = IRIS_traite(
         typeExport=de_iris_traite_session["typeExport"]
@@ -125,12 +120,22 @@ def iris_traite_charge_sans_chemin(de_iris_traite_session):
     print(iris.fe.chemin_fichier == de_iris_traite_session["chemin"])
     print(len(iris.tableau_fichiers_importes.df) == de_iris_traite_session["Nb fichiers import"])
 
-# ============
-# === MAIN ===
-# ============
+
+# ======================================================================================
+# === TRAITEMENT tous les IRIS
+# ======================================================================================
+def traite_tous_extract_IRIS_depuis_config():
+    IRISServices.concatener_plusieursTypes(
+        typesExports=("Sessions", "Formations", "Ventes", "Inscriptions"),
+        depuis_config=True
+    )
+
+# ======================================================================================
+# === TESTS
+# ======================================================================================
 
 def main():
-    iris_traite_charge_sans_chemin(de_iris_traite_session)
+    traite_tous_extract_IRIS_depuis_config()
 
 if __name__ == "__main__":
     #test07()

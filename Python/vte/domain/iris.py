@@ -178,20 +178,7 @@ class IRIS:
 
     # ================================================
     # === Méthodes statiques de traitement d'infos ===
-    # ================================================
-    @staticmethod
-    def cei(typeExport:str) -> ConfigExportIRIS:
-        """
-        Renvoie les propriétés 
-
-        Args:
-            typeExport (str): _description_
-
-        Returns:
-            ConfigExportIRIS: _description_
-        """
-        return IRIS._dict_exports_IRIS["ConfigExportIRIS"][typeExport]
-    
+    # ================================================   
     @staticmethod
     def extraire_infos_numSessionIRIS(numSession:str) -> pd.Series:
         """
@@ -619,7 +606,7 @@ class IRIS_natif(IRIS):
         # ===
         # Si aucun fichier input n'est donné, alors on ouvre un filedialog
         if chemins_fichiersInput is None:
-            chemins_fichiersInput = self._choisir_fichiers()
+            chemins_fichiersInput = self.choisir_fichiers(self._typeExport)
 
         # On convertit en Tuple[Path]
         chemins_fichiersInput = convertir_tuple_path(chemins_fichiersInput)
@@ -649,7 +636,7 @@ class IRIS_natif(IRIS):
                 taille = chemin.stat().st_size  # taille en octets 
                 pbar.set_postfix(file=fichier, progress=f"{i}/{len(chemins_fichiersInput)}")  # Affichage dynamique dans la barre
                 
-                df = pd.read_excel(chemin, skiprows=self.cei._input.nbLignes_avantET)
+                df = pd.read_excel(chemin, skiprows=self.cei(self.typeExport)._input.nbLignes_avantET)
                 df_list.append(df)  # On ajoute le DataFrame à notre liste de DataFrame
                 
                 # Mise à jour de la barre avec la taille du fichier
@@ -710,11 +697,11 @@ class IRIS_natif(IRIS):
         """
         # Si aucun fichier de sortie n'est donnée, alors on prend le chemin par défaut
         if chemin_fichier_sauv is None:
-            chemin_fichier_sauv = self.cei._output.chemin_fichier
+            chemin_fichier_sauv = self.cei(self.typeExport)._output.chemin_fichier
  
         # On ouvre le modèle et tous ses tableaux structurés
         self._fe = FichierExcel.depuis_modele(
-                                        chemin_modele=self.cei._modele.chemin_fichier, 
+                                        chemin_modele=self.cei(self.typeExport)._modele.chemin_fichier, 
                                         chemin_fichier_sauv=chemin_fichier_sauv
                                         )
 
@@ -769,22 +756,42 @@ class IRIS_natif(IRIS):
             ) 
         
 
+    # =========================
+    # === Méthodes externes ===
+    # =========================
+    @staticmethod
+    def cei(typeExport:str) -> ConfigExportIRIS:
+        """
+        Renvoie les propriétés 
+
+        Args:
+            typeExport (str): _description_
+
+        Returns:
+            ConfigExportIRIS: _description_
+        """
+        return IRIS.DICT_EXPORTS_IRIS["ConfigExportIRIS"][typeExport]
+
     # ===========
     # === IHM ===
     # ===========
-    def _choisir_fichiers(self) -> Path | List[Path]:
+    @staticmethod
+    def choisir_fichiers(typeExport:str) -> Path|List[Path]:
         """
         Ouvre un filedialog pour demander à l'utilisateur de sélectionner un ou plusieurs extract IRIS natifs.
         On pointe au mieux sur le répertoire des extracts IRIS pour la boîte de dialogue.
 
+        Args:
+            typeExport (str): Type de l'export à sélectionner, doit être parmis ["Sessions", "Formations", "Ventes", "Inscriptions"]
+
         Returns:
-            Path | List[Path]: Le ou les chemins des fichiers IRIS natifs pointés par l'utilisateur
+            Path|List[Path]: Le ou les chemins des fichiers IRIS natifs pointés par l'utilisateur
         """
         return choisir_fichier(
-            titre=f"Sélectionner un ou plusieurs fichiers Extract IRIS {str.lower(self._typeExport)} ({self.cei._codeExport})",
+            titre=f"Sélectionner un ou plusieurs fichiers Extract IRIS {str.lower(IRIS_natif.cei(typeExport)._typeExport)} ({IRIS_natif.cei(typeExport)._codeExport})",
             types_fichiers=[("Fichiers Excel", "*.xlsx")],
-            dossier_initial=self.cei._input.repertoire,
-            texte_bouton_choisir=f"Choisir extract IRIS {str.lower(self._typeExport)} {self.cei._codeExport} à nouveau",
+            dossier_initial=IRIS_natif.cei(typeExport)._input.repertoire,
+            texte_bouton_choisir=f"Choisir extract IRIS {str.lower(IRIS_natif.cei(typeExport)._typeExport)} {IRIS_natif.cei(typeExport)._codeExport} à nouveau",
             multi_fichiers=True
         )
 

@@ -6,12 +6,6 @@ from vte.domain.iris import *
 DATA_DIR = Path(__file__).parent / "data"
 
 
-# Lancer les tests :
-#    - pytest : tous les tests depuis la racine du projet
-#    - pytest -v : plus verbeux
-#    - ciblé : python -m pytest -v tests/vte/test_iris.py
-#    - ciblé avec les print: python -m pytest -s -v tests/vte/test_iris.py
-#    - ciblé et unitaire : python -m pytest -s -v tests/vte/test_iris.py::test_iris_natif_initialisation_et_chargement_df_un_fichier_input
 
 
 
@@ -142,3 +136,12 @@ def test_iris_traite_charge_avec_chemin(de_iris_traite_session):
     assert iris.fe.chemin_fichier == de_iris_traite_session["chemin"]
     assert len(iris.tableau_fichiers_importes.df) == de_iris_traite_session["Nb fichiers import"]
 
+
+
+
+# Lancer les tests :
+#    - pytest : tous les tests depuis la racine du projet
+#    - pytest -v : plus verbeux
+#    - ciblé : python -m pytest -v tests/vte/test_iris.py
+#    - ciblé avec les print: python -m pytest -s -v tests/vte/test_iris.py
+#    - ciblé et unitaire : python -m pytest -s -v tests/vte/test_iris.py::test_iris_natif_initialisation_et_chargement_df_un_fichier_input
