@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Tuple
 
 from vte.domain.iris import IRIS, IRIS_natif
-from vte.utils.utils import convertir_tuple_path, convertir_tuple_str
+from vte.utils.utils import convertir_tuple_str
 
 
-class IRISServices:
+class IRIS_services:
     """
     Services métier autour des exports IRIS.
     """

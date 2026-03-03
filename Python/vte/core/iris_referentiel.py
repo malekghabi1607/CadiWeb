@@ -11,7 +11,7 @@ from vte.domain import IRIS
 # ======================================================================================
 
 
-class IRISReferentiel:
+class IRIS_referentiel:
     """
     Référentiel applicatif des fichiers IRIS déjà chargés.
     Évite de relire plusieurs fois les mêmes fichiers Excel (coûteux).
