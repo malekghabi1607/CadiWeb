@@ -24,6 +24,9 @@ from vte.utils.utils_instn import demander_code
 # STRUCTURES DE DONNÉES
 # ======================================================================================
 
+# TODO : j'ai du retype de code IRIS en str : self.df["Code IRIS"] = self.df["Code IRIS"].astype(str)  # Retype "Code IRIS"
+
+
 @dataclass
 class InfosExportsIRIS:
     repertoire: Optional[Path]
@@ -137,14 +140,12 @@ class IRIS:
     """
     DICT_EXPORTS_IRIS = {
 
-
         "ConfigExportIRIS": {
             "Sessions": _SESSIONS,
             "Formations": _FORMATIONS,
             "Ventes": _VENTES,
             "Inscriptions": _INSCRIPTIONS,
         },
-
 
         "chemins_fichiersInput": {
             "Sessions": config_extractsIRIS._tSessions,
@@ -472,7 +473,8 @@ class IRIS:
         :return: DataFrame de _fe._tableaux[self._typeExport]._df (ex. : _fe._tableaux["Sessions"]._df)
         :rtype: DataFrame
         """
-        return self._fe._tableaux[self._typeExport]._df
+        #return self._fe._tableaux[self._typeExport]._df
+        return self._fe.get_df_tableau(self.typeExport)
 
     @df.setter
     def df(self, valeur:pd.DataFrame):
@@ -482,15 +484,18 @@ class IRIS:
         :param valeur: DataFrame devant écraser l'ancien dans self._fe._tableaux[self._typeExport]._df
         :type valeur: pd.DataFrame
         """
-        self._fe._tableaux[self._typeExport]._df = valeur
+        #self._fe._tableaux[self._typeExport]._df = valeur
+        self._fe.set_df_tableau(self._typeExport) = valeur
 
     @property
     def tableau_donnees_iris(self) -> FichierExcel._TableauExcel:
-        return self._fe._tableaux[self.typeExport]
+        #return self._fe._tableaux[self.typeExport]
+        return self._fe.get_tableau(self.typeExport)
     
     @property
     def tableau_fichiers_importes(self) -> FichierExcel._TableauExcel:
-        return self._fe._tableaux["Imports"]
+        #return self._fe._tableaux["Imports"]
+        return self._fe.get_tableau("Imports")
 
     @property
     def chemin(self) -> Path:

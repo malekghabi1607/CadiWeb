@@ -1304,6 +1304,20 @@ class FichierExcel:
         """
         return self._tableaux.get(nom)
 
+    def get_df_tableau(self, nom: str) -> Optional[pd.DataFrame]:
+        """
+        Récupère le DataFrame d'un tableau par nom (ou None si absent).
+        """
+        return self._tableaux.get(nom)._df
+    
+    def set_df_tableau(self, nom: str, df:pd.DataFrame) -> None:
+        """
+        Remplace le DataFrame d'un tableau sélectionné par nom par un autre.
+        """
+        if self._tableaux.get(nom) is not None:
+            self._tableaux[nom]._df = df
+        else:
+            log_erreur("On ne trouve pas de tableau avec ce nom donc on ne peut pas affecter le df via set_df_tableau")
 
     # === Méthodes publiques : recharger un worksheet en mode valeur ===
     def _charge_worksheet_valeurs(self, nom_onglet: str) -> Worksheet:
