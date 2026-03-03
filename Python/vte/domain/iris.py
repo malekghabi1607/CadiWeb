@@ -1124,7 +1124,7 @@ class IRIS_traite(IRIS):
 
 
         # On trie
-        df_sessions_filtre.sort_values("Date début ses.", ascending=False)
+        df_sessions_filtre = df_sessions_filtre.sort_values("Date début ses.", ascending=False)
 
         return df_sessions_filtre
 
