@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Dict, Tuple
 
-from vte.domain import IRIS
+from vte.domain.iris import IRIS, IRIS_traite
 
 
 
@@ -11,26 +11,33 @@ from vte.domain import IRIS
 # ======================================================================================
 
 
-class IRIS_referentiel:
+# ======================================================================================
+# CACHE INTERNE
+# ======================================================================================
+
+_cache: Dict[str, IRIS] = {}
+
+
+
+# ======================================================================================
+# API PUBLIQUE
+# ======================================================================================
+
+def charge_iris(typeExport: str) -> IRIS_traite:
     """
-    Référentiel applicatif des fichiers IRIS déjà chargés.
-    Évite de relire plusieurs fois les mêmes fichiers Excel (coûteux).
+    Retourne une instance IRIS chargée pour un type donné.
+    Si elle n'existe pas encore, elle est créée et mise en cache.
     """
 
-    _cache: Dict[Tuple[str, str], IRIS] = {}
+    if typeExport not in _cache:
+        iris = IRIS_traite(typeExport=typeExport)
+        _cache[typeExport] = iris
 
-    @classmethod
-    def get(cls, type_export: str, chemin: str) -> IRIS:
-        key = (type_export, chemin)
+    return _cache[typeExport]
 
-        if key not in cls._cache:
-            cls._cache[key] = IRIS(
-                type_export=type_export,
-                chemin_fichier=chemin
-            )
 
-        return cls._cache[key]
-
-    @classmethod
-    def clear(cls) -> None:
-        cls._cache.clear()
+def vider_cache() -> None:
+    """
+    Vide le cache (utile pour tests).
+    """
+    _cache.clear()

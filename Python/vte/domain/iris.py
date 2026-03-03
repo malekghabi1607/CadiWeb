@@ -804,11 +804,14 @@ class IRIS_traite(IRIS):
     """
     Classe qui permet d'ouvrir et traiter un Extract IRIS déjà traité
     """
-    def __init__(self, typeExport:str, chemin:Optional[Path]=None, fe:Optional[FichierExcel]=None):
+    def __init__(self, typeExport:str, chemin:Optional[Path]=None, fe:Optional[FichierExcel]=None, IRIS_plus_recent:Optional[bool]=True):
         """
-        Constructeur d'un fichier IRIS déjà traité
+        Charge un fichier IRIS déjà traité.
 
-        En entrée on donne soit le chemin, soit fe. Si les 2 sont donnés, on priorise fe.
+        Par défaut on prend automatiquement le fichier IRIS le plus récent (IRIS_plus_recent = True).
+        Si chemin est donné, alors on pointe vers celui-ci.
+
+        Si fe est donné, alors on ne fait rien (c'est qu'il est déjà chargé)
 
         :param typeExport: spécifie le type d'export. Doit être dans cette liste : ["Sessions", "Formations", "Ventes", "Insciptions"]
         :type typeExport: str
@@ -816,6 +819,8 @@ class IRIS_traite(IRIS):
         :type chemin: Optional[Path]
         :param fe: Fichier Excel 
         :type fe: Optional[FichierExcel]
+        :param IRIS_plus_recent: Défaut = True. Si True, on prend automatiquement le fichier IRIS le plus récent.
+        :type IRIS_plus_recent: bool
         """
         # On initialise la classe mère
         super().__init__(typeExport=typeExport)
@@ -824,8 +829,13 @@ class IRIS_traite(IRIS):
         self._typeExport = typeExport
         self._fe = fe
 
+        # Si chemin non donné et IRIS_plus_recent = True, alors on prend le fichier IRIS le plus récent
+        if (chemin is None) and (IRIS_plus_recent):
+            chemin = self._chemin_IRIS_traite_plus_recent()
+
         # On ouvre le fichier IRIS s'il n'existe pas encore
         self._charger_excel(fe=self._fe, chemin=chemin)
+
 
 
     # =========================
@@ -979,6 +989,43 @@ class IRIS_traite(IRIS):
                 # On convertit la colonne "Date de début" en datetime
                 self.df['Date de début'] = pd.to_datetime(self.df['Date de début'])
 
+    def _chemin_IRIS_traite_plus_recent(self) -> Path:
+        """
+        Récupère le chemin du fichier le plus récent dans le répertoire spécifié.
+        Le nom du fichier doit correspondre au format :
+        f"{self.cei._codeExport}_{self._typeExport}-COMPLET-{date.today():%Y.%m.%d}.xlsx"
+
+        Returns:
+            Path: Chemin du fichier le plus récent, ou None si aucun fichier correspondant n'est trouvé.
+        """
+        # Récupérer le répertoire depuis self.cei._output.chemin_fichier
+        repertoire = self.cei._output.chemin_fichier.parent
+        print(repertoire)
+
+        # Générer le pattern de nom de fichier à rechercher
+        pattern = f"{self.cei._codeExport}_{self._typeExport}-COMPLET-*.xlsx"
+
+        # Lister tous les fichiers dans le répertoire qui correspondent au pattern
+        fichiers = list(repertoire.glob(pattern))
+        print(fichiers)
+
+        if not fichiers:
+            return None
+
+        # Fonction pour extraire la date du nom de fichier
+        def extraire_date(fichier):
+            match = re.search(r"-COMPLET-(\d{4}\.\d{2}\.\d{2})$", fichier.stem)
+            if not match:
+                raise ValueError(
+                    f"Format de date incorrect dans le nom du fichier : {fichier.name}"
+                )
+            return datetime.strptime(match.group(1), "%Y.%m.%d")
+
+        # Trier les fichiers par date extraite du nom (du plus récent au plus ancien)
+        fichiers_tries = sorted(fichiers, key=extraire_date, reverse=True)
+
+        # Retourner le chemin du fichier le plus récent
+        return fichiers_tries[0]
 
 
 
