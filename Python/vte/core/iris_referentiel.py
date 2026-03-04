@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import Dict, Tuple
+from pathlib import Path
+from typing import Dict, Optional, Tuple
 
 from vte.domain.iris import IRIS, IRIS_traite
 
@@ -23,26 +24,33 @@ _cache: Dict[str, IRIS] = {}
 # API PUBLIQUE
 # ======================================================================================
 
-def get(typeExport: str) -> IRIS_traite:
+def get_iris(typeExport: str, chemin:Optional[Path]=None) -> IRIS_traite:
     """
     Retourne une instance IRIS chargée pour un type donné.
     Si elle n'existe pas encore, elle est créée et mise en cache.
+
+    :param typeExport: Type de l'export iris à considérer. Doit être dans cette liste : ["Sessions", "Formations", "Ventes", "Insciptions"]
+    :type typeExport: str
+    :param chemin: chemin de l'export IRIS. Si renseigné, alors on n'emploiera pas celui par défaut (plus récent dans le répertoire idoine). Défaut = None
+    :type chemin: Optional[Path]
+    :return: le fichier IRIS traité
+    :rtype: IRIS_traite
     """
 
     if typeExport not in _cache:
-        iris = IRIS_traite(typeExport=typeExport)
+        iris = IRIS_traite(typeExport=typeExport, chemin=chemin)
         _cache[typeExport] = iris
 
     return _cache[typeExport]
 
-def reload(type_export: str) -> IRIS_traite:
+def reload_iris(type_export: str, chemin:Optional[Path]=None) -> IRIS_traite:
     """
     Recharge le cache
     """
     _cache.pop(type_export, None)
-    return get(type_export)
+    return get_iris(typeExport=type_export, chemin=chemin)
 
-def clear() -> None:
+def clear_iris() -> None:
     """
     Vide le cache (utile pour tests).
     """

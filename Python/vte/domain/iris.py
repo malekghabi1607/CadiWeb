@@ -474,7 +474,7 @@ class IRIS:
         :rtype: DataFrame
         """
         #return self._fe._tableaux[self._typeExport]._df
-        return self._fe.get_df_tableau(self.typeExport)
+        return self._fe.get_df_tableau(self._typeExport)
 
     @df.setter
     def df(self, valeur:pd.DataFrame):
@@ -485,7 +485,7 @@ class IRIS:
         :type valeur: pd.DataFrame
         """
         #self._fe._tableaux[self._typeExport]._df = valeur
-        self._fe.set_df_tableau(self._typeExport) = valeur
+        self._fe.set_df_tableau(self._typeExport, df=valeur)
 
     @property
     def tableau_donnees_iris(self) -> FichierExcel._TableauExcel:
