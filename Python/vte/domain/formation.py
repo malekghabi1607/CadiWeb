@@ -1,6 +1,7 @@
 from typing import Optional
 from collections.abc import Iterable
 
+from vte.domain.evalStat import EvalStat_formation
 from vte.fdc import FdC
 from vte.domain.session import Session
 
@@ -12,10 +13,10 @@ class Formation:
         self._trigramme_formation:str = trigramme_formation
 
         # Une formation a une fiche de coûts
-        self._fdc:Optional[FdC] = None
+        #self._fdc:Optional[FdC] = None
         
         # Une formation a une évaluation stagiaire de la formation (regroupement de toutes les évaluations stagiaires de toutes les sessions)
-        self._eval:Optional[EvalStat] = None
+        self._eval:Optional[EvalStat_formation] = None
 
         # Une formation a un ou plusieurs bilans de formation (annuel)
         #self.bilans_formation:Optional[dict[int, BilanFormation]] = {}  # bilans_formation[2025] : Index = année du bilan
@@ -46,14 +47,19 @@ class Formation:
             codes = codes_IRIS
 
         for code_IRIS in codes:
-            self._sessions[code_IRIS] = Session(code_IRIS=code_IRIS)
+            self._sessions[code_IRIS] = Session(formation=self, code_IRIS=code_IRIS)
+
+    def ajout_evalStat(self) -> None:
+        if self._eval is None:
+            self._eval = EvalStat_formation(formation=self)
+
 
 
     # =========================
     # === GETTERS / SETTERS ===
     # =========================
     @property
-    def trigramme_formation(self) -> str:
+    def trigramme_formation(self) -> str|None:
         """
         Renvoie le trigramme de la formation.
         
@@ -64,7 +70,7 @@ class Formation:
     
     
     @property
-    def sessions(self) -> dict[int, Session]:
+    def sessions(self) -> dict[int, Session]|None:
         """
         Renvoie le dictionnaire des sessions de la formation.
         
@@ -73,3 +79,6 @@ class Formation:
         """
         return self._sessions
     
+    @property
+    def eval(self) -> EvalStat_formation|None:
+        return self._eval

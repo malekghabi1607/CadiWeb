@@ -1,6 +1,15 @@
-from typing import Optional
+from typing import Optional, Protocol
 
-from vte.evalStat import EvalStat
+#from vte.domain.formation import Formation
+from vte.domain.evalStat import EvalStat_session, EvalStat_formation
+
+class Formation_protocol(Protocol):
+    @property
+    def trigramme_formation(self) -> str: ...
+
+    @property
+    def eval(self) -> EvalStat_formation: ...
+
 
 # ======================================================================================
 # CLASSE SESSION
@@ -8,14 +17,31 @@ from vte.evalStat import EvalStat
 
 
 class Session:
-    def __init__(self, code_IRIS: int):
-        self._code_IRIS:int = code_IRIS
+    def __init__(self, formation:Formation_protocol, code_IRIS: int):
+        
+        self._formation = formation  # Protocol pour éviter les références circulaires
+        self._code_IRIS = code_IRIS
         
         # Une session a une évaluation stagiaire de la session /!\ Faire distinction entre EvalStat natif et le mien → On va prendre le mien
-        self._eval:Optional[EvalStat] = None
+        self._eval:Optional[EvalStat_session] = None
 
     # =========================
     # === METHODES EXTERNES ===
     # =========================
     def ajout_evalStat(self) -> None:
-        self._eval = EvalStat(codeIRIS=self._code_IRIS)
+        self._eval = EvalStat_session(codeIRIS=self._code_IRIS)
+
+    # ==================================================================================
+    # GETTERS / SETTERS
+    # ==================================================================================    
+    @property
+    def code_IRIS(self) -> int|None:
+        return self._code_IRIS
+    
+    @property
+    def trigramme_formation(self) -> str|None:
+        return self._formation.trigramme_formation
+    
+    @property
+    def eval_formation(self) -> EvalStat_formation:
+        return self._formation.eval

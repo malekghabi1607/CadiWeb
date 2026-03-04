@@ -1925,9 +1925,66 @@ def adapter_colonnes_dataframe_selon_modele(df_modele, df_a_modifier):
 
 
 
+### --------------------------------------------------------------------
+#  Backup / rollback pour tests
+### --------------------------------------------------------------------
+def backup_fichier_test(chemin_input:Path) -> bool:
+    """
+    Vérifie si le fichier input existe, puis crée un backup en renommant le fichier.
+    Le backup est créé avec le nom original sans extension suivi de "-BAK_TESTS" et de l'extension originale.
 
+    Args:
+        chemin_input (Path): Chemin du fichier dont il faut faire le backup.
 
+    Returns:
+        bool: True si le backup a été créé avec succès, False sinon.
+    """
+    # Vérifier si le fichier existe
+    if not chemin_input.exists():
+        print(f"Le fichier {chemin_input} n'existe pas.")
+        return False
 
+    try:
+        # Créer le chemin du backup
+        chemin_backup = chemin_input.with_name(
+            f"{chemin_input.stem}-BAK_TESTS{chemin_input.suffix}"
+        )
+
+        # Vérifier si le fichier de backup existe déjà
+        if chemin_backup.exists():
+            print("Fichier backup existe déjà")
+            return False
+        
+        # Créer le backup en renommant le fichier original
+        shutil.move(str(chemin_input), str(chemin_backup))
+        print(f"Backup créé avec succès : {chemin_backup}")
+        return True
+    except Exception as e:
+        print(f"Erreur lors de la création du backup : {e}")
+        return False
+
+def rollback_nom_fichier_test(chemin_input) -> bool:
+    """
+    Remet le fichier BAK_TESTS en place en renommant avec son ancien nom.
+
+    Args:
+        chemin_input (Path): Chemin du fichier à renommer.
+
+    Returns:
+        bool: True si le fichier a été renommé avec succès, False sinon.
+    """
+    chemin_backup = chemin_input.with_name(
+            f"{chemin_input.stem}-BAK_TESTS{chemin_input.suffix}"
+        )
+    
+    try:
+        # Renommer le fichier avec le nom initial
+        shutil.move(str(chemin_backup), str(chemin_input))
+        print(f"Fichier renommé avec succès : {chemin_input}")
+        return True
+    except Exception as e:
+        print(f"Erreur lors du renommage du fichier : {e}")
+        return False
 
 
 ### --------------------------------------------------------------------
