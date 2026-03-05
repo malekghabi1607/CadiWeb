@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Optional
 from collections.abc import Iterable
 
@@ -29,6 +30,14 @@ class Formation:
 
 
 
+    @classmethod
+    def avec_ouverture_evalStat(cls, trigramme_formation: str) -> Formation:
+        """
+        Crée une Formation en créant un evalStat formation (ou en l'ouvrant s'il existe déjà)
+        """
+        instance = cls(trigramme_formation=trigramme_formation)
+        instance.ajout_evalStat_avec_ouverture()
+        return instance
 
     # =========================
     # === METHODES EXTERNES ===
@@ -49,10 +58,13 @@ class Formation:
         for code_IRIS in codes:
             self._sessions[code_IRIS] = Session(formation=self, code_IRIS=code_IRIS)
 
-    def ajout_evalStat(self) -> None:
+    def ajout_evalStat_objetVierge(self) -> None:
         if self._eval is None:
             self._eval = EvalStat_formation(formation=self)
 
+    def ajout_evalStat_avec_ouverture(self) -> None:
+        if self._eval is None:
+            self._eval = EvalStat_formation.avec_ouverture(formation=self)
 
 
     # =========================

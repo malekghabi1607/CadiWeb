@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Optional, Protocol
 
 #from vte.domain.formation import Formation
@@ -25,11 +26,17 @@ class Session:
         # Une session a une évaluation stagiaire de la session /!\ Faire distinction entre EvalStat natif et le mien → On va prendre le mien
         self._eval:Optional[EvalStat_session] = None
 
+    @classmethod
+    def avec_ajout_evalStat(cls, formation:Formation_protocol, code_IRIS: int) -> Session:
+        instance = cls(formation = formation, code_IRIS = code_IRIS)
+        instance.ajout_evalStat()
+        return instance
+
     # =========================
     # === METHODES EXTERNES ===
     # =========================
     def ajout_evalStat(self) -> None:
-        self._eval = EvalStat_session(codeIRIS=self._code_IRIS)
+        self._eval = EvalStat_session(session=self)
 
     # ==================================================================================
     # GETTERS / SETTERS
@@ -41,6 +48,10 @@ class Session:
     @property
     def trigramme_formation(self) -> str|None:
         return self._formation.trigramme_formation
+    
+    @property
+    def eval_session(self) -> EvalStat_session:
+        return self._eval
     
     @property
     def eval_formation(self) -> EvalStat_formation:

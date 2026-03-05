@@ -39,4 +39,3 @@ class formation_cli:
 
 
 
-    

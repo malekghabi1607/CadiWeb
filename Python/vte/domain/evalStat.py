@@ -218,20 +218,6 @@ class EvalStat_session(EvalStat):
 
 
 
-        # Début ancienne méthode depuis_chemin_csv_evaluations_stagiaires_avec_contexte
-        # On vérifie que l'eval formation est ouvert en mémoire
-        # TODO : pas sûr, à voir. Si oui, revoir emplacement ?
-        if instance.eval_formation.fe is None:
-            log_erreur("Le fichier Excel de la formation n'est pas ouvert.")
-        
-
-        # On génère le fichier Excel du CSV à partir du modèle
-        #instance._traiter(ouvrirDossier=ouvrirDossier)
-
-
-
-
-
 
 
         # Début de traiter
@@ -241,6 +227,16 @@ class EvalStat_session(EvalStat):
         #timer.debut(f"Traitement du fichier CSV : {self._chemin_csv_evaluations_stagiaires.name}")
         print("\n")
         timer.debut(f"{Style.BRIGHT}{Fore.YELLOW}Gestion du CSV {instance._chemin_csv.name}") 
+
+
+
+        # Etape interactions avec eval formation (ouverture + vérif si csv déjà existant dedans)
+        # On vérifie que l'eval formation est ouvert en mémoire sinon on ouvre ou crée
+        # TODO : pas sûr, à voir. Si oui, revoir emplacement ?
+        if instance.eval_formation.fe is None:
+            # Le fichier Excel de la formation n'est pas ouvert, c'est donc le premier appel → On l'ouvre
+            instance.eval_formation._ouvrir_ou_creer_eval_formation()
+            #log_erreur("Le fichier Excel de la formation n'est pas ouvert.")
 
         # On vérifie que chemin_csv_session n'est pas déjà dans le fichier évaluations des formations pour savoir si on l'exclue du traitement
         # instance.eval_formation.df_stagiaires
@@ -262,6 +258,11 @@ class EvalStat_session(EvalStat):
             instance._statut_csv = "Exclu - CSV déjà dans fichier global"
             return
 
+
+
+
+
+
         # On récupère IRIS sessions, seulement si nécessaire (je le fais ici car si besoin action utilisateur ça évite de couper le traitement de la boucle)
         # TODO : quelle boucle ? Mettre ailleurs ?
         #_ = get_iris(typeExport="Sessions", chemin=chemin_IRIS_sessions)
@@ -273,23 +274,32 @@ class EvalStat_session(EvalStat):
         #    self._codeIRIS = IRIS.extraire_code_IRIS_depuis_chemin(chemin_csv)
 
     
+
+
+
         # Étape 1 — Charger le CSV dans df_csv_stagiaires
         #df_csv_stagiaires = instance._charger_csv_stagiaire()
         instance._charger_csv_stagiaire()
-        if df_csv_stagiaires is None:
+        if instance._df_csv_stagiaires is None:
             # il y a eu un problème dans _charger_csv_stagiaire → on saute la fin du traitement
             return
-        if df_csv_stagiaires.empty:
+        if instance._df_csv_stagiaires.empty:
             # le dataframe est vide (csv présent avec en-têtes mais sans ligne) → on saute la fin du traitement
             return
         
 
-        # Étape 2 — Vérifier la cohérence avec l'Extract IRIS (i.e. s'il est bien existant dans l'extract)
-        df_IRIS_sessions = get_iris(typeExport="Sessions", chemin=chemin_IRIS_sessions)  # On charge IRIS
+
+
+
+        # Étape 2 — Vérifier la cohérence avec l'Extract IRIS (i.e. si le code_IRIS est bien existant dans l'extract)
+        df_IRIS_sessions = get_iris(typeExport="Sessions", chemin=chemin_IRIS_sessions).df  # On charge IRIS
         if instance.code_IRIS not in df_IRIS_sessions["Code IRIS"].values:
             print(f"⚠️  Code IRIS {instance.code_IRIS} non trouvé dans l’extract IRIS.")
             instance._statut_csv = "Exclu - Code IRIS pas dans Extract IRIS sessions"
             return
+
+
+
 
         # Étape 3 — Générer l'excel des évaluations des stagiaire (_fe_evaluations_stagiaires : 2 onglets + TCD)
         # 3.1 - On crée les dataframes
@@ -377,6 +387,9 @@ class EvalStat_session(EvalStat):
             self._statut_csv = "Exclu - CSV vide / Aucun retour"
             return None
         
+        # On nettoie les espaces en début et fin des noms d'en-tête
+        df_csv_stagiaires.columns = [col.strip() for col in df_csv_stagiaires.columns]
+
         self._df_csv_stagiaires = df_csv_stagiaires
 
         return df_csv_stagiaires
@@ -459,6 +472,7 @@ class EvalStat_session(EvalStat):
         df_long = []
 
         # Parcours des lignes de CSV_stagiaires
+        #print(self._df_csv_stagiaires.columns.tolist())
         for _, row in self._df_csv_stagiaires.iterrows():
             #print("Ligne en cours : ")
             #print(row)
@@ -525,7 +539,7 @@ class EvalStat_session(EvalStat):
 
         # Pour faire le merge, il faut que les colonnes soient de même type (là "Code session" est de type int64 et "Code IRIS" est de type object (souvent des chaînes de caractères)).
         # Comme je ne peux être sûr que tous les "Code IRIS" issu des CSV soient bien convertibles en int (c’est-à-dire pas de chaînes vides, NaN, ou autres caractères non numériques), alors je passe par des strings
-        self._df_stagiaires["Code session"] = self._df_stagiaires["Code session"].astype(str)
+        # TODO à remettre si jamais ça ne marche pas en int self._df_stagiaires["Code session"] = self._df_stagiaires["Code session"].astype(str)
         
         # On récupère uniquement les colonnes souhaitées dans une vue pour faciliter le codage (c'est un alias)
         #self._df_sessions_filtre = self._fe_IRIS_sessions._tableaux["Sessions"]._df[self._colonnes_sessions]
@@ -607,7 +621,7 @@ class EvalStat_session(EvalStat):
     @property
     def trigramme_formation(self) -> str|None:
         # On essaye d'abord à partir de formation
-        if self.trigramme_formation is not None :
+        if self._session.trigramme_formation is not None :
             return self._session.trigramme_formation
         
         # Sinon tente de le récupérer depuis le chemin de l'évaluation stagiaire 
@@ -624,7 +638,7 @@ class EvalStat_session(EvalStat):
 
     @property
     def eval_formation(self) -> EvalStat_formation:
-        return Session_protocol.eval_formation
+        return self._session.eval_formation
 
 
 
@@ -646,6 +660,9 @@ class EvalStat_formation(EvalStat):
     # === CONSTRUCTEURS ===
     # =====================
     def __init__(self, formation:Formation_protocol):
+        """
+        Initialisation d'un EvalStat formation a minima
+        """
         # On initialise la classe mère
         super().__init__()
 
@@ -656,22 +673,16 @@ class EvalStat_formation(EvalStat):
         self._supprimeEtRemplace_donneesEval:Optional[bool] = None
 
 
+    @classmethod
+    def avec_ouverture(cls, formation:Formation_protocol) -> EvalStat_formation:
+        """
+        Initialisation d'un EvalStat formation avec ouverture ou création du fichier Excel
+        """
+        instance = cls(formation)
 
-        timer.debut(f"Ouverture ou création du fichier Excel de la formation {self.trigramme_formation}")
+        instance._ouvrir_ou_creer_eval_formation()
 
-        self._ouvrir_ou_creer_eval_formation()
-
-        # On retype en str la colonne Code IRIS
-        # TODO : vraiment ???
-        #self._df_evaluations_formation = self._fe_evaluations_formation._tableaux["Stagiaires"].df  # Alias
-        #self._df_evaluations_formation["Code IRIS"] = self._df_evaluations_formation["Code IRIS"].astype(str)
-        self.df_stagiaires["Code IRIS"] = self.df_stagiaires["Code IRIS"].astype(str)
-
-        # On fait un hash du df pour savoir s'il a été modifié, auquel cas on sauvegardera à la fin
-        self._df_initial_hash = hash_df(self.df_stagiaires)
-        timer.fin()
-
-
+        return instance
 
 
 
@@ -691,7 +702,10 @@ class EvalStat_formation(EvalStat):
             - Un booléen indiquant si les anciennes données doivent être supprimées et remplacées 
                 (`True` si nouveau fichier créé, `False` sinon).
         """
-        
+        timer.debut(f"Ouverture ou création du fichier Excel de la formation {self.trigramme_formation}")
+
+
+
         # On définit le chemin de destination du fichier excel d'évaluation depuis le fichier config
         chemin_excel_eval = config.format_path(config.CHEMIN_EXCEL_EVALUATIONS_FORMATION, trigramme_formation=self.trigramme_formation)
         #)
@@ -734,6 +748,17 @@ class EvalStat_formation(EvalStat):
             self._supprimeEtRemplace_donneesEval = True
 
             vlog.ajouter_message("Création EvalStat Global formation", self.chemin_fe, style=["vert"])
+
+
+        # On retype en str la colonne Code IRIS
+        # TODO : vraiment ???
+        #self._df_evaluations_formation = self._fe_evaluations_formation._tableaux["Stagiaires"].df  # Alias
+        #self._df_evaluations_formation["Code IRIS"] = self._df_evaluations_formation["Code IRIS"].astype(str)
+        self.df_stagiaires["Code IRIS"] = self.df_stagiaires["Code IRIS"].astype(str)
+
+        # On fait un hash du df pour savoir si, en fin de traitement il aura été modifié, auquel cas on le sauvegardera
+        self._df_initial_hash = hash_df(self.df_stagiaires)
+        timer.fin()
 
         #return self._fe_evaluations_formation, self._df_evaluations_formation, supprimeDonneesEtRemplace
         #return fe, supprimeDonneesEtRemplace
