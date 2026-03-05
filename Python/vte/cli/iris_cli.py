@@ -143,8 +143,10 @@ def traite_tous_extract_IRIS_depuis_config():
 # ======================================================================================
 
 def main():
-    iris_traite_methode_chemin_IRIS_plus_recent(de_iris_traite_session)
-    #traite_tous_extract_IRIS_depuis_config()
+    #iris_traite_methode_chemin_IRIS_plus_recent(de_iris_traite_session)
+    traite_tous_extract_IRIS_depuis_config()
+
+    #IRIS_natif.avec_traitement("Sessions")
 
 if __name__ == "__main__":
     #test07()

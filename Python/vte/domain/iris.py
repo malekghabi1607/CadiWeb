@@ -24,9 +24,6 @@ from vte.utils.utils_instn import demander_code
 # STRUCTURES DE DONNÉES
 # ======================================================================================
 
-# TODO : j'ai du retype de code IRIS en str : self.df["Code IRIS"] = self.df["Code IRIS"].astype(str)  # Retype "Code IRIS"
-
-
 @dataclass
 class InfosExportsIRIS:
     repertoire: Optional[Path]
@@ -181,15 +178,161 @@ class IRIS:
     # === Méthodes statiques de traitement d'infos ===
     # ================================================   
     @staticmethod
-    def extraire_infos_numSessionIRIS(numSession:str) -> pd.Series:
+    def extraire_infos_numSessionIRIS(numSession: str) -> pd.Series:
         """
         Fonction pour extraire les colonnes à partir de la colonne 'Référence'. Je dois faire une fonction interne car j'emploie Split qui ne s'applique que sur des string. Je dois donc faire appel à cette fonction ligne par ligne et donc créer une fonction que j'appelle par DataFrame[colonne].apply().
 
         Exemples de cas à traiter  :
-        #S-04934-FI1516-1512-GI_VBE_GBO
-        #S-05251-FI1516-1510-AMS-LCH-CLE
-        #S-05246-F1516-1510-OPE-HGR-NNO
-        #S-04178-FC15-604-SES-CCO
+        S-04178-FC15-604-SES-CCO
+
+        S-04934-FI1516-1512-GI_VBE_GBO
+        S-05251-FI1516-1510-AMS-LCH-CLE
+        S-05246-F1516-1510-OPE-HGR-NNO
+        S-01131-FI12-1111-NPC-CSI-CSI
+        
+        S-00754-FC12-TDA BCDE-JVI-MLR
+
+        S-05672FC17-894-MCG-CCO
+        S08125-FC18-ACI-OCR-MBO
+
+        S-00674-FC12-ACT-2-1-JV-MLR
+        S-03291-FA1415-1410-STN-SCO-MNC
+
+        S-01273-FC12-PBO-LGE  : RP et AF peuvent être extrait
+        S-00653-FC12-T30-2-1-JV-MLR  : trigramme = T30
+        S-00674-FC12-ACT-2-1-JV-MLR : trigramme = ACT
+        S-00826-FC12047-ALA-CBR : trigramme = 047
+        S-00915-FC12-SCA-1-1-JV-MLR : trigramme = SCA
+        S-01444-FC13-J32 : trigramme = J32
+        S-01731-FC13-ACI.SPE.SLC : on a un point en séparateur à la fin entre trigramme, rp et af
+        S-02614-FC14.ACI.SPE.SLC  : on a des points en séparateurs à la fin
+        S-02922-P57-HBR-MME : trigramme = P57
+        S-06172-FC16.470-OCR-SDA : point en séparateur, trigramme = 470
+
+        ANCIENNE METHODE DE TRAITEMENT
+        self.__df_tableau['Numéro IRIS'] = self.__df_tableau['N° Session'].astype(str).str[2:7]
+        self.__df_tableau['Type formation'] = self.__df_tableau['N° Session'].astype(str).str[8:10]
+        self.__df_tableau['Trigramme AF'] = self.__df_tableau['N° Session'].astype(str).str[-3:] #tout sauf 3 derniers caract
+        self.__df_tableau['Trigramme RP'] = self.__df_tableau['N° Session'].astype(str).str[-7:-4] #De -7 à -4
+        self.__df_tableau['Trigramme formation'] = self.__df_tableau['N° Session'].astype(str).str[-11:-8]        
+        """
+        pattern_debut = re.compile(
+            r"""
+            ^S-?                               # S initial optionnel
+            (?P<code_iris>\d{4,6})             # Code IRIS 4 à 6 chiffres
+            -?                                 # Tiret optionnel
+            (?P<type>[A-Z]{1,2}F?){0,1}        # Type formation optionnel
+            (?P<annee>\d{2,4})?                # Année optionnelle
+            [-._]?                              # Tiret/point/underscore optionnel
+            (?P<reste>.*)                       # Tout le reste
+            """,
+            re.VERBOSE | re.IGNORECASE
+        )
+
+
+        colonnes = [
+            'Trigramme formation',
+            'Code IRIS',
+            'Type de formation',
+            'Année',
+            'Trigramme RP',
+            'Trigramme AF',
+            '3ème élément de la référence'
+        ]
+
+        # Si ce n'est pas une chaîne, retourner None pour tout
+        if not isinstance(numSession, str):
+            return pd.Series([None]*7, index=colonnes)
+
+        numSession = numSession.strip().replace(" ", "")
+        match = pattern_debut.match(numSession)
+        if not match:
+            return pd.Series([None]*7, index=colonnes)
+
+        code_iris = match.group("code_iris")
+        type_formation = match.group("type")
+        annee = match.group("annee")
+        reste = match.group("reste")
+
+        code_iris = int(code_iris) if code_iris else None
+        annee = int(annee) if annee else None
+
+        # Normaliser tous les séparateurs en "-"
+        reste = re.sub(r"[-._]", "-", reste)
+        blocs = [b for b in reste.split("-") if b]
+
+        # Initialisation
+        trigramme_formation = None
+        trigramme_rp = None
+        trigramme_af = None
+        bloc_central = None
+
+        nb_blocs = len(blocs)
+
+        if nb_blocs >= 3:
+            # Bloc avant les 2 derniers = trigramme formation
+            trigramme_formation = blocs[-3]
+            trigramme_rp = blocs[-2]
+            trigramme_af = blocs[-1]
+            # Tout ce qui précède trigramme formation = 3ème élément
+            bloc_central = "-".join(blocs[:-3]) if nb_blocs > 3 else None
+
+        elif nb_blocs == 2:
+            # Pas de trigramme formation, juste RP et AF
+            trigramme_formation = None
+            trigramme_rp = blocs[0]
+            trigramme_af = blocs[1]
+            bloc_central = None
+
+        elif nb_blocs == 1:
+            # Seulement RP, pas de trigramme formation ni AF
+            trigramme_formation = None
+            trigramme_rp = blocs[0]
+            trigramme_af = None
+            bloc_central = None
+
+        return pd.Series({
+            'Trigramme formation': trigramme_formation or None,
+            'Code IRIS': code_iris,
+            'Type de formation': type_formation or None,
+            'Année': annee,
+            'Trigramme RP': trigramme_rp or None,
+            'Trigramme AF': trigramme_af or None,
+            '3ème élément de la référence': bloc_central or None
+        })
+
+
+    @staticmethod
+    def extraire_infos_numSessionIRIS_BAK(numSession:str) -> pd.Series:
+        """
+        Fonction pour extraire les colonnes à partir de la colonne 'Référence'. Je dois faire une fonction interne car j'emploie Split qui ne s'applique que sur des string. Je dois donc faire appel à cette fonction ligne par ligne et donc créer une fonction que j'appelle par DataFrame[colonne].apply().
+
+        Exemples de cas à traiter  :
+        S-04178-FC15-604-SES-CCO
+
+        S-04934-FI1516-1512-GI_VBE_GBO
+        S-05251-FI1516-1510-AMS-LCH-CLE
+        S-05246-F1516-1510-OPE-HGR-NNO
+        S-01131-FI12-1111-NPC-CSI-CSI
+        
+        S-00754-FC12-TDA BCDE-JVI-MLR
+
+        S-05672FC17-894-MCG-CCO
+        S08125-FC18-ACI-OCR-MBO
+
+        S-00674-FC12-ACT-2-1-JV-MLR
+        S-03291-FA1415-1410-STN-SCO-MNC
+
+        S-01273-FC12-PBO-LGE  : RP et AF peuvent être extrait
+        S-00653-FC12-T30-2-1-JV-MLR  : trigramme = T30
+        S-00674-FC12-ACT-2-1-JV-MLR : trigramme = ACT
+        S-00826-FC12047-ALA-CBR : trigramme = 047
+        S-00915-FC12-SCA-1-1-JV-MLR : trigramme = SCA
+        S-01444-FC13-J32 : trigramme = J32
+        S-01731-FC13-ACI.SPE.SLC : on a un point en séparateur à la fin entre trigramme, rp et af
+        S-02614-FC14.ACI.SPE.SLC  : on a des points en séparateurs à la fin
+        S-02922-P57-HBR-MME : trigramme = P57
+        S-06172-FC16.470-OCR-SDA : point en séparateur, trigramme = 470
 
         ANCIENNE METHODE DE TRAITEMENT
         self.__df_tableau['Numéro IRIS'] = self.__df_tableau['N° Session'].astype(str).str[2:7]
@@ -793,10 +936,10 @@ class IRIS_natif(IRIS):
             Path|List[Path]: Le ou les chemins des fichiers IRIS natifs pointés par l'utilisateur
         """
         return choisir_fichier(
-            titre=f"Sélectionner un ou plusieurs fichiers Extract IRIS {str.lower(IRIS_natif.cei(typeExport)._typeExport)} ({IRIS_natif.cei(typeExport)._codeExport})",
+            titre=f"Sélectionner un ou plusieurs fichiers Extract IRIS {str.lower(IRIS_natif.cei(typeExport)._nom_typeExport)} ({IRIS_natif.cei(typeExport)._codeExport})",
             types_fichiers=[("Fichiers Excel", "*.xlsx")],
             dossier_initial=IRIS_natif.cei(typeExport)._input.repertoire,
-            texte_bouton_choisir=f"Choisir extract IRIS {str.lower(IRIS_natif.cei(typeExport)._typeExport)} {IRIS_natif.cei(typeExport)._codeExport} à nouveau",
+            texte_bouton_choisir=f"Choisir extract IRIS {str.lower(IRIS_natif.cei(typeExport)._nom_typeExport)} {IRIS_natif.cei(typeExport)._codeExport} à nouveau",
             multi_fichiers=True
         )
 
@@ -990,7 +1133,7 @@ class IRIS_traite(IRIS):
         match self._typeExport:
             case "Sessions":
                 self.df["Trigramme formation"] = self.df["Trigramme formation"].astype(str)  # Retype "Trigramme formation"
-                self.df["Code IRIS"] = self.df["Code IRIS"].astype(str)  # Retype "Code IRIS"
+                #self.df["Code IRIS"] = self.df["Code IRIS"].astype(str)  # Retype "Code IRIS"
 
             case "Ventes":
                 # On convertit la colonne "Date de début" en datetime
