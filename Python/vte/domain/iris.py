@@ -834,11 +834,13 @@ class IRIS_traite(IRIS):
         self._typeExport = typeExport
         self._fe = fe
 
-        # Si chemin non donné et IRIS_plus_recent = True, alors on prend le fichier IRIS le plus récent
+        # Si chemin non donné et IRIS_plus_recent = True, alors on prend le fichier IRIS le plus récent.
+        # Si l'utilisateur force un chemin, alors on prendra cette valeur (chemin) 
         if (chemin is None) and (IRIS_plus_recent):
             chemin = self._chemin_IRIS_traite_plus_recent()
 
         # On ouvre le fichier IRIS s'il n'existe pas encore
+        # Si chemin = None, alors _charger_excel le gèrera pour faire pointer l'utilisateur
         self._charger_excel(fe=self._fe, chemin=chemin)
 
 
