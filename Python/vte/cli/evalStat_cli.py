@@ -36,7 +36,7 @@ class evalStat_cli:
     formation.sessions[16411]
     formation.sessions[16411].ajout_evalStat()
 
-    formation.sessions[16411].eval_session.traitement_depuis_chemin_csv(
+    formation.sessions[16411].eval_session.avec_traitement_depuis_chemin_csv(
         session=formation.sessions[16411],
         chemin_csv=tel_csv_existant["chemin_csv_session"],
         chemin_IRIS_sessions=tel_csv_existant["chemin_IRIS_sessions"],
