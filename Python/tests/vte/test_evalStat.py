@@ -30,6 +30,9 @@ def tel_csv_existant():
 # ======================================================================================
 
 def test_creation_nouvel_eval_formation(tel_csv_existant):
+    """
+    Pas d'eval foramtion du tout
+    """
 
     backup_fichier_test(tel_csv_existant["chemin_eval_formation"])
 
@@ -60,7 +63,12 @@ def test_ouverture_eval_formation_existant(tel_csv_existant):
     
     #assert len(formation.eval.df_stagiaires) == 0  # La variable existe mais la longueur vaut 0
     assert formation.eval.df_stagiaires["N° Session"].loc[0] == tel_csv_existant["resultat_1er_elem_eval_formation"]
-    
+
+
+# Création avec eval formation existant ne contenant pas la ref du CSV (on le remplit)
+# Création avec eval formation existant mais contenant la ref du CSV (on saute le traitement)
+
+
 # TODO : sauvegarde eval formation
 # TODO : mise à jour suite à nouveau eval session
 # TODO : mise à jour suite à traitement plusieurs eval sessions
