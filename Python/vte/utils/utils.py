@@ -1923,7 +1923,33 @@ def adapter_colonnes_dataframe_selon_modele(df_modele, df_a_modifier):
 
     return df_a_modifier
 
+def verifier_dataframe_colonnes(df:pd.DataFrame) -> None:
+    """
+    Afficher les colonnes d'un DataFrame
 
+    Args:
+        df (pd.DataFrame): DataFrame à vérifier
+    """
+    print("Colonnes du DataFrame :", df.columns)
+
+def verifier_dataframe_colonnes_typesDonnees(df:pd.DataFrame) -> None:
+    """
+    Afficher le type des colonnes d'un DataFrame
+
+    Args:
+        df (pd.DataFrame): DataFrame à vérifier
+    """
+    print("\nTypes de données du DataFrame :")
+    print(df.dtypes)
+
+def verifier_dataframe_index(df:pd.DataFrame) -> None:
+    """
+    Affiche l'index d'un DataFrame
+
+    Args:
+        df (pd.DataFrame): DataFrame à vérifier
+    """
+    print("Index du DataFrame :", df.index)
 
 ### --------------------------------------------------------------------
 #  Backup / rollback pour tests
