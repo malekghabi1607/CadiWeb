@@ -48,7 +48,7 @@ def test_creation_avec_ouverture_evalStat_existant(tel):
 
 def test_creation_avec_ouverture_evalStat_Nonexistant(tel):
     # Backup et vérif que le fichier est présent au départ
-    backup_fichier_test(tel["chemin_eval_formation"], deplacement=False)
+    backup_fichier_test(tel["chemin_eval_formation"], deplacement=True)
     assert not tel["chemin_eval_formation"].is_file()
 
     formation = Formation.avec_ouverture_evalStat(tel["trigramme_formation"])
@@ -74,7 +74,7 @@ def test_creation_avec_creation_une_session(tel):
     #print(len(formation.eval.df_stagiaires))
     
     assert formation.trigramme_formation == tel["trigramme_formation"]
-    assert len(formation.sessions) == len(tel["code_IRIS"])
+    assert len(formation.sessions) == 1
     assert formation.sessions[tel["code_IRIS"]].code_IRIS == tel["code_IRIS"]
 
 
