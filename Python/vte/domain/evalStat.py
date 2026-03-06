@@ -35,8 +35,6 @@ class Session_protocol(Protocol):
     def eval_formation(self) -> EvalStat_formation: ...
 
 
-
-# TODO : j'ai du retype de code IRIS en str : self.df_stagiaires["Code IRIS"] = self.df_stagiaires["Code IRIS"].astype(str)  # Retype "Code IRIS"
 # ======================================================================================
 # CLASSE EVALSTAT
 # Objet fichier EvalStat + logique directement liée au fichier
@@ -123,6 +121,35 @@ class EvalStat:
         self._fe:Optional[FichierExcel] = None  # Objet Excel contenant les données EvalStat stagiaire individuel
 
 
+
+    # ==================================================================================
+    # METHODES INTERNES
+    # ==================================================================================
+    def _ecrit_df_et_sauve(self, nouveau_chemin_fichier:Optional[Path] = None) -> None:
+        """
+        Ecrit les dataframes csv et stagiaires dans le fichier excel.
+
+        Sauve et ferme.
+
+        Actualise les TCD.
+
+        Si nouveau_chemin est None, alors on écrit au même endroit que l'ancien fichier (sauvegarde simple)
+
+        Args:
+            nouveau_chemin_fichier (Optional[Path], optional): Chemin du fichier de sortie. Défaut = None.
+        """
+
+        # On écrit et on sauve (pour l'instant on remplace tout le dataframe sans optimiser)
+        self.fe.get_tableau("CSV_stagiaires").ecrit_dataFrame_dans_tableauStructure(supprimeDonneesEtRemplace = True)
+        self.fe.get_tableau("Stagiaires").ecrit_dataFrame_dans_tableauStructure(supprimeDonneesEtRemplace = True)
+
+        self._fe.save(nouveau_chemin_fichier)
+        self._fe.close()
+
+        # Actualiser TCD
+        self._fe.actualiser_TCD()
+
+
     # ==================================================================================
     # GETTERS / SETTERS
     # ==================================================================================
@@ -197,32 +224,15 @@ class EvalStat_session(EvalStat):
         if chemin_csv is None:
             instance._chemin_csv = cls._filedialog_csv(trigramme_formation=instance.trigramme_formation)
             if instance._chemin_csv is None:
-                vlog.log_erreur("Pas de fichier CSV", continuer=True)
+                vlog.log_erreur("Aucun chemin CSV fourni pour le traitement.", continuer=True)
                 return 
 
         # Si le chemin est avec un raccourci réseau alors on récupère le chemin en entier + on convertit en Path 
         instance._chemin_csv = chemin_vers_unc(Path(chemin_csv)) 
         instance._chemin_excel = instance._chemin_csv.with_suffix(".xlsx")
 
-        # On récupère le trigramme de la formation depuis le chemin du CSV
-        # → PAs besoin : trigramme dispo depuis session → Formation via protocol
-        #if trigramme_formation is None:
-        #    trigramme_formation = recupere_trig_formation_depuis_chemin(chemin_csv)
-
-        # Si l'utilisateur force un chemin pour chemin_IRIS_sessions, alors on renseigne la valeur sinon → IRIS_traite sait gérer ça déjà
 
 
-
-
-
-
-
-
-
-
-        # Début de traiter
-        if not instance._chemin_csv:
-            log_erreur("Aucun chemin CSV fourni pour le traitement.")
 
         #timer.debut(f"Traitement du fichier CSV : {self._chemin_csv_evaluations_stagiaires.name}")
         print("\n")
@@ -230,31 +240,16 @@ class EvalStat_session(EvalStat):
 
 
 
-        # Etape interactions avec eval formation (ouverture + vérif si csv déjà existant dedans)
+        # === Interactions avec eval formation (ouverture + vérif si csv déjà existant dedans)
         # On vérifie que l'eval formation est ouvert en mémoire sinon on ouvre ou crée
-        # TODO : pas sûr, à voir. Si oui, revoir emplacement ?
         if instance.eval_formation.fe is None:
             # Le fichier Excel de la formation n'est pas ouvert, c'est donc le premier appel → On l'ouvre
             instance.eval_formation._ouvrir_ou_creer_eval_formation()
-            #log_erreur("Le fichier Excel de la formation n'est pas ouvert.")
 
         # On vérifie que chemin_csv_session n'est pas déjà dans le fichier évaluations des formations pour savoir si on l'exclue du traitement
-        # instance.eval_formation.df_stagiaires
         if str(instance._chemin_csv) in instance.eval_formation.df_stagiaires["Chemin fichier CSV"].drop_duplicates().tolist():  
             print(f"⚠️  Exclusion car csv déjà dans le fichier global : {instance._chemin_csv}")
             #pprint(self._df_evaluations_formation["Chemin fichier CSV"])
-
-            # _code_IRIS est déjà connu à travers la session : instance.code_IRIS
-            # Todo : mettre cette partie ailleurs dans une fonction ailleurs au cas où pour plus tard
-            """
-            self._codeIRIS = str(rechercheX_dataframe(
-                instance.eval_formation.df_stagiaires,
-                "Chemin fichier CSV",
-                str(chemin_csv),
-                "Code IRIS"
-            ))
-            """
-
             instance._statut_csv = "Exclu - CSV déjà dans fichier global"
             return
 
@@ -263,22 +258,9 @@ class EvalStat_session(EvalStat):
 
 
 
-        # On récupère IRIS sessions, seulement si nécessaire (je le fais ici car si besoin action utilisateur ça évite de couper le traitement de la boucle)
-        # TODO : quelle boucle ? Mettre ailleurs ?
-        #_ = get_iris(typeExport="Sessions", chemin=chemin_IRIS_sessions)
-        #self._charger_IRIS_sessions()
-
-        # Définition self._codeIRIS. Si non existant, on récupère le numéro IRIS depuis le CSV (c'est le plus sur), sinon popup pour demander
-        # _code_IRIS est déjà connu à travers la session : instance.code_IRIS
-        #if self._codeIRIS is None:
-        #    self._codeIRIS = IRIS.extraire_code_IRIS_depuis_chemin(chemin_csv)
-
-    
-
 
 
         # Étape 1 — Charger le CSV dans df_csv_stagiaires
-        #df_csv_stagiaires = instance._charger_csv_stagiaire()
         instance._charger_csv_stagiaire()
         if instance._df_csv_stagiaires is None:
             # il y a eu un problème dans _charger_csv_stagiaire → on saute la fin du traitement
@@ -304,41 +286,41 @@ class EvalStat_session(EvalStat):
         # Étape 3 — Générer l'excel des évaluations des stagiaire (_fe_evaluations_stagiaires : 2 onglets + TCD)
         # 3.1 - On crée les dataframes
         instance._traiter_df_csv_stagiaires()  # Traitement onglet CSV_stagiaires (import "direct" du CSV avec quelques traitements mineurs)
-        # TODO : Attention, avant j'avais le sauve / reload à l'étape d'avant or juste après j'emploie df_csv_stagiaires → Bug à venir ?
         instance._traiter_df_stagiaires()  # Traitement seconde partie du dataframe du CSV
         
-        # 3.2 - On fait la manip save / reload l'Excel à partir du modèle à cause des espaces des noms des colonnes
-        # TODO : voir si on ne peut pas faire une manip pour récupérer les noms des colonnes du modèles et les affecter aux colonnes du df.
-        # On crée le fichier Excel depuis le modèle
+        # 3.2 - On crée le fichier Excel depuis le modèle puis on écrit les dataframes dans les 2 onglets
         instance._fe = FichierExcel.depuis_modele(chemin_modele=config.CHEMIN_MODELE_EXCEL_EVALUATIONS_STAGIAIRES, chemin_fichier_sauv=instance._chemin_excel)
+        # TODO : Attention, on a _df_csv qui est bien rempli (variable temporaire pour le traitement)
+        """
+        En revanche self._fe._df est vide (on vient de créer _fe)
+        Attention, pour l'évaluation formation il faudra vérifier qu'on a bien les bonnes variables pour inscrire les df.
+        """
 
-        # On ecrit_dataFrame_dans_tableauStructure pour les 2 onglets
-        # self._fe_evaluations_stagiaires._tableaux[nom_tableau].ecrit_dataFrame_dans_tableauStructure(df_stagiaires, supprimeDonneesEtRemplace=True)
-        instance._fe.get_tableau("CSV_stagiaires").ecrit_dataFrame_dans_tableauStructure(instance._df_csv_stagiaires, supprimeDonneesEtRemplace=True)
-        instance._fe.get_tableau("Stagiaires").ecrit_dataFrame_dans_tableauStructure(instance._df_stagiaires, supprimeDonneesEtRemplace=True)
 
-        # On sauve et on ferme
-        instance._fe.save(instance._chemin_excel)
-        instance._fe.close()
+        instance._ecrit_df_et_sauve()  # Avant on mettait instance._chemin_excel
+        #instance._fe.get_tableau("CSV_stagiaires").ecrit_dataFrame_dans_tableauStructure(instance._df_csv_stagiaires, supprimeDonneesEtRemplace=True)
+        #instance._fe.get_tableau("Stagiaires").ecrit_dataFrame_dans_tableauStructure(instance._df_stagiaires, supprimeDonneesEtRemplace=True)
+        #instance._fe.save(instance._chemin_excel)
+        #instance._fe.close()
 
 
         # On recharge l'Excel
-        instance._fe = FichierExcel.depuis_fichier(instance._chemin_excel)
+        #instance._fe = FichierExcel.depuis_fichier(instance._chemin_excel)
 
         # On réaffecte les 2 df (ils auront les bonnes en-têtes de colonnes)
-        instance._df_csv_stagiaires = instance._fe.get_df_tableau("CSV_stagiaires")
-        instance._df_stagiaires = instance._fe.get_df_tableau("Stagiaires")
+        #instance._df_csv_stagiaires = instance._fe.get_df_tableau("CSV_stagiaires")
+        #instance._df_stagiaires = instance._fe.get_df_tableau("Stagiaires")
 
-        # 3.3 - On actualise les TCD et on sauve
-        #instance._fe_evaluations_stagiaires.actualiser_TCD()  # Mise à jour TCD
-        instance.fe.actualiser_TCD()
+        # 3.3 - On actualise les TCD et on sauve (autre méthode que pandas, on est avec du win32com.client)
+        #instance._fe.actualiser_TCD()
         instance._statut_csv = "Traité"
 
         #print("\nTypes de données de df_stagiaires dans méthode traiter :")
         #print(df_stagiaires.dtypes)
 
         # Étape 4 — Mettre à jour le DataFrame de formation partagé
-        #TODO : instance._mettre_a_jour_evaluations_formation()
+        print(f"\n\n{Style.BRIGHT}{Fore.RED}Écriture du fichier global des évaluations de la formation {self.trigramme_formation}")
+        instance._mettre_a_jour_eval_formation()
 
         # Ouverture du dossier à la fin si demandé
         if ouvrirDossier:
@@ -581,7 +563,60 @@ class EvalStat_session(EvalStat):
         """
         return self._df_stagiaires
 
+    def _mettre_a_jour_eval_formation(self) -> None:
+        """
+        Met à jour le DataFrame partagé des évaluations de la formation courante
+        avec les données du CSV actuel.
+        On écrira le fichier Excel à la fin
+        """
 
+        #if self.eval_formation.df_stagiaires is None:  # EvalStat._df_evaluations_formation
+        #    print("⚠️  Aucun DataFrame de formation ouvert, impossible de mettre à jour.")
+        #    return
+        
+        #print("\n")
+        #timer.debut(f"{Style.BRIGHT}{Fore.RED}Mise à jour de {self._fe_evaluations_formation.chemin_fichier.name}")
+
+        # TODO : ici je mets à jour le df de l'excel évaluation formation. Il sera écrit physiquement à la sortie du contexte formation.
+        # TODO : df nouveau df comprend l'ancien (i.e. évaluation formation existant) + le nouveau que l'on traite.
+        # TODO : pour l'instant je réécrit tout ce df mais pour être optimal on ne pourrait écrire que le nouveau
+
+        # Si df_formation_csv est vide, il faut l'initialiser avec le premier df de la session ; sinon on concatène
+        if (self.eval_formation.df_csv is None) or (self.eval_formation.df_csv.empty):
+            self.eval_formation.df_csv = self.df_csv.copy()  # self._fe_evaluations_stagiaires._tableaux["CSV_stagiaires"]._df.copy()
+            self.eval_formation.df_stagiaires = self.df_stagiaires.copy()  # self._fe_evaluations_stagiaires._tableaux["Stagiaires"]._df.copy()
+
+        # df_formation_csv contient déjà des choses → Il faut concaténer les nouvelles données de cette session avec les anciennes
+        else:
+            if (not self.df_csv.empty) and (self.df_csv is not None): # Evite un future wanring de concaténer avec un df vide
+                self.df_csv = adapter_colonnes_dataframe_selon_modele(df_modele=self.eval_formation.df_csv, df_a_modifier=self.df_csv)
+                self.eval_formation.df_csv = pd.concat([self.eval_formation.df_csv, self.df_csv], ignore_index=True)
+            
+            if (not self.df_stagiaires.empty) and (self.df_stagiaires is not None): # Evite un future wanring de concaténer avec un df vide
+                
+                self.df_stagiaires = adapter_colonnes_dataframe_selon_modele(df_modele=self.eval_formation.df_stagiaires, df_a_modifier=self.df_stagiaires)
+                
+                # Tester colonnes
+                #print("Colonnes de df_formation_stagiaires :", df_formation_stagiaires.columns)
+                #print("Colonnes de df :", df.columns)
+
+                #print("\nTypes de données de df_formation_stagiaires :")
+                #print(df_formation_stagiaires.dtypes)
+
+                #print("\nTypes de données de df_stagiaires :")
+                #print(df_stagiaires.dtypes)
+
+                # Tester index
+                #print("Index de df_formation_stagiaires :", df_formation_stagiaires.index)
+                #print("Index de df :", df_stagiaires.index)
+
+
+                self.eval_formation.df_stagiaires = pd.concat([self.eval_formation.df_stagiaires, self.df_stagiaires], ignore_index=True)
+
+        #self._fe_evaluations_formation._tableaux["CSV_stagiaires"]._df = df_formation_csv
+        #self._fe_evaluations_formation._tableaux["Stagiaires"]._df = df_formation_stagiaires
+
+        #timer.fin()
 
     # ==================================================================================
     # POPUP
@@ -764,7 +799,8 @@ class EvalStat_formation(EvalStat):
         #return fe, supprimeDonneesEtRemplace
 
 
-    def _sauver_eval_formation_siModif(self):
+
+    def _ecritdf_et_sauve_siModif(self):
         """
         Sauvegarde et fermeture du fichier Excel de la formation à la sortie du contexte.
 
@@ -780,12 +816,8 @@ class EvalStat_formation(EvalStat):
             df_final_hash = hash_df(self.df_stagiaires)
 
             if df_final_hash != self._df_initial_hash:
-                #TODO : pour l'instant je force à tout réécrire et pas seulement faire les mises à jour
-                # Forçage réécriture en entier du df
-                self._supprimeDonneesEtRemplace_evaluations_formation = True
-
                 # Le DataFrame a changé → on sauvegarde
-                self._sauver_excel_evaluations_formation(fermer_fichier=False)
+                self._ecrit_df_et_sauve()
 
             else:
                 vlog.ajouter_message(
@@ -807,27 +839,4 @@ class EvalStat_formation(EvalStat):
 
 
 class A_employer():
-    def _sauver_excel_evaluations_formation(self, nouveau_chemin_fichier:Optional[Path] = None, fermer_fichier:Optional[bool]=True) -> None:
-        """
-        Sauvegarde le fichier Excel des évaluations de la formation.
-
-        :Note: Il faut sauvegarder à la sortie du contexte (car fin du traitement de la ou des sessions d'une même formation)
-        """
-        print(f"\n\n{Style.BRIGHT}{Fore.RED}Écriture du fichier global des évaluations de la formation {self._trigramme_formation}")
-
-        # On écrit et on sauve
-        self._fe_evaluations_formation._tableaux["CSV_stagiaires"].ecrit_dataFrame_dans_tableauStructure(supprimeDonneesEtRemplace = self._supprimeDonneesEtRemplace_evaluations_formation)
-        self._fe_evaluations_formation._tableaux["Stagiaires"].ecrit_dataFrame_dans_tableauStructure(supprimeDonneesEtRemplace = self._supprimeDonneesEtRemplace_evaluations_formation)
-        #self._fe_evaluations_formation._tableaux["CSV_stagiaires"].charge_df()
-        #self._fe_evaluations_formation._tableaux["Stagiaires"].charge_df()
-
-        #self._df_evaluations_formation = instance._fe_evaluations_formation._tableaux["Stagiaires"]._df  # Alias
-
-        self._fe_evaluations_formation.save(nouveau_chemin_fichier)
-
-        # Actualiser TCD
-        self._fe_evaluations_formation.actualiser_TCD()
-
-        # On ferme si demandé
-        if fermer_fichier:
-            self._fe_evaluations_formation.close()
+    pass
