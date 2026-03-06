@@ -34,34 +34,37 @@ def test_creation_avec_ouverture_evalStat_existant(tel):
     backup_fichier_test(tel["chemin_eval_formation"], deplacement=False)
     assert tel["chemin_eval_formation"].is_file()
 
-    formation = Formation.avec_ouverture_evalStat(tel["trigramme_formation"])
-    #print("\n")
-    #print(len(formation.eval.df_stagiaires))
-    
-    assert formation.trigramme_formation == tel["trigramme_formation"]
-    assert formation.eval.fe is not None
-    if formation.eval.fe is not None :
-        assert (formation.eval.chemin_fe == tel["chemin_eval_formation"])
-        assert len(formation.eval.df_stagiaires) > 0
+    try:
+        formation = Formation.avec_ouverture_evalStat(tel["trigramme_formation"])
+        #print("\n")
+        #print(len(formation.eval.df_stagiaires))
+        
+        assert formation.trigramme_formation == tel["trigramme_formation"]
+        assert formation.eval.fe is not None
+        if formation.eval.fe is not None :
+            assert (formation.eval.chemin_fe == tel["chemin_eval_formation"])
+            assert len(formation.eval.df_stagiaires) > 0
 
-    rollback_nom_fichier_test(tel["chemin_eval_formation"])
+    finally:
+        rollback_nom_fichier_test(tel["chemin_eval_formation"])
 
 def test_creation_avec_ouverture_evalStat_Nonexistant(tel):
     # Backup et vérif que le fichier est présent au départ
     backup_fichier_test(tel["chemin_eval_formation"], deplacement=True)
     assert not tel["chemin_eval_formation"].is_file()
 
-    formation = Formation.avec_ouverture_evalStat(tel["trigramme_formation"])
-    #print("\n")
-    #print(len(formation.eval.df_stagiaires))
-    
-    assert formation.trigramme_formation == tel["trigramme_formation"]
-    assert formation.eval.fe is not None
-    if formation.eval.fe is not None :
-        assert (formation.eval.chemin_fe == tel["chemin_eval_formation"])
-        assert len(formation.eval.df_stagiaires) == 0
-
-    rollback_nom_fichier_test(tel["chemin_eval_formation"])
+    try:
+        formation = Formation.avec_ouverture_evalStat(tel["trigramme_formation"])
+        #print("\n")
+        #print(len(formation.eval.df_stagiaires))
+        
+        assert formation.trigramme_formation == tel["trigramme_formation"]
+        assert formation.eval.fe is not None
+        if formation.eval.fe is not None :
+            assert (formation.eval.chemin_fe == tel["chemin_eval_formation"])
+            assert len(formation.eval.df_stagiaires) == 0
+    finally:
+        rollback_nom_fichier_test(tel["chemin_eval_formation"])
 
 def test_creation_avec_creation_une_session(tel):
 
@@ -70,7 +73,7 @@ def test_creation_avec_creation_une_session(tel):
         trigramme_formation=tel["trigramme_formation"],
         codes_IRIS=tel["code_IRIS"]
     )
-    print("\n")
+    #print("\n")
     #print(len(formation.eval.df_stagiaires))
     
     assert formation.trigramme_formation == tel["trigramme_formation"]
@@ -85,7 +88,7 @@ def test_creation_avec_creation_plusieurs_sessions(tel):
         trigramme_formation=tel["trigramme_formation"],
         codes_IRIS=tel["codes_IRIS"]
     )
-    print("\n")
+    #print("\n")
     #print(len(formation.eval.df_stagiaires))
     
     assert formation.trigramme_formation == tel["trigramme_formation"]
@@ -104,3 +107,5 @@ def test_creation_avec_creation_plusieurs_sessions(tel):
 # python -m pytest -s -v tests/vte/test_evalStat.py::
 # python -m pytest -s -v tests/vte/test_evalStat.py::test_creation_nouvel_eval_formation
 # python -m pytest -s -v tests/vte/test_evalStat.py::test_ouverture_eval_formation_existant
+
+#python -m pytest -v tests/vte/test_formation.py
