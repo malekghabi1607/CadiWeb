@@ -14,12 +14,12 @@ from vte.domain.evalStat import *
 def tel_csv_existant():
     return {
         "trigramme_formation": "TEL",
-        "codes_IRIS": 16411,
-        "chemin_eval_formation": Path(r"P:\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\Evaluation-Stagiaires-Global-TEL.xlsx"),
-        "chemin_csv_session": Path(r"P:\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-16411-rapports-session-evaluations\S-16411-FC25-TEL-VTE-CAR-Stagiaires.csv"),
-        "chemin_eval_session": Path(r"P:\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-16411-rapports-session-evaluations\S-16411-FC25-TEL-VTE-CAR-Stagiaires.xlsx"),
+        "code_IRIS": 16411,
+        "chemin_eval_formation": chemin_vers_unc(Path(r"P:\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\Evaluation-Stagiaires-Global-TEL.xlsx")),
+        "chemin_csv_session": chemin_vers_unc(Path(r"P:\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-16411-rapports-session-evaluations\S-16411-FC25-TEL-VTE-CAR-Stagiaires.csv")),
+        "chemin_eval_session": chemin_vers_unc(Path(r"P:\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-16411-rapports-session-evaluations\S-16411-FC25-TEL-VTE-CAR-Stagiaires.xlsx")),
 
-        "chemin_IRIS_sessions": Path(r"R:\_Echanges\VTE\Prog\IRIS\Extracts complets\TESTS - TEL - R04110_Sessions-COMPLET.xlsx"),
+        "chemin_IRIS_sessions": chemin_vers_unc(Path(r"R:\_Echanges\VTE\Prog\IRIS\Extracts complets\TESTS - TEL - R04110_Sessions-COMPLET.xlsx")),
 
         "resultat_1er_elem_eval_formation": "S-12766-FC22-TEL-JVI-LRA",
     }
@@ -28,44 +28,96 @@ def tel_csv_existant():
 # ======================================================================================
 # TESTS CLASSE EVALSTAT FORMATION
 # ======================================================================================
-
+# python -m pytest -s -v tests/vte/test_evalStat.py::test_creation_nouvel_eval_formation
 def test_creation_nouvel_eval_formation(tel_csv_existant):
     """
-    Pas d'eval foramtion du tout
+    Pas d'eval formation existant initialement → On en crée un
     """
 
     backup_fichier_test(tel_csv_existant["chemin_eval_formation"])
-
-    try:
-        formation = Formation(tel_csv_existant["trigramme_formation"])
-        formation.ajout_sessions(codes_IRIS=tel_csv_existant["codes_IRIS"])
-        formation.ajout_evalStat()
-        #print("\n")
-        #print(len(formation.eval.df_stagiaires))
-        
-        assert len(formation.eval.df_stagiaires) == 0  # La variable existe mais la longueur vaut 0
-        #assert formation.eval.df_stagiaires["N° Session"].loc[0] == ""
     
-    except Exception as e:
-        log_erreur(f"Erreur lors du test du fichier : {e}")
-    
-    finally:
-        rollback_nom_fichier_test(tel_csv_existant["chemin_eval_formation"])
+    # Vérif que le fichier n'est pas présent au départ
+    assert not tel_csv_existant["chemin_eval_formation"].is_file()
 
-def test_ouverture_eval_formation_existant(tel_csv_existant):
-
-
-    formation = Formation(tel_csv_existant["trigramme_formation"])
-    formation.ajout_sessions(codes_IRIS=tel_csv_existant["codes_IRIS"])
-    formation.ajout_evalStat()  # lance EvalStat_formation(formation=self)
-    #print("\n")
+    formation = Formation.avec_ouverture_evalStat(tel_csv_existant["trigramme_formation"])
+    print("\n")
     #print(len(formation.eval.df_stagiaires))
     
-    #assert len(formation.eval.df_stagiaires) == 0  # La variable existe mais la longueur vaut 0
-    assert formation.eval.df_stagiaires["N° Session"].loc[0] == tel_csv_existant["resultat_1er_elem_eval_formation"]
+    assert formation.eval.fe is not None
+    if formation.eval.fe is not None :
+        assert (formation.eval.chemin_fe == tel_csv_existant["chemin_eval_formation"])
+        assert len(formation.eval.df_stagiaires) == 0
 
+    rollback_nom_fichier_test(tel_csv_existant["chemin_eval_formation"])
+
+# python -m pytest -s -v tests/vte/test_evalStat.py::test_creation_ouvrir_eval_formation_existant
+def test_creation_ouvrir_eval_formation_existant(tel_csv_existant):
+    """
+    Eval formation existant initialement → On l'ouvre
+    """
+    # Backup et vérif que le fichier est présent au départ
+    backup_fichier_test(tel_csv_existant["chemin_eval_formation"], deplacement=False)
+    assert tel_csv_existant["chemin_eval_formation"].is_file()
+
+    formation = Formation.avec_ouverture_evalStat(tel_csv_existant["trigramme_formation"])
+    print("\n")
+    #print(len(formation.eval.df_stagiaires))
+    
+    assert formation.eval.fe is not None
+    if formation.eval.fe is not None :
+        assert (formation.eval.chemin_fe == tel_csv_existant["chemin_eval_formation"])
+        assert len(formation.eval.df_stagiaires) > 0
+
+    rollback_nom_fichier_test(tel_csv_existant["chemin_eval_formation"])
 
 # Création avec eval formation existant ne contenant pas la ref du CSV (on le remplit)
+def test_creation_eval_session_refCSV_inexistant_dans_eval_formation(tel_csv_existant):
+
+    # Backup et vérif que le fichier est présent au départ
+    backup_fichier_test(tel_csv_existant["chemin_eval_formation"], deplacement=False)
+    assert tel_csv_existant["chemin_eval_formation"].is_file()
+
+    # On crée la formation
+    formation = Formation.avec_creation_sessions(
+        trigramme_formation=tel_csv_existant["trigramme_formation"],
+        codes_IRIS=tel_csv_existant["code_IRIS"]
+    )
+    print("\n")
+    #print(len(formation.eval.df_stagiaires))
+    
+    assert formation.eval.fe is not None
+    if formation.eval.fe is not None :
+        assert (formation.eval.chemin_fe == tel_csv_existant["chemin_eval_formation"])
+        assert len(formation.eval.df_stagiaires) > 0
+    assert formation.sessions[tel_csv_existant["code_IRIS"]].code_IRIS == tel_csv_existant["code_IRIS"]
+
+
+    rollback_nom_fichier_test(tel_csv_existant["chemin_eval_formation"])
+
+# Création avec eval formation existant ne contenant pas la ref du CSV (on le remplit)
+def test_eval_session_refCSV_inexistant_dans_eval_formation(tel_csv_existant):
+
+    # Backup et vérif que le fichier est présent au départ
+    backup_fichier_test(tel_csv_existant["chemin_eval_formation"], deplacement=False)
+    assert tel_csv_existant["chemin_eval_formation"].is_file()
+
+    # On crée la formation
+    formation = Formation.avec_creation_sessions(
+        trigramme_formation=tel_csv_existant["trigramme_formation"],
+        codes_IRIS=tel_csv_existant["code_IRIS"]
+    )
+    print("\n")
+    #print(len(formation.eval.df_stagiaires))
+    
+    assert formation.eval.fe is not None
+    if formation.eval.fe is not None :
+        assert (formation.eval.chemin_fe == tel_csv_existant["chemin_eval_formation"])
+        assert len(formation.eval.df_stagiaires) > 0
+    assert formation.sessions[tel_csv_existant["code_IRIS"]].code_IRIS == tel_csv_existant["code_IRIS"]
+    
+
+    rollback_nom_fichier_test(tel_csv_existant["chemin_eval_formation"])
+
 # Création avec eval formation existant mais contenant la ref du CSV (on saute le traitement) instance._statut_csv = "Exclu - CSV déjà dans fichier global" ; instance._fe = None
 # Création avec eval formation existant ne contenant pas la ref du CSV mais IRIS sessions ne contient pas le code IRIS instance._statut_csv = "Exclu - Code IRIS pas dans Extract IRIS sessions" ; instance._fe = None
 # Pb lecture du CSV : self._statut_csv = "Exclu - Problème lecture CSV" ; instance._fe = None

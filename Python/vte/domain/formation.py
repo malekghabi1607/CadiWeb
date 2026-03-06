@@ -28,8 +28,6 @@ class Formation:
         # Une formation a une ou plusieurs sessions
         self._sessions:Optional[dict[int, Session]] = {}  # Index = code IRIS de la formation
 
-
-
     @classmethod
     def avec_ouverture_evalStat(cls, trigramme_formation: str) -> Formation:
         """
@@ -37,6 +35,22 @@ class Formation:
         """
         instance = cls(trigramme_formation=trigramme_formation)
         instance.ajout_evalStat_avec_ouverture()
+        return instance
+
+    @classmethod
+    def avec_creation_sessions(cls, trigramme_formation: str, codes_IRIS:int|Iterable[int]) -> Formation:
+        """
+        Initialise une formation en créant une ou plusieurs sessions
+
+        Args:
+            trigramme_formation (str): trigramme de la formation
+            codes_IRIS (int): codes IRIS des sessions à créer
+
+        Returns:
+            Formation: Instance de Formation
+        """
+        instance = cls(trigramme_formation=trigramme_formation)
+        instance.ajout_sessions(codes_IRIS=codes_IRIS)
         return instance
 
     # =========================

@@ -1954,13 +1954,18 @@ def verifier_dataframe_index(df:pd.DataFrame) -> None:
 ### --------------------------------------------------------------------
 #  Backup / rollback pour tests
 ### --------------------------------------------------------------------
-def backup_fichier_test(chemin_input:Path) -> bool:
+def backup_fichier_test(chemin_input:Path, deplacement:bool=True) -> bool:
     """
     Vérifie si le fichier input existe, puis crée un backup en renommant le fichier.
     Le backup est créé avec le nom original sans extension suivi de "-BAK_TESTS" et de l'extension originale.
 
+    Par défaut, on déplace le fichier ; si deplacement = False on fera une copie
+
+    Si on n'arrive pas à faire le backup, alors on raise un systemExit
+
     Args:
         chemin_input (Path): Chemin du fichier dont il faut faire le backup.
+        deplacement (bool) : si True (défaut), alors on déplace ; si False, alors on copie.
 
     Returns:
         bool: True si le backup a été créé avec succès, False sinon.
@@ -1982,12 +1987,17 @@ def backup_fichier_test(chemin_input:Path) -> bool:
             return False
         
         # Créer le backup en renommant le fichier original
-        shutil.move(str(chemin_input), str(chemin_backup))
-        print(f"Backup créé avec succès : {chemin_backup}")
+        if deplacement:
+            shutil.move(str(chemin_input), str(chemin_backup))
+        else:
+            shutil.copy(str(chemin_input), str(chemin_backup))
+        #print(f"Backup créé avec succès : {chemin_backup}")
         return True
     except Exception as e:
         print(f"Erreur lors de la création du backup : {e}")
-        return False
+        # return False
+        raise SystemExit
+        
 
 def rollback_nom_fichier_test(chemin_input) -> bool:
     """
@@ -2006,7 +2016,7 @@ def rollback_nom_fichier_test(chemin_input) -> bool:
     try:
         # Renommer le fichier avec le nom initial
         shutil.move(str(chemin_backup), str(chemin_input))
-        print(f"Fichier renommé avec succès : {chemin_input}")
+        print(f"\n\nRollback backup – Fichier renommé avec succès : {chemin_input}")
         return True
     except Exception as e:
         print(f"Erreur lors du renommage du fichier : {e}")
