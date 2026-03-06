@@ -80,7 +80,6 @@ def test_creation_avec_creation_une_session(tel):
     assert len(formation.sessions) == 1
     assert formation.sessions[tel["code_IRIS"]].code_IRIS == tel["code_IRIS"]
 
-
 def test_creation_avec_creation_plusieurs_sessions(tel):
 
     # On crée la formation
