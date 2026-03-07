@@ -81,15 +81,12 @@ class Formation:
         instance = cls.avec_ouverture_evalStat(trigramme_formation=trigramme_formation)
         instance.ajout_sessions(codes_IRIS=codes_IRIS)
 
-        for session in instance.sessions.values():
-            session.eval.traiter_eval(
+        instance.traiter_eval_sessions(
             chemin_csv=chemin_csv,
             chemin_IRIS_sessions=chemin_IRIS_sessions,
             ouvrirDossier=ouvrirDossier
-            )
+        )
         
-        # TODO : Ici je ne pourrais faire qu'une seule sauvegarde de l'eval formation
-
         return instance
 
 
@@ -140,7 +137,7 @@ class Formation:
             chemin_IRIS_sessions (Optional[Path], optional): Chemin du fichier IRIS sessions à employer si l'utilisateur ne veut pas celui par défaut. Defaults = None = Fichier généré le plus récent dans le répertoire donné en config.
             ouvrirDossier (bool, optional): Ouvre le répertoire de l'EvalStat généré. Defaut = False.
         """
-        # On spécifie la variable pour ne pas sauvegarder 
+        # On boucle sur Session pour traiter_eval en spécifiant ecrire_eval_formation=False
         for session in self.sessions.values():
             session.eval.traiter_eval(
                 chemin_csv=chemin_csv,
@@ -178,3 +175,7 @@ class Formation:
     @property
     def eval(self) -> EvalStat_formation|None:
         return self._eval
+    
+    @eval.setter
+    def eval(self, valeur:EvalStat_formation) -> None:
+        self._eval = valeur
