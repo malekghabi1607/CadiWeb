@@ -34,7 +34,7 @@ class evalStat_cli:
     formation.ajout_sessions(codes_IRIS=16411)
     #formation.ajout_evalStat()  # EvalStat formation
     formation.sessions[16411]
-    formation.sessions[16411].ajout_evalStat()
+    formation.sessions[16411]._ajout_evalStat()
 
     formation.sessions[16411].eval_session.avec_traitement_depuis_chemin_csv(
         session=formation.sessions[16411],

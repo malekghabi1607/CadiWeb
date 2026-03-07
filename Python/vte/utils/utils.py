@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, List, Tuple, Optional, Union, Any, Type, Callable
+from typing import Dict, Iterable, List, Tuple, Optional, TypeVar, Union, Any, Type, Callable
 from types import ModuleType
 
 import pandas as pd
@@ -1293,6 +1293,33 @@ def convertir_tuple_str(input:str|tuple[str]) -> tuple[str]:
         return (input,)
     else:
         return input
+
+T = TypeVar('T')
+def convertir_collection(
+    input: Union[T, Iterable[T]],
+    type_retour: Type[Union[Tuple[T, ...], List[T], Iterable[T]]] = Iterable
+) -> Union[Tuple[T, ...], List[T], Iterable[T]]:
+    """
+    Convertit un élément ou un iterable en une collection du type spécifié.
+
+    Args:
+        input: L'élément ou l'iterable à convertir.
+        type_retour: Le type de retour souhaité (tuple, list, ou iterable). Par défaut, tuple.
+
+    Returns:
+        Une collection du type spécifié.
+    """
+    if isinstance(input, type_retour):
+        return input
+    elif isinstance(input, Iterable) and not isinstance(input, str):  # Exclure les str pour éviter les caractères individuels
+        return type_retour(input)
+    else:
+        if type_retour is tuple:
+            return (input,)
+        elif type_retour is list:
+            return [input]
+        else:
+            return [input]  # Par défaut, retourne une liste pour un iterable générique
 
 def convertir_liste_str(x: Any) -> list[str]:
     """

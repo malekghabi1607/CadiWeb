@@ -12,6 +12,8 @@ from vte.utils.office import FichierExcel
 from vte.utils.utils import *
 from vte.utils.utils_instn import recupere_trig_formation_depuis_chemin
 
+# TODO : Pour l'instant c'est une classe de traitemnt. Le jour où j'ai besoin d'ouvrir un EvalStat pour le lire uniquement, prendre modèle sur IRIS avec des classes de lecture et de traitement
+
 # ======================================================================================
 # PROTOCOLES
 # (pour faire passer les informations des objets parents sans ref circulaires)
@@ -159,6 +161,8 @@ class EvalStat:
 # CLASSE EVALSTAT_SESSION
 # ======================================================================================
 class EvalStat_session(EvalStat):
+    # Variable globale si traitement en boucle pour ne sauvegarder qu'une fois EvalStat formation en fin de boucle
+    #_TRAITEMENT_EN_BOUCLE:bool = False
 
     # =====================
     # === CONSTRUCTEURS ===
@@ -180,12 +184,27 @@ class EvalStat_session(EvalStat):
 
 
     @classmethod
-    def avec_traitement_depuis_chemin_csv(cls, session:Session_protocol, chemin_csv:Path|str, chemin_IRIS_sessions:Optional[Path]=None, ouvrirDossier:bool=False) -> EvalStat_session:
+    def avec_traitement(cls, session:Session_protocol, chemin_csv:Optional[Path|str]=None, chemin_IRIS_sessions:Optional[Path]=None, ecrire_eval_formation:bool=True, ouvrirDossier:bool=False) -> EvalStat_session:
+        """
+        Crée l'instance EvalStat d'une session et traite cet EvalStat.
+        
+        Crée l'Excel EvalStat d'une session à partir d'un CSV (s'il n'est pas donné, on ouvre un filedialog)
+
+        L'évaluation de la formation est mise à jour avec ces nouvelles données et est sauvée en fin de traitement selon le critère ecrire_eval_formation.
+
+        Args:
+            session (Session_protocol): La session à laquelle est affectée l'EvalStat
+            chemin_csv (Optional[Path|str], optional): chemin du CSV à traiter. S'il est None, on ouvre un filedialog
+            chemin_IRIS_sessions (Optional[Path], optional): Chemin du fichier IRIS sessions à employer si l'utilisateur ne veut pas celui par défaut. Defaults = None = Fichier généré le plus récent dans le répertoire donné en config.
+            ecrire_eval_formation (bool, optional): Pour écrire physiquement l'Excel eval formation en fin de traitement. Si False, il devra être écrit ailleurs (à l'endroit où il y a la boucle pour du multi-traitement typiquement). Défaut = True.
+            ouvrirDossier (bool, optional): Ouvre le répertoire de l'EvalStat généré. Defaut = False.
+        """
         instance = cls(session)
-        instance._cree_excel_session_et_maj_excel_formation_depuis_chemin_csv(
+        instance.traiter_eval(
             chemin_csv=chemin_csv,
             chemin_IRIS_sessions=chemin_IRIS_sessions,
-            ouvrirDossier=ouvrir_dossier
+            ecrire_eval_formation=ecrire_eval_formation,
+            ouvrirDossier=ouvrirDossier
         )
         return instance
 
@@ -361,7 +380,7 @@ class EvalStat_session(EvalStat):
         # On vire "Code session" qui est redondante avec "Code IRIS"
         self.df_stagiaires.drop(columns=["Code session"], inplace=True)
         
-    def _mettre_a_jour_eval_formation(self) -> None:
+    def _maj_dataframes_eval_formation(self) -> None:
         """
         Met à jour le DataFrame partagé des évaluations de la formation courante
         avec les données du CSV actuel.
@@ -383,16 +402,21 @@ class EvalStat_session(EvalStat):
                 #self.df_stagiaires = adapter_colonnes_dataframe_selon_modele(df_modele=self.eval_formation.df_stagiaires, df_a_modifier=self.df_stagiaires)
                 self.eval_formation.df_stagiaires = pd.concat([self.eval_formation.df_stagiaires, self.df_stagiaires], ignore_index=True)
 
-    def _cree_excel_session_et_maj_excel_formation_depuis_chemin_csv(self, chemin_csv:Path|str, chemin_IRIS_sessions:Optional[Path]=None, ouvrirDossier:bool=False) -> None:
-        """
-        Crée l'Excel EvalStat d'une session à partir d'un CSV.
-        L'évaluation de la formation est mise à jour avec ces nouvelles données.
 
-        L'évaluation de la formation est sauvée en fin de traitement. Ca pourrait être fait ailleurs si boucle de traitement de plusieurs EvalStat de sessions d'une même formation.
+
+    # ==================================================================================
+    # MÉTHODES EXTERNES - TRAITEMENT INDIVIDUEL
+    # ==================================================================================
+    def traiter_eval(self, chemin_csv:Optional[Path|str]=None, chemin_IRIS_sessions:Optional[Path]=None, ecrire_eval_formation:bool=True, ouvrirDossier:bool=False) -> None:
+        """
+        Crée l'Excel EvalStat d'une session à partir d'un CSV (s'il n'est pas donné, on ouvre un filedialog)
+
+        L'évaluation de la formation est mise à jour avec ces nouvelles données et est sauvée en fin de traitement selon le critère ecrire_eval_formation.
 
         Args:
-            chemin_csv (Path | str): chemin du CSV à traiter   
+            chemin_csv (Optional[Path|str], optional): chemin du CSV à traiter. S'il est None, on ouvre un filedialog
             chemin_IRIS_sessions (Optional[Path], optional): Chemin du fichier IRIS sessions à employer si l'utilisateur ne veut pas celui par défaut. Defaults = None = Fichier généré le plus récent dans le répertoire donné en config.
+            ecrire_eval_formation (bool, optional): Pour écrire physiquement l'Excel eval formation en fin de traitement. Si False, il devra être écrit ailleurs (à l'endroit où il y a la boucle pour du multi-traitement typiquement). Défaut = True.
             ouvrirDossier (bool, optional): Ouvre le répertoire de l'EvalStat généré. Defaut = False.
         """
         print("\n")
@@ -462,9 +486,12 @@ class EvalStat_session(EvalStat):
 
 
         # Étape 3 — On met à jour le DataFrame de formation partagé
-        print(f"\n\n{Style.BRIGHT}{Fore.RED}Écriture du fichier global des évaluations de la formation {self.trigramme_formation}")
-        self._mettre_a_jour_eval_formation()
-        self.eval_formation._ecritdf_et_sauve_siModif()
+        # 3.1 : On met à jour les DataFrame d'evalFormation
+        self._maj_dataframes_eval_formation()
+
+        # 3.2 : On sauvegade selon argument utilisateur ; normalement si et seulement si nous ne faisons pas un traitement en boucle (sinon on le fait en fin de traitement de boucle)
+        if ecrire_eval_formation:
+            self.eval_formation.ecritdf_et_sauve_siModif()
     
     
     
@@ -540,7 +567,7 @@ class EvalStat_session(EvalStat):
 # ======================================================================================
 # CLASSE EVALSTAT_FORMATION
 # ======================================================================================
-class EvalStat_formation(EvalStat):
+class EvalStat_formation(EvalStat): 
 
 
     # ==================================================================================
@@ -643,7 +670,11 @@ class EvalStat_formation(EvalStat):
 
         #return self._fe_evaluations_formation, self._df_evaluations_formation, supprimeDonneesEtRemplace
 
-    def _ecritdf_et_sauve_siModif(self):
+
+    # ==================================================================================
+    # METHODES EXTERNES
+    # ==================================================================================
+    def ecritdf_et_sauve_siModif(self):
         """
         Sauvegarde et fermeture du fichier Excel de la formation.
 
@@ -653,6 +684,8 @@ class EvalStat_formation(EvalStat):
         # TODO : df nouveau df comprend l'ancien (i.e. évaluation formation existant) + le nouveau que l'on traite.
         # TODO : pour l'instant je réécris tout ce df mais pour être optimal on ne pourrait écrire que le nouveau
 
+
+        print(f"\n\n{Style.BRIGHT}{Fore.RED}Écriture du fichier global des évaluations de la formation {self.trigramme_formation}")
 
         if self._fe is not None:
             df_final_hash = hash_df(self.df_stagiaires)
@@ -667,7 +700,6 @@ class EvalStat_formation(EvalStat):
                     self.chemin_fe,
                     style=["jaune"]
                 )
-
 
     # ==================================================================================
     # GETTERS / SETTERS
