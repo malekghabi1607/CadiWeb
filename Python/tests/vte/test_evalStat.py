@@ -2,6 +2,7 @@ import pytest
 
 from vte.domain.formation import Formation
 from vte.domain.evalStat import *
+from vte.domain.session import Session
 
 
 #DATA_DIR = Path(__file__).parent / "data"
@@ -11,7 +12,7 @@ from vte.domain.evalStat import *
 # FIXTURES
 # ======================================================================================
 @pytest.fixture
-def tel_csv_existant():
+def tel():
     return {
         "trigramme_formation": "TEL",
         "code_IRIS": 16411,
@@ -25,9 +26,43 @@ def tel_csv_existant():
         "resultat_1er_elem_eval_formation": "S-12766-FC22-TEL-JVI-LRA",
     }
 
+
+@pytest.fixture
+def formation(tel):
+    """Formation réelle avec son EvalStat ouvert"""
+    return Formation.avec_ouverture_evalStat(tel["trigramme_formation"])
+
+
+@pytest.fixture
+def session(formation, tel):
+    """Session réelle attachée à la formation"""
+    formation.ajout_sessions(codes_IRIS=tel["code_IRIS"])
+    session = formation.sessions[tel["code_IRIS"]]
+    return session
+
+
+
+
 # ======================================================================================
 # TESTS CLASSE EVALSTAT FORMATION
 # ======================================================================================
+# ----------------------------------------------------------------------
+# Test de __init__
+# ----------------------------------------------------------------------
+# python -m pytest -s -v tests/vte/test_evalStat.py::test_init
+def test_init(tel):
+    evalStat = EvalStat()
+    assert isinstance(evalStat, EvalStat)
+    assert evalStat.fe is None
+
+
+
+# ======================================================================================
+# TESTS CLASSE EVALSTAT FORMATION
+# ======================================================================================
+
+
+
 # python -m pytest -s -v tests/vte/test_evalStat.py::test_creation_nouvel_eval_formation
 def test_creation_nouvel_eval_formation(tel_csv_existant):
     """
@@ -97,6 +132,9 @@ def test_eval_session_refCSV_inexistant_dans_eval_formation(tel_csv_existant):
         
     finally:
         rollback_nom_fichier_test(tel_csv_existant["chemin_eval_formation"])
+
+
+
 
 # Création avec eval formation existant mais contenant la ref du CSV (on saute le traitement) instance._statut_csv = "Exclu - CSV déjà dans fichier global" ; instance._fe = None
 # Création avec eval formation existant ne contenant pas la ref du CSV mais IRIS sessions ne contient pas le code IRIS instance._statut_csv = "Exclu - Code IRIS pas dans Extract IRIS sessions" ; instance._fe = None
