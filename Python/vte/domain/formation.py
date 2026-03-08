@@ -13,6 +13,12 @@ from vte.utils.utils import convertir_collection
 # ======================================================================================
 class Formation:
     def __init__(self, trigramme_formation: str):
+        """
+        Initialise une instance de Formation a minima.
+
+        :param trigramme_formation: Le trigramme de la formation.
+        :type trigramme_formation: str
+        """
         self._trigramme_formation:str = trigramme_formation
 
         # Une formation a une fiche de coûts
@@ -33,10 +39,12 @@ class Formation:
     @classmethod
     def avec_ouverture_evalStat(cls, trigramme_formation: str) -> Formation:
         """
-        Crée une Formation en créant un evalStat formation (ou en l'ouvrant s'il existe déjà)
-        
-        Args:
-            trigramme_formation (str): trigramme de la formation
+        Crée une instance de Formation en créant un evalStat formation (ou en l'ouvrant s'il existe déjà)
+
+        :param trigramme_formation: Le trigramme de la formation
+        :type trigramme_formation: str
+        :return: Une instance de formation
+        :rtype: Formation
         """
         instance = cls(trigramme_formation=trigramme_formation)
         instance._ajout_evalStat_avec_ouverture()
@@ -45,45 +53,61 @@ class Formation:
     @classmethod
     def avec_creation_sessions(cls, trigramme_formation: str, codes_IRIS:int|Iterable[int]) -> Formation:
         """
-        Initialise une formation en créant une ou plusieurs sessions
+        Initialise une instance de Formation contenant une ou plusieurs instances de Session.
 
-        Args:
-            trigramme_formation (str): trigramme de la formation
-            codes_IRIS (int): codes IRIS des sessions à créer
-
-        Returns:
-            Formation: Instance de Formation
+        :param trigramme_formation: Le trigramme de la formation
+        :type trigramme_formation: str
+        :param codes_IRIS: Un itérable de codes IRIS
+        :type codes_IRIS: int | Iterable[int]
+        :return: Une instance de formation
+        :rtype: Formation
         """
         instance = cls(trigramme_formation=trigramme_formation)
         instance.ajout_sessions(codes_IRIS=codes_IRIS)
         return instance
     
     @classmethod
-    def avec_creation_sessions_et_traitement_EvalStat(cls, trigramme_formation: str, codes_IRIS:int|Iterable[int], chemin_csv:Optional[Path|str]=None, chemin_IRIS_sessions:Optional[Path]=None, ouvrirDossier:bool=False) -> Formation:
+    def avec_creation_session_et_traitement_EvalStat(
+        cls, 
+        trigramme_formation: str, 
+        code_IRIS:int, 
+        chemin_csv:Optional[Path|str]=None, 
+        chemin_IRIS_sessions:Optional[Path]=None, 
+        ecrire_eval_formation:bool=True, 
+        ouvrirDossier:bool=False
+        ) -> Formation:
         """
-        Initialise une formation en créant une ou plusieurs sessions
+        Initialise une instance de Formation contenant une instance de Session.
         
         Crée l'Excel EvalStat d'une session à partir d'un CSV (s'il n'est pas donné, on ouvre un filedialog)
         L'évaluation de la formation est mise à jour avec ces nouvelles données.
 
-        L'évaluation de la formation est sauvée en fin de traitement. Ca pourrait être fait ailleurs si boucle de traitement de plusieurs EvalStat de sessions d'une même formation.
+        L'évaluation de la formation est sauvée en fin de traitement.
 
-        Args:
-            trigramme_formation (str): trigramme de la formation
-            codes_IRIS (int): codes IRIS des sessions à créer
-            chemin_csv (Optional[Path|str], optional): chemin du CSV à traiter. S'il est None, on ouvre un filedialog
-            chemin_IRIS_sessions (Optional[Path], optional): Chemin du fichier IRIS sessions à employer si l'utilisateur ne veut pas celui par défaut. Defaults = None = Fichier généré le plus récent dans le répertoire donné en config.
-            ouvrirDossier (bool, optional): Ouvre le répertoire de l'EvalStat généré. Defaut = False.
-
-        Returns:
-            Formation: Instance de Formation
+        :param trigramme_formation: Le trigramme de la formation
+        :type trigramme_formation: str
+        :param code_IRIS: Le code IRIS de la session
+        :type code_IRIS: int
+        :param chemin_csv: _description_, defaults to None
+        :type chemin_csv: Optional[Path | str], optional
+        :param chemin_IRIS_sessions: _description_, defaults to None
+        :type chemin_IRIS_sessions: Optional[Path], optional
+        :param ecrire_eval_formation: Pour écrire physiquement l'Excel eval formation en fin de traitement. Si False, il devra être écrit ailleurs (à l'endroit où il y a la boucle pour du multi-traitement typiquement). Défaut = True.
+        :type ecrire_eval_formation: bool, optional
+        :param ouvrirDossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
+        :type ouvrirDossier: bool, optional
+        :return: Une instance de formation
+        :rtype: Formation
         """
+
+
         instance = cls.avec_ouverture_evalStat(trigramme_formation=trigramme_formation)
-        instance.ajout_sessions(codes_IRIS=codes_IRIS)
+        instance.ajout_sessions(codes_IRIS=code_IRIS)
 
         instance.traiter_eval_sessions(
             chemin_csv=chemin_csv,
             chemin_IRIS_sessions=chemin_IRIS_sessions,
+            ecrire_eval_formation=ecrire_eval_formation,
             ouvrirDossier=ouvrirDossier
         )
         
@@ -93,12 +117,13 @@ class Formation:
 
     # =========================
     # === METHODES INTERNES ===
-    # =========================  
-    def ajout_evalStat_objetVierge(self) -> None:
-        if self._eval is None:
-            self._eval = EvalStat_formation(formation=self)
-
+    # =========================
     def _ajout_evalStat_avec_ouverture(self) -> None:
+        """
+        Ajoute l'évaluation de la formation à l'instance de Formation (i.e. renseigne self._eval)
+
+        L'évaluation est créée si elle n'existe pas ou est ouverte si elle existe.
+        """
         if self._eval is None:
             self._eval = EvalStat_formation.avec_ouverture(formation=self)
 
@@ -111,8 +136,8 @@ class Formation:
         """
         Ajouter une ou plusieurs sessions au dictionnaire de la formation
 
-        Args:
-            codes_IRIS (int | Iterable[int]): code IRIS (int) ou codes IRIS (Iterable : peut être une liste ou un tuple)
+        :param codes_IRIS: Codes IRIS à ajouter
+        :type codes_IRIS: int | Iterable[int]
         """
         codes = convertir_collection(codes_IRIS)
 
@@ -123,20 +148,27 @@ class Formation:
         self,
         chemin_csv: Optional[Path|str],
         chemin_IRIS_sessions: Optional[Path],
+        ecrire_eval_formation:bool, 
         ouvrirDossier: bool
-    ):
+        ) -> None:
         """
         Traite les EvalStat de plusieurs sessions. Pour chacune d'elle :
 
         Crée l'Excel EvalStat d'une session à partir d'un CSV (s'il n'est pas donné, on ouvre un filedialog)
 
-        L'évaluation de la formation est mise à jour avec ces nouvelles données et est sauvée en fin de traitement de la boucle.
+        L'évaluation de la formation est mise à jour avec ces nouvelles données et est sauvée en fin de traitement.
 
-        Args:
-            chemin_csv (Optional[Path|str], optional): chemin du CSV à traiter. S'il est None, on ouvre un filedialog
-            chemin_IRIS_sessions (Optional[Path], optional): Chemin du fichier IRIS sessions à employer si l'utilisateur ne veut pas celui par défaut. Defaults = None = Fichier généré le plus récent dans le répertoire donné en config.
-            ouvrirDossier (bool, optional): Ouvre le répertoire de l'EvalStat généré. Defaut = False.
+        :param chemin_csv: _description_, defaults to None
+        :type chemin_csv: Optional[Path | str], optional
+        :param chemin_IRIS_sessions: _description_, defaults to None
+        :type chemin_IRIS_sessions: Optional[Path], optional
+        :param ecrire_eval_formation: Pour écrire physiquement l'Excel eval formation en fin de traitement. Si False, il devra être écrit ailleurs (à l'endroit où il y a la boucle pour du multi-traitement typiquement). Défaut = True.
+        :type ecrire_eval_formation: bool, optional
+        :param ouvrirDossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
+        :type ouvrirDossier: bool, optional
         """
+
+
         # On boucle sur Session pour traiter_eval en spécifiant ecrire_eval_formation=False
         for session in self.sessions.values():
             session.eval.traiter_eval(
