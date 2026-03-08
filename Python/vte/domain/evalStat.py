@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections import defaultdict
 from pathlib import Path
 from typing import Optional, Protocol
 
@@ -19,16 +20,19 @@ from vte.utils.utils_instn import recupere_trig_formation_depuis_chemin
 # (pour faire passer les informations des objets parents sans ref circulaires)
 # ======================================================================================
 class Formation_protocol(Protocol):
+    """
+    Protocol de Formation : permet de simuler une formation en évitant les références circulaires
+    """
     @property
     def trigramme_formation(self) -> str: ...
 
     @property
     def eval(self) -> EvalStat_formation|None: ...
-    
-    #@property
-    #def chemin_dossier_eval(self) -> Path: ...
 
 class Session_protocol(Protocol):
+    """
+    Protocol de Session : permet de simuler une session en évitant les références circulaires
+    """
     @property
     def code_IRIS(self) -> int|None: ...
         
@@ -45,9 +49,12 @@ class Session_protocol(Protocol):
 # ======================================================================================
 class EvalStat:
     """
-    Classe principale pour le traitement des évaluations stagiaires individuelles.
-    Gère la lecture des fichiers CSV stagiaires, la mise à jour du fichier Excel
-    de la formation, et les interactions éventuelles avec l'extract IRIS.
+    Classe mère pour le traitement des évaluations stagiaires individuelles.
+
+    Gère :
+       - la lecture des fichiers CSV stagiaires, 
+       - la création des fichiers d'évaluation au format xlsx,
+       - la création/mise à jour du fichier d'évaluation de la formation au format xlsx.
     """
     # === Colonnes du CSV selon traitement à avoir ===
     # Colonnes descriptives à recopier
@@ -96,7 +103,7 @@ class EvalStat:
     # ==================================================================================
     def __init__(self) -> None:
         """
-        Crée ine stance d'EvalStat à minima (self_fe = None)
+        Crée une instance d'EvalStat à minima (self_fe = None)
         """
         self._fe:Optional[FichierExcel] = None  # Objet Excel contenant les données EvalStat stagiaire individuel
 
@@ -114,8 +121,8 @@ class EvalStat:
 
         Si nouveau_chemin est None, alors on écrit au même endroit que l'ancien fichier (sauvegarde simple)
 
-        Args:
-            nouveau_chemin_fichier (Optional[Path], optional): Chemin du fichier de sortie. Défaut = None.
+        :param nouveau_chemin_fichier: Chemin du fichier de sortie. Défaut = None.
+        :type nouveau_chemin_fichier: Optional[Path]
         """
 
         # On écrit et on sauve (pour l'instant on remplace tout le dataframe sans optimiser)
@@ -161,9 +168,14 @@ class EvalStat:
 # CLASSE EVALSTAT_SESSION
 # ======================================================================================
 class EvalStat_session(EvalStat):
-    # Variable globale si traitement en boucle pour ne sauvegarder qu'une fois EvalStat formation en fin de boucle
-    #_TRAITEMENT_EN_BOUCLE:bool = False
+    """
+    Classe evalStat Session pour le traitement des évaluations stagiaires individuelles.
 
+    Gère :
+       - la lecture des fichiers CSV stagiaires, 
+       - la création des fichiers d'évaluation au format xlsx,
+       - l'appel à EvalStat_formation pour la création/mise à jour du fichier d'évaluation de la formation au format xlsx.
+    """
     # =====================
     # === CONSTRUCTEURS ===
     # =====================
@@ -171,8 +183,8 @@ class EvalStat_session(EvalStat):
         """
         Crée l'instance EvalStat d'un session a minima.
 
-        Args:
-            session (Session_protocol): La session à laquelle est affectée l'EvalStat
+        :param session: La session à laquelle est affectée l'EvalStat
+        :type session: Session_protocol
         """
         # On initialise la classe mère
         super().__init__()
@@ -187,17 +199,21 @@ class EvalStat_session(EvalStat):
     def avec_traitement(cls, session:Session_protocol, chemin_csv:Optional[Path|str]=None, chemin_IRIS_sessions:Optional[Path]=None, ecrire_eval_formation:bool=True, ouvrirDossier:bool=False) -> EvalStat_session:
         """
         Crée l'instance EvalStat d'une session et traite cet EvalStat.
-        
-        Crée l'Excel EvalStat d'une session à partir d'un CSV (s'il n'est pas donné, on ouvre un filedialog)
+
+        Crée l'Excel EvalStat d'une session à partir d'un CSV (s'il n'est pas donné, on ouvre un filedialog).
 
         L'évaluation de la formation est mise à jour avec ces nouvelles données et est sauvée en fin de traitement selon le critère ecrire_eval_formation.
 
-        Args:
-            session (Session_protocol): La session à laquelle est affectée l'EvalStat
-            chemin_csv (Optional[Path|str], optional): chemin du CSV à traiter. S'il est None, on ouvre un filedialog
-            chemin_IRIS_sessions (Optional[Path], optional): Chemin du fichier IRIS sessions à employer si l'utilisateur ne veut pas celui par défaut. Defaults = None = Fichier généré le plus récent dans le répertoire donné en config.
-            ecrire_eval_formation (bool, optional): Pour écrire physiquement l'Excel eval formation en fin de traitement. Si False, il devra être écrit ailleurs (à l'endroit où il y a la boucle pour du multi-traitement typiquement). Défaut = True.
-            ouvrirDossier (bool, optional): Ouvre le répertoire de l'EvalStat généré. Defaut = False.
+        :param session: La session à laquelle est affectée l'EvalStat
+        :type session: Session_protocol
+        :param chemin_csv: chemin du CSV à traiter. S'il est None, on ouvre un filedialog
+        :type chemin_csv: Optional[Path|str]
+        :param chemin_IRIS_sessions: Chemin du fichier IRIS sessions à employer si l'utilisateur ne veut pas celui par défaut. Defaults = None = Fichier généré le plus récent dans le répertoire donné en config.
+        :type chemin_IRIS_sessions: Optional[Path]
+        :param ecrire_eval_formation: Pour écrire physiquement l'Excel eval formation en fin de traitement. Si False, il devra être écrit ailleurs (à l'endroit où il y a la boucle pour du multi-traitement typiquement). Défaut = True.
+        :type ecrire_eval_formation: bool
+        :param ouvrirDossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
+        :type ouvrirDossier: bool
         """
         instance = cls(session)
         instance.traiter_eval(
@@ -219,17 +235,14 @@ class EvalStat_session(EvalStat):
     def _charger_csv_stagiaire(self, chemin_csv:Path) -> Optional[pd.DataFrame] :
         """
         Permet de stocker un CSV dans un dataframe en employant le bon encodage
-
         Si le return est None c'est qu'il y a eu un problème ou que le dataframe est vide (csv présent avec en-têtes mais sans ligne).
         Dans ce cas on écrit le self._statut_csv pour tracer la raison exclusion.
-
         chemin_csv est le chemin du CSV à aller récupérer (à ce stade il est connu)
 
-        Args:
-            chemin_csv (Path): chemin du csv à charger
-
-        Returns:
-            Optional[pd.DataFrame]: le dataframe du csv. Si None, c'est qu'il y a eu un problème ou que le dataframe est vide (csv présent avec en-têtes mais sans ligne).
+        :param chemin_csv: chemin du csv à charger
+        :type chemin_csv: Path
+        :return: le dataframe du csv. Si None, c'est qu'il y a eu un problème ou que le dataframe est vide (csv présent avec en-têtes mais sans ligne).
+        :rtype: Optional[pd.DataFrame]
         """
         codage_csv = trouve_encodage_csv(chemin_csv)  # On récupère l'encodage et on importe le CSV dans un DataFrame
         try:
@@ -382,8 +395,9 @@ class EvalStat_session(EvalStat):
         
     def _maj_dataframes_eval_formation(self) -> None:
         """
-        Met à jour le DataFrame partagé des évaluations de la formation courante
-        avec les données du CSV actuel.
+        Met à jour le DataFrame partagé des évaluations de la formation courante 
+        (self.eval_formation.df_csv et self.eval_formation.df_stagiaires) avec les données du CSV actuel.
+
         On écrira le fichier Excel ailleurs (fin du traitement de l'EvalStat ou d'une boucle si plusieurs)
         """
 
@@ -409,15 +423,18 @@ class EvalStat_session(EvalStat):
     # ==================================================================================
     def traiter_eval(self, chemin_csv:Optional[Path|str]=None, chemin_IRIS_sessions:Optional[Path]=None, ecrire_eval_formation:bool=True, ouvrirDossier:bool=False) -> None:
         """
-        Crée l'Excel EvalStat d'une session à partir d'un CSV (s'il n'est pas donné, on ouvre un filedialog)
+        Crée l'Excel EvalStat d'une session à partir d'un CSV (s'il n'est pas donné, on ouvre un filedialog).
 
         L'évaluation de la formation est mise à jour avec ces nouvelles données et est sauvée en fin de traitement selon le critère ecrire_eval_formation.
 
-        Args:
-            chemin_csv (Optional[Path|str], optional): chemin du CSV à traiter. S'il est None, on ouvre un filedialog
-            chemin_IRIS_sessions (Optional[Path], optional): Chemin du fichier IRIS sessions à employer si l'utilisateur ne veut pas celui par défaut. Defaults = None = Fichier généré le plus récent dans le répertoire donné en config.
-            ecrire_eval_formation (bool, optional): Pour écrire physiquement l'Excel eval formation en fin de traitement. Si False, il devra être écrit ailleurs (à l'endroit où il y a la boucle pour du multi-traitement typiquement). Défaut = True.
-            ouvrirDossier (bool, optional): Ouvre le répertoire de l'EvalStat généré. Defaut = False.
+        :param chemin_csv: chemin du CSV à traiter. S'il est None, on ouvre un filedialog
+        :type chemin_csv: Optional[Path|str]
+        :param chemin_IRIS_sessions: Chemin du fichier IRIS sessions à employer si l'utilisateur ne veut pas celui par défaut. Defaults = None = Fichier généré le plus récent dans le répertoire donné en config.
+        :type chemin_IRIS_sessions: Optional[Path]
+        :param ecrire_eval_formation: Pour écrire physiquement l'Excel eval formation en fin de traitement. Si False, il devra être écrit ailleurs (à l'endroit où il y a la boucle pour du multi-traitement typiquement). Défaut = True.
+        :type ecrire_eval_formation: bool
+        :param ouvrirDossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
+        :type ouvrirDossier: bool
         """
         print("\n")
         timer.debut(f"{Style.BRIGHT}{Fore.YELLOW}Gestion du CSV {chemin_csv.name}") 
@@ -501,7 +518,74 @@ class EvalStat_session(EvalStat):
 
         timer.fin()       
 
+    # ==================================================================================
+    # MÉTHODES EXTERNES
+    # ==================================================================================
+    @staticmethod
+    def construire_dictionnaire_trigrammeFormation_codeIRIS_cheminsCSV_depuis_iterableCSV(chemins_csv: Iterable[Union[str, Path]]) -> Dict[str, Dict[int, Path]]:
+        """
+        Construit un dictionnaire imbriqué de la forme {trigramme_formation: {code_IRIS: chemin_csv}} à partir de chemins CSV.
 
+        Ce dictionnaire s'emploie pour faciliter l'appel d'une boucle de traitement d'EvalStat
+
+        :param chemins_csv: Un itérable de chemins CSV qui sont de type str ou Path.
+        :type chemins_csv: Iterable[Union[str, Path]]
+        :return: Un dictionnaire imbriqué où les clés de premier niveau sont les trigrammes de formation,
+            et les clés de second niveau sont les codes IRIS.
+        :rtype: Dict[str, Dict[int, Path]]
+        """
+        dictionnaire = {}
+
+        for chemin in chemins_csv:
+            # Convertir le chemin en objet Path si ce n'est pas déjà fait
+            chemin_path = Path(chemin) if isinstance(chemin, str) else chemin
+
+            # Récupérer le trigramme de la formation
+            trigramme_formation = recupere_trig_formation_depuis_chemin(chemin_path)
+
+            # Récupérer le code IRIS
+            code_IRIS = IRIS.extraire_code_IRIS_depuis_chemin(chemin_path)
+
+            # Initialiser le sous-dictionnaire pour le trigramme si nécessaire
+            if trigramme_formation not in dictionnaire:
+                dictionnaire[trigramme_formation] = {}
+
+            # Ajouter l'entrée au sous-dictionnaire
+            dictionnaire[trigramme_formation][code_IRIS] = chemin_path
+
+        return dictionnaire
+
+
+    @staticmethod
+    def construire_dictionnaire_trigrammeFormation_codeIRIS_cheminsCSV_depuis_iterableCodesIRIS(codes_IRIS: Iterable[int]) -> Dict[str, Dict[int, Path]]:
+        """
+        Construit un dictionnaire imbriqué de la forme {trigramme_formation: {code_IRIS: chemin_csv}} à partir de codes IRIS.
+
+        Ce dictionnaire s'emploie pour faciliter l'appel d'une boucle de traitement d'EvalStat.
+
+        :param codes_IRIS: Un itérable de codes IRIS de type int
+        :type codes_IRIS: Iterable[int]
+        :return: Un dictionnaire imbriqué où les clés de premier niveau sont les trigrammes de formation,
+            et les clés de second niveau sont les codes IRIS.
+        :rtype: Dict[str, Dict[int, Path]]
+        """
+        dictionnaire = {}
+
+        for code_IRIS in codes_IRIS:
+            # Convertir le chemin en objet Path si ce n'est pas déjà fait
+            chemin_path = EvalStat_session.filedialog_csv(code_IRIS=code_IRIS)
+
+            # Récupérer le trigramme de la formation
+            trigramme_formation = recupere_trig_formation_depuis_chemin(chemin_path)
+
+            # Initialiser le sous-dictionnaire pour le trigramme si nécessaire
+            if trigramme_formation not in dictionnaire:
+                dictionnaire[trigramme_formation] = {}
+
+            # Ajouter l'entrée au sous-dictionnaire
+            dictionnaire[trigramme_formation][code_IRIS] = chemin_path
+
+        return dictionnaire
 
     # ==================================================================================
     # POPUP
@@ -511,17 +595,38 @@ class EvalStat_session(EvalStat):
         Ouvre un filedialog pour demander à l'utilisateur de sélectionner un CSV.
         On pointe au mieux sur le répertoire des CSV de cette formation pour la boîte de dialogue.
         """
+        return self.filedialog_csv(self.trigramme_formation, self.code_IRIS)
+
+
+    @staticmethod
+    def filedialog_csv(trigramme_formation:Optional[str]=None, code_IRIS:Optional[int]=None) -> Path | None:
+        """
+        Ouvre un filedialog pour demander à l'utilisateur de sélectionner un CSV.
+
+        On pointe au mieux sur le répertoire des CSV de cette formation pour la boîte de dialogue.
+
+        Le trigramme permet d'optimiser le répertoire de recherche (non obligatoire).
+
+        Le code IRIS permet d'être spécifié dans l'en-tête du filedialog (non obligatoire).
+
+        :param trigramme_formation: Trigramme de la formation. Permet d'optimiser le répertoire de recherche (non obligatoire).
+        :type trigramme_formation: Optional[str]
+        :param code_IRIS: Code IRIS de la session. Permet d'être spécifié dans l'en-tête du filedialog (non obligatoire).
+        :type code_IRIS: Optional[int]
+        :return: Description
+        :rtype: Path | None
+        """
 
         # Si on a un trigramme de formation, alors on est en mesure de trouver un chemin optimisé
-        if self.trigramme_formation:
+        if trigramme_formation:
             chemin_repertoire_csv = optimiseCheminRepertoire(
-                config.format_path(config.REPERTOIRE_CSV_EVALUATIONS, trigramme_formation=self.trigramme_formation)
+                config.format_path(config.REPERTOIRE_CSV_EVALUATIONS, trigramme_formation=trigramme_formation)
                 )
         else:
             chemin_repertoire_csv = optimiseCheminRepertoire(config.REPERTOIRE_FORMATION.parent)  #Path.cwd()  
             
         # Adaptation de l'intitulé de l'en-tête de la popup
-        fin_titre = f"de la session {self.code_IRIS}" if self.code_IRIS is not None else "désiré"
+        fin_titre = f"de la session {code_IRIS}" if code_IRIS is not None else "désiré"
 
         # Ouverture popup
         return choisir_fichier(titre=f"Sélectionner le fichier EvalStat stagiaire {fin_titre}",
@@ -559,7 +664,9 @@ class EvalStat_session(EvalStat):
     def eval_formation(self) -> EvalStat_formation:
         return self._session.eval_formation
 
-
+    @property
+    def statut_csv(self) -> str:
+        return self._statut_csv
 
 
 
@@ -568,7 +675,11 @@ class EvalStat_session(EvalStat):
 # CLASSE EVALSTAT_FORMATION
 # ======================================================================================
 class EvalStat_formation(EvalStat): 
+    """
+    Classe evalStat Formation employée en parllèle du traitement des évaluations stagiaires individuelles.
 
+    Gère la création ou la mise à jour du fichier d'évaluation de la formation au format xlsx.
+    """
 
     # ==================================================================================
     # CONSTRUCTEURS
@@ -590,7 +701,7 @@ class EvalStat_formation(EvalStat):
     @classmethod
     def avec_ouverture(cls, formation:Formation_protocol) -> EvalStat_formation:
         """
-        Initialisation d'un EvalStat formation avec ouverture ou création du fichier Excel
+        Initialisation d'un EvalStat formation avec (ouverture ou création) du fichier d'évaluation de la formation
         """
         instance = cls(formation)
 
@@ -607,16 +718,13 @@ class EvalStat_formation(EvalStat):
         Ouvre ou crée le fichier Excel d'évaluations d'une formation.
 
         Construit le chemin vers le fichier d'évaluations correspondant au trigramme de la formation.
+
         Si ce fichier existe, il est ouvert et les données des stagiaires sont chargées dans un DataFrame.
+
         Sinon, un nouveau fichier est créé à partir d'un modèle, et les données seront à initialiser.
-        """
-        """
-        Args:
-            trigramme_formation (str): Trigramme de la formation.
-        Returns:
-            - FichierExcel: Objet FichierExcel ouvert.
-            - Un booléen indiquant si les anciennes données doivent être supprimées et remplacées 
-                (`True` si nouveau fichier créé, `False` sinon).
+
+        :param trigramme_formation: Trigramme de la formation.
+        :type trigramme_formation: str
         """
         timer.debut(f"Ouverture ou création du fichier Excel de la formation {self.trigramme_formation}")
 
@@ -676,9 +784,9 @@ class EvalStat_formation(EvalStat):
     # ==================================================================================
     def ecritdf_et_sauve_siModif(self):
         """
-        Sauvegarde et fermeture du fichier Excel de la formation.
+        Sauvegarde et fermeture du fichier d'évaluation de la formation.
 
-        On ne l'exécute que si le fichier Excel a été modifié.
+        On ne l'exécute que si le DataFrame fichier d'évaluation a été modifié.
         """
         # TODO : dans _mettre_a_jour_evaluations_formation() je mets à jour le df de l'excel évaluation formation. Il sera écrit physiquement à la sortie du contexte formation.
         # TODO : df nouveau df comprend l'ancien (i.e. évaluation formation existant) + le nouveau que l'on traite.
