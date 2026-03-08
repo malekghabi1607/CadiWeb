@@ -1,5 +1,8 @@
 from vte.domain.formation import Formation
+from vte.services.evalStat_services import EvalStat_services
 from vte.utils.utils import *
+
+from vte.core.user_config_evalStat import *
 
 # ==========================================================================================
 # CLASSE EVALSTAT_CLI
@@ -10,10 +13,10 @@ from vte.utils.utils import *
 
 
 
-class evalStat_cli:
-    """
-    Services Command Line Interface d'EvalStat.
-    """
+# ======================================================================================
+# === TESTS
+# ======================================================================================
+def verifications():
     tel_csv_existant = {
         "trigramme_formation": "TEL",
         "codes_IRIS": 16411,
@@ -42,4 +45,29 @@ class evalStat_cli:
         chemin_IRIS_sessions=tel_csv_existant["chemin_IRIS_sessions"],
         ouvrirDossier=True)
 
-    
+
+# ======================================================================================
+# === TRAITEMENT tous les IRIS
+# ======================================================================================
+def traite_tous_evalStats_depuis_tuple_csv():
+
+    statuts_csv = EvalStat_services.traiter_evalStat_depuis_iterable_de_csv(
+        tuple_csv_stagiaires= tuple_csv_stagiaires_TEL,
+        chemin_IRIS_sessions=chemin_vers_unc(Path(r"R:\_Echanges\VTE\Prog\IRIS\Extracts complets\TESTS - TEL - R04110_Sessions-COMPLET.xlsx")),
+        ouvrirDossier=True
+    )
+
+    print(statuts_csv)
+
+
+# ======================================================================================
+# === TESTS
+# ======================================================================================
+
+def main():
+    traite_tous_evalStats_depuis_tuple_csv()
+
+if __name__ == "__main__":
+    #test07()
+    main()
+

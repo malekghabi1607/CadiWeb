@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from vte.domain.formation import Formation
-from vte.utils.utils import backup_fichier_test, rollback_nom_fichier_test, log_erreur
+from vte.utils.utils import backup_fichier_test, restore_nom_fichier_test, log_erreur
 # ==========================================================================================
 # CLASSE EVALSTAT_CLI
 #
@@ -34,7 +34,7 @@ class formation_cli:
         log_erreur(f"Erreur lors du test du fichier : {e}")
     
     finally:
-        rollback_nom_fichier_test(chemin)
+        restore_nom_fichier_test(chemin)
     
 
 

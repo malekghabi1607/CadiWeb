@@ -70,7 +70,7 @@ def test_ajout_evalStat_avec_traitement(mock, formation, tel):
 
     session = Session(formation=formation, code_IRIS=tel["code_IRIS"])
 
-    session._ajout_evalStat_avec_traitement(
+    session.ajout_evalStat_avec_traitement(
         chemin_csv=None,
         chemin_IRIS_sessions=None,
         ecrire_eval_formation=False,

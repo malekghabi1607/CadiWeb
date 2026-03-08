@@ -63,7 +63,7 @@ class Session:
         :type ouvrirDossier: bool
         """
         instance = cls(formation = formation, code_IRIS = code_IRIS)
-        instance._ajout_evalStat_avec_traitement(
+        instance.ajout_evalStat_avec_traitement(
             session=instance,
             chemin_csv=chemin_csv,
             chemin_IRIS_sessions=chemin_IRIS_sessions,
@@ -81,12 +81,15 @@ class Session:
         """
         self._eval = EvalStat_session(session=self)
 
-    def _ajout_evalStat_avec_traitement(self, chemin_csv:Optional[Path|str]=None, chemin_IRIS_sessions:Optional[Path]=None, ecrire_eval_formation:bool=False, ouvrirDossier:bool=False) -> None:
+    # =========================
+    # === METHODES EXTERNES ===
+    # =========================
+    def ajout_evalStat_avec_traitement(self, chemin_csv:Optional[Path|str]=None, chemin_IRIS_sessions:Optional[Path]=None, ecrire_eval_formation:bool=False, ouvrirDossier:bool=False) -> None:
         """
         Crée l'Excel EvalStat d'une session.
 
         Si CSV non donné, alors on ouvre un filedialog.
-        
+
         L'évaluation de la formation est mise à jour avec ces nouvelles données.
         L'évaluation de la formation est sauvée en fin de traitement. Ca pourrait être fait ailleurs si boucle de traitement de plusieurs EvalStat de sessions d'une même formation.
 

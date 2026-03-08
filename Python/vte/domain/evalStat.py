@@ -257,9 +257,11 @@ class EvalStat_session(EvalStat):
             self._statut_csv = "Exclu - CSV vide / Aucun retour"
             return None
         
+        print(df_csv_stagiaires)
+
         # On nettoie les espaces en début et fin des noms d'en-tête
         df_csv_stagiaires.columns = [col.strip() for col in df_csv_stagiaires.columns]
-
+        print(df_csv_stagiaires)
         return df_csv_stagiaires
 
     def _traiter_df_csv(self) -> None:
@@ -272,11 +274,14 @@ class EvalStat_session(EvalStat):
         
         # Prise en compte qu'on a plusieurs formats de CSV : on doit traiter des colonnes en + ou - en conséquences
         if "Date de fin" in self.df_csv.columns:
-            # Cas 1 (nouveau format de csv) : supprimer "Date de fin" → Test : r"P:\FORMATIONS_C\54C\P07-bilan-sessions-et-bilan-formation\rapports-sessions-evaluations\2023-06-S14317 UEM\S-14317-FC23-54C-VTE-LRA-Stagiaires.csv"
+            # Cas 1 (nouveau format de csv) : supprimer "Date de fin" → Test : r"P:\FORMATIONS_C\22B\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-17606 - 22B - 06-2025\S-17606-FC25-22B-VTE-CAR-Stagiaires.csv"
             self.df_csv = self.df_csv.drop(columns=["Date de fin"])
         else:
-            # Cas 2 (ancien format de csv) : supprimer la 2e et 3e colonne (indices 1 et 2) → Test : r"P:\FORMATIONS_C\22B\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-17606 - 22B - 06-2025\S-17606-FC25-22B-VTE-CAR-Stagiaires.csv"
+            # Cas 2 (ancien format de csv) : supprimer la 2e et 3e colonne (indices 1 et 2) → Test : r"P:\FORMATIONS_C\54C\P07-bilan-sessions-et-bilan-formation\rapports-sessions-evaluations\2023-06-S14317 UEM\S-14317-FC23-54C-VTE-LRA-Stagiaires.csv"
             self.df_csv = self.df_csv.drop(self.df_csv.columns[[1, 2]], axis=1)
+            self.df_csv = self.df_csv.rename(columns={"Prénom.1": "Prénom"})
+        
+        print(self.df_csv)
         
         # On rajoute le chemin du CSV en première colonne
         self.df_csv.insert(0, "Chemin fichier CSV", str(chemin_csv))
@@ -290,6 +295,8 @@ class EvalStat_session(EvalStat):
                 self.df_csv["Date"] = pd.to_datetime(self.df_csv["Date"], dayfirst=True, errors="coerce").dt.strftime("%d/%m/%Y")  # dayfirst=True indique que le premier nombre correspond au jour (format jj/mm/aaaa)
             except Exception as e:
                 print(f"Erreur de conversion de la colonne Date : {e}")
+
+        print(self.df_csv)
 
         #return self.df_csv
 
@@ -306,8 +313,8 @@ class EvalStat_session(EvalStat):
         # Parcours des lignes de CSV_stagiaires
         #print(self._df_csv_stagiaires.columns.tolist())
         for _, row in self.df_csv.iterrows():
-            #print("Ligne en cours : ")
-            #print(row)
+            print("Ligne en cours : ")
+            print(row)
             base = {col: row[col] for col in self._colonnes_csv_fixes}  # Création des colonnes qui seront répétées à chaque fois
             base["NOM Prénom"] = f"{str(row['Nom']).upper()} {row['Prénom']}".strip()  # Création du champ "NOM Prénom"
 
