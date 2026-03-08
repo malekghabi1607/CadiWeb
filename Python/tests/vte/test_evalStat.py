@@ -1,10 +1,73 @@
 import pandas as pd
 from unittest.mock import patch
 
+import pytest
+
 from vte.domain.formation import Formation
 from vte.domain.evalStat import EvalStat, EvalStat_session, EvalStat_formation
 
 from vte.utils.utils import backup_fichier_test, rollback_nom_fichier_test
+
+@pytest.fixture
+def csv_datasets(tel):
+    """
+    Liste de datasets CSV à tester.
+    Chaque dataset représente un cas réel rencontré.
+    """
+
+    return [
+
+        {
+            "nom": "csv_valide_standard",
+            "csv": tel["chemin_csv_session"],
+            "iris": tel["chemin_IRIS_sessions"],
+            "statut": "Traité",
+        },
+
+        {
+            "nom": "csv_deja_dans_eval_formation",
+            "csv": tel["csv_deja_dans_eval_formation"],
+            "iris": tel["chemin_IRIS_sessions"],
+            "statut": "Exclu - CSV déjà dans fichier global",
+        },
+
+        {
+            "nom": "code_IRIS_absent_extract",
+            "csv": tel["chemin_csv_session_non_present_eval_formation"],
+            "iris": tel["iris_sessions_sans_code"],
+            "statut": "Exclu - Code IRIS pas dans Extract IRIS sessions",
+        },
+
+        {
+            "nom": "csv_vide",
+            "csv": tel["csv_vide"],
+            "iris": tel["chemin_IRIS_sessions"],
+            "statut": "Exclu - CSV vide / Aucun retour",
+        },
+
+        {
+            "nom": "csv_probleme_lecture",
+            "csv": tel["csv_probleme_lecture"],
+            "iris": tel["chemin_IRIS_sessions"],
+            "statut": "Exclu - Problème lecture CSV",
+        },
+
+        {
+            "nom": "csv_nouveau_format",
+            "csv": tel["csv_nouveau_format"],
+            "iris": tel["chemin_IRIS_sessions"],
+            "statut": "Traité",
+        },
+
+        {
+            "nom": "csv_ancien_format",
+            "csv": tel["csv_ancien_format"],
+            "iris": tel["chemin_IRIS_sessions"],
+            "statut": "Traité",
+        },
+
+    ]
+
 
 
 # ======================================================================================
@@ -224,7 +287,7 @@ def test_ecritdf_et_sauve_siModif(mock_hash, formation):
 # Création nouvel eval formation
 # ----------------------------------------------------------------------
 # python -m pytest -s -v tests/vte/test_evalStat.py::test_creation_nouvel_eval_formation
-def test_creation_nouvel_eval_formation(tel):
+def test_eval_formation_avec_ouverture_evalStat(tel):
 
     # from vte.utils.utils import backup_fichier_test, rollback_nom_fichier_test
     # from vte.domain.formation import Formation
@@ -289,7 +352,8 @@ def test_creation_ouvrir_eval_formation_existant(tel):
 
 
 # ----------------------------------------------------------------------
-# Création avec eval formation existant ne contenant pas la ref du CSV (on le remplit)
+# Création avec eval formation existant ne contenant pas le code IRIS de la session
+# (on peut traiter l'EvalStat session)
 # ----------------------------------------------------------------------
 # TODO : peut-être à finir
 def test_eval_session_refCSV_inexistant_dans_eval_formation(tel_csv_existant):
@@ -319,13 +383,169 @@ def test_eval_session_refCSV_inexistant_dans_eval_formation(tel_csv_existant):
 
 
 
+#ChatGPT - Probablement inclure tests traitement EvalStat session complet, et vérifier retours evalstat session + evalstat formation
+def test_maj_eval_formation_apres_traitement(
+    formation_tel_complete,
+    tel
+):
+
+    formation_tel_complete.ajout_session_avec_evalStat(
+        code_IRIS=tel["code_IRIS"],
+        chemin_csv=tel["chemin_csv_session"],
+        chemin_IRIS_sessions=tel["chemin_IRIS_sessions"]
+    )
+
+    eval_formation = formation_tel_complete.eval
+
+    assert len(eval_formation.df) == tel["nb_lignes_eval_formation_apres_maj"]
+
+    assert eval_formation.df.iloc[-1,0] == tel["dernier_code_session_eval_formation"]
+
+#ChatGPT
+def test_generation_excel_eval_session(
+    formation_tel_complete,
+    tel
+):
+
+    s = formation_tel_complete.ajout_session_avec_evalStat(
+        code_IRIS=tel["code_IRIS"],
+        chemin_csv=tel["chemin_csv_session"],
+        chemin_IRIS_sessions=tel["chemin_IRIS_sessions"]
+    )
+
+    evalstat = s.eval
+
+    assert evalstat.chemin_excel == tel["chemin_eval_session"]
 
 
+# À partir de là c'est ChatGPT
+# ======================================================================================
+# TESTS DES CAS CSV QUI EXCLUENT LE TRAITEMENT EVALSTAT SESSION
+# ======================================================================================
+@pytest.mark.parametrize("dataset_index", range(7))
+def test_pipeline_csv(
+    formation_tel_complete,
+    tel,
+    csv_datasets,
+    dataset_index
+):
+
+    dataset = csv_datasets[dataset_index]
+
+    s = formation_tel_complete.ajout_session_avec_evalStat(
+        code_IRIS=tel["code_IRIS"],
+        chemin_csv=dataset["csv"],
+        chemin_IRIS_sessions=dataset["iris"]
+    )
+
+    evalstat = s.eval
+
+    assert evalstat._statut_csv == dataset["statut"]
+
+    
 
 
+def test_csv_deja_present_dans_eval_formation(
+    formation_tel_complete,
+    tel
+):
+
+    s = formation_tel_complete.ajout_session_avec_evalStat(
+        code_IRIS=tel["code_IRIS"],
+        chemin_csv=tel["csv_deja_dans_eval_formation"],
+        chemin_IRIS_sessions=tel["chemin_IRIS_sessions"]
+    )
+
+    evalstat = s.eval
+
+    assert evalstat._statut_csv == "Exclu - CSV déjà dans fichier global"
+    assert evalstat._fe is None
+
+def test_code_IRIS_absent_extract_sessions(
+    formation_tel_complete,
+    tel
+):
+
+    s = formation_tel_complete.ajout_session_avec_evalStat(
+        code_IRIS=tel["code_IRIS"],
+        chemin_csv=tel["chemin_csv_session_non_present_eval_formation"],
+        chemin_IRIS_sessions=tel["iris_sessions_sans_code"]
+    )
+
+    evalstat = s.eval
+
+    assert evalstat._statut_csv == "Exclu - Code IRIS pas dans Extract IRIS sessions"
+    assert evalstat._fe is None
+
+def test_csv_probleme_lecture(
+    formation_tel_complete,
+    tel
+):
+
+    s = formation_tel_complete.ajout_session_avec_evalStat(
+        code_IRIS=tel["code_IRIS"],
+        chemin_csv=tel["csv_probleme_lecture"],
+        chemin_IRIS_sessions=tel["chemin_IRIS_sessions"]
+    )
+
+    evalstat = s.eval
+
+    assert evalstat._statut_csv == "Exclu - Problème lecture CSV"
+    assert evalstat._fe is None
+
+def test_csv_vide(
+    formation_tel_complete,
+    tel
+):
+
+    s = formation_tel_complete.ajout_session_avec_evalStat(
+        code_IRIS=tel["code_IRIS"],
+        chemin_csv=tel["csv_vide"],
+        chemin_IRIS_sessions=tel["chemin_IRIS_sessions"]
+    )
+
+    evalstat = s.eval
+
+    assert evalstat._statut_csv == "Exclu - CSV vide / Aucun retour"
+    assert evalstat._fe is None
 
 
+# ======================================================================================
+# TESTS DES VERSIONS DES CSV
+# ======================================================================================
+# Cas 1 déjà traité normalement
+def test_csv_nouveau_format(
+    formation_tel_complete,
+    tel
+):
 
+    s = formation_tel_complete.ajout_session_avec_evalStat(
+        code_IRIS=tel["code_IRIS"],
+        chemin_csv=tel["csv_nouveau_format"],
+        chemin_IRIS_sessions=tel["chemin_IRIS_sessions"]
+    )
+
+    evalstat = s.eval
+
+    assert evalstat._statut_csv == "Traité"
+    assert evalstat._fe is not None
+
+# Cas 2 – Ancien format
+def test_csv_ancien_format(
+    formation_tel_complete,
+    tel
+):
+
+    s = formation_tel_complete.ajout_session_avec_evalStat(
+        code_IRIS=tel["code_IRIS"],
+        chemin_csv=tel["csv_ancien_format"],
+        chemin_IRIS_sessions=tel["chemin_IRIS_sessions"]
+    )
+
+    evalstat = s.eval
+
+    assert evalstat._statut_csv == "Traité"
+    assert evalstat._fe is not None
 
 
 # Création avec eval formation existant mais contenant la ref du CSV (on saute le traitement) instance._statut_csv = "Exclu - CSV déjà dans fichier global" ; instance._fe = None
