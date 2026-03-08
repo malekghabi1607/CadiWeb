@@ -34,15 +34,4 @@ tuple_csv_stagiaires_22B = (
     r"P:\FORMATIONS_C\22B\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-17606 - 22B - 06-2025\S-17606-FC25-22B-VTE-CAR-Stagiaires.csv",
 )
 
-
-
-tuple_csv_stagiaires = (
-    r"P:\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\2024 csv\S-15942-FC24-TEL-JVI-ACD-Stagiaires.csv",
-    r"P:\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\2024 csv\S-16161-FC24-TEL-VTE-ACD-Stagiaires.csv",
-    r"P:\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-12766-rapports-session-evaluations\S-12766-FC22-TEL-JVI-LRA-Stagiaires.csv",
-    r"P:\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-13414-rapports-session-evaluations\S-13414-FC22-TEL-JVI-LRA-Stagiaires.csv",
-    r"P:\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-16411-rapports-session-evaluations\S-16411-FC25-TEL-VTE-CAR-Stagiaires.csv",
-)
-
-
 tuple_csv_stagiaires = tuple_csv_stagiaires_948 + tuple_csv_stagiaires_TEL + tuple_csv_stagiaires_22B

@@ -1150,14 +1150,14 @@ class IRIS_traite(IRIS):
         """
         # Récupérer le répertoire depuis self.cei._output.chemin_fichier
         repertoire = self.cei._output.chemin_fichier.parent
-        print(repertoire)
+        #print(repertoire)
 
         # Générer le pattern de nom de fichier à rechercher
         pattern = f"{self.cei._codeExport}_{self._typeExport}-COMPLET-*.xlsx"
 
         # Lister tous les fichiers dans le répertoire qui correspondent au pattern
         fichiers = list(repertoire.glob(pattern))
-        print(fichiers)
+        #print(fichiers)
 
         if not fichiers:
             return None
@@ -1174,8 +1174,11 @@ class IRIS_traite(IRIS):
         # Trier les fichiers par date extraite du nom (du plus récent au plus ancien)
         fichiers_tries = sorted(fichiers, key=extraire_date, reverse=True)
 
+        fichier_iris_plus_recent = fichiers_tries[0]
+        #print(fichier_iris_plus_recent)
+
         # Retourner le chemin du fichier le plus récent
-        return fichiers_tries[0]
+        return fichier_iris_plus_recent
 
 
 

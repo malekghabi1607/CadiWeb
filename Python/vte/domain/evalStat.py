@@ -56,6 +56,42 @@ class EvalStat:
        - la création des fichiers d'évaluation au format xlsx,
        - la création/mise à jour du fichier d'évaluation de la formation au format xlsx.
     """
+    # === Colonnes du modèle de l'evalStat
+    _colonnes_modele_evalStat = [
+        "Chemin fichier CSV",
+        "Date",
+        "Prénom",
+        "Nom",
+        "Entreprise",
+        "Code session",
+        "Comment avez-vous connu cette formation ?",
+        "Accueil, organisation et qualité des informations délivrées",
+        "Commentaires",
+        "Conseils et orientation avant l'inscription",
+        "Commentaires ",
+        "Informations après l'inscription",
+        "Commentaires  ",
+        "Accueil à l'arrivée sur site",
+        "Commentaires   ",
+        "Prise en compte de vos besoins et attentes",
+        "Commentaires    ",
+        "Qualité des animations",
+        "Commentaires     ",
+        "Logique d'enchainement des interventions",
+        "Commentaires      ",
+        "Qualité des supports de cours utilisés",
+        "Commentaires       ",
+        "Qualité des moyens pédagogique",
+        "Commentaires        ",
+        "Accès aux outils digitaux",
+        "Commentaires         ",
+        "Satisfaction globale",
+        "Commentaires          ",
+        "Recommanderiez-vous cette formation ?",
+        "Avez-vous d'autres besoins de formation ?",
+        "Lesquels ?",
+        "Commentaires, remarques, suggestions"]
+    
     # === Colonnes du CSV selon traitement à avoir ===
     # Colonnes descriptives à recopier
     _colonnes_csv_fixes = [
@@ -257,11 +293,40 @@ class EvalStat_session(EvalStat):
             self._statut_csv = "Exclu - CSV vide / Aucun retour"
             return None
         
-        print(df_csv_stagiaires)
+        # On traite les csv selon leur type / renomme les colonnes / ...
+        # Prise en compte qu'on a plusieurs formats de CSV : on doit traiter des colonnes en + ou - en conséquences
+        
+        if "Date de fin" in df_csv_stagiaires.columns:
+            # Cas 1 (nouveau format de csv) : supprimer "Date de fin" → Test : r"P:\FORMATIONS_C\22B\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-17606 - 22B - 06-2025\S-17606-FC25-22B-VTE-CAR-Stagiaires.csv"
+            df_csv_stagiaires = df_csv_stagiaires.drop(columns=["Date de fin"])
+            #df_csv_stagiaires = df_csv_stagiaires.rename(columns={df_csv_stagiaires.columns[0]: "Date"})
+        else:
+            # Cas 2 (ancien format de csv) : supprimer la 2e et 3e colonne (indices 1 et 2) → Test : r"P:\FORMATIONS_C\54C\P07-bilan-sessions-et-bilan-formation\rapports-sessions-evaluations\2023-06-S14317 UEM\S-14317-FC23-54C-VTE-LRA-Stagiaires.csv"
+            df_csv_stagiaires = df_csv_stagiaires.drop(df_csv_stagiaires.columns[[1, 2]], axis=1)
+            #df_csv_stagiaires = df_csv_stagiaires.rename(columns={df_csv_stagiaires.columns[1]: "Prénom"})  
+            #df_csv_stagiaires = df_csv_stagiaires.rename(columns={df_csv_stagiaires.columns[2]: "Nom"})
+        #print(df_csv_stagiaires)
+
+        # On rajoute le chemin du CSV en première colonne
+        df_csv_stagiaires.insert(0, "Chemin fichier CSV", str(chemin_csv))
 
         # On nettoie les espaces en début et fin des noms d'en-tête
-        df_csv_stagiaires.columns = [col.strip() for col in df_csv_stagiaires.columns]
-        print(df_csv_stagiaires)
+        #df_csv_stagiaires.columns = [col.strip() for col in df_csv_stagiaires.columns]
+
+        # Je renomme à la main toutes les colonnes à la main car les CSV c'est le bordel avec des espaces qui trainent et des caractères spéciaux
+        mapping = dict(zip(df_csv_stagiaires.columns, self._colonnes_modele_evalStat))  # On fait un dictionnaire de mapping anciens noms/nouveaux noms
+        df_csv_stagiaires = df_csv_stagiaires.rename(columns=mapping)  # On renomme les colonnes
+
+
+    
+        # Mise au format jj/mm/aaaa de la colonne "Date" (si elle existe)
+        try:
+            df_csv_stagiaires["Date"] = pd.to_datetime(df_csv_stagiaires["Date"], dayfirst=True, errors="coerce").dt.strftime("%d/%m/%Y")  # dayfirst=True indique que le premier nombre correspond au jour (format jj/mm/aaaa)
+        except Exception as e:
+            print(f"Erreur de conversion de la colonne Date : {e}")
+
+
+        #print(df_csv_stagiaires)
         return df_csv_stagiaires
 
     def _traiter_df_csv(self) -> None:
@@ -272,31 +337,18 @@ class EvalStat_session(EvalStat):
         # On recrée le chemin du CSV à partir du chemin di fichier Excel
         chemin_csv = self.chemin_fe.with_suffix(".csv")
         
-        # Prise en compte qu'on a plusieurs formats de CSV : on doit traiter des colonnes en + ou - en conséquences
-        if "Date de fin" in self.df_csv.columns:
-            # Cas 1 (nouveau format de csv) : supprimer "Date de fin" → Test : r"P:\FORMATIONS_C\22B\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-17606 - 22B - 06-2025\S-17606-FC25-22B-VTE-CAR-Stagiaires.csv"
-            self.df_csv = self.df_csv.drop(columns=["Date de fin"])
-        else:
-            # Cas 2 (ancien format de csv) : supprimer la 2e et 3e colonne (indices 1 et 2) → Test : r"P:\FORMATIONS_C\54C\P07-bilan-sessions-et-bilan-formation\rapports-sessions-evaluations\2023-06-S14317 UEM\S-14317-FC23-54C-VTE-LRA-Stagiaires.csv"
-            self.df_csv = self.df_csv.drop(self.df_csv.columns[[1, 2]], axis=1)
-            self.df_csv = self.df_csv.rename(columns={"Prénom.1": "Prénom"})
+        #print(self.df_csv)
         
-        print(self.df_csv)
-        
-        # On rajoute le chemin du CSV en première colonne
-        self.df_csv.insert(0, "Chemin fichier CSV", str(chemin_csv))
+        # On colle le chemin du CSV en première colonne
+        #self.df_csv.insert(0, "Chemin fichier CSV", str(chemin_csv))
+        #self.df_csv["Chemin fichier CSV"] = str(chemin_csv)
 
         # Met à jour ou crée la colonne "Code session" avec self._codeIRIS
         self.df_csv["Code session"] = self.code_IRIS
 
-        # Mise au format jj/mm/aaaa de la colonne "Date" (si elle existe)
-        if "Date" in self.df_csv.columns:
-            try:
-                self.df_csv["Date"] = pd.to_datetime(self.df_csv["Date"], dayfirst=True, errors="coerce").dt.strftime("%d/%m/%Y")  # dayfirst=True indique que le premier nombre correspond au jour (format jj/mm/aaaa)
-            except Exception as e:
-                print(f"Erreur de conversion de la colonne Date : {e}")
 
-        print(self.df_csv)
+
+        #print(self.df_csv)
 
         #return self.df_csv
 
@@ -313,8 +365,8 @@ class EvalStat_session(EvalStat):
         # Parcours des lignes de CSV_stagiaires
         #print(self._df_csv_stagiaires.columns.tolist())
         for _, row in self.df_csv.iterrows():
-            print("Ligne en cours : ")
-            print(row)
+            #print("Ligne en cours : ")
+            #print(row)
             base = {col: row[col] for col in self._colonnes_csv_fixes}  # Création des colonnes qui seront répétées à chaque fois
             base["NOM Prénom"] = f"{str(row['Nom']).upper()} {row['Prénom']}".strip()  # Création du champ "NOM Prénom"
 

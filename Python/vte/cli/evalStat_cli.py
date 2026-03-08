@@ -1,3 +1,5 @@
+from pprint import pprint
+
 from vte.domain.formation import Formation
 from vte.services.evalStat_services import EvalStat_services
 from vte.utils.utils import *
@@ -52,12 +54,12 @@ def verifications():
 def traite_tous_evalStats_depuis_tuple_csv():
 
     statuts_csv = EvalStat_services.traiter_evalStat_depuis_iterable_de_csv(
-        tuple_csv_stagiaires= tuple_csv_stagiaires_TEL,
-        chemin_IRIS_sessions=chemin_vers_unc(Path(r"R:\_Echanges\VTE\Prog\IRIS\Extracts complets\TESTS - TEL - R04110_Sessions-COMPLET.xlsx")),
-        ouvrirDossier=True
+        tuple_csv_stagiaires= tuple_csv_stagiaires_22B,
+        chemin_IRIS_sessions=None, #chemin_vers_unc(Path(r"R:\_Echanges\VTE\Prog\IRIS\Extracts complets\TESTS - TEL - R04110_Sessions-COMPLET.xlsx")),
+        ouvrirDossier=False
     )
 
-    print(statuts_csv)
+    pprint(statuts_csv)
 
 
 # ======================================================================================

@@ -73,3 +73,5 @@ class EvalStat_services:
             
             # On sauvegarde l'évaluation de la formation
             formation.eval.ecritdf_et_sauve_siModif()
+        
+        return statuts_csv
