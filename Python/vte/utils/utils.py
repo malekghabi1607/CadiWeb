@@ -2026,7 +2026,7 @@ def backup_fichier_test(chemin_input:Path, deplacement:bool=True) -> bool:
         raise SystemExit
         
 
-def rollback_nom_fichier_test(chemin_input) -> bool:
+def restore_nom_fichier_test(chemin_input) -> bool:
     """
     Remet le fichier BAK_TESTS en place en renommant avec son ancien nom.
 
