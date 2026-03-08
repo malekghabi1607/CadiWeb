@@ -519,15 +519,15 @@ class IRIS:
         return False, None
 
     @staticmethod
-    def extraire_code_IRIS_depuis_chemin(chemin:Path|str) -> str:
+    def extraire_code_IRIS_depuis_chemin(chemin:Path|str) -> int:
         """
         Récupère le numéro IRIS (5 chiffres) depuis un chemin (a priori chemin CSV) si pas possible on demande le code à l'utilisateur
         """
         match = re.search(r"\b\d{5}\b", str(chemin))
         if match:
-            codeIRIS = match.group(0)
+            codeIRIS = int(match.group(0))
         else:
-            codeIRIS = str(demander_code(typeCode="Code IRIS", chemin=chemin))
+            codeIRIS = demander_code(typeCode="Code IRIS", chemin=chemin)
 
         return codeIRIS
 
