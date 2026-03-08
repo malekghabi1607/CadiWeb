@@ -1,33 +1,10 @@
-from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
-import pytest
-
-from vte.domain.evalStat import EvalStat_session
-from vte.domain.formation import Formation
 from vte.domain.session import Session
-from vte.utils.utils import backup_fichier_test, chemin_vers_unc, rollback_nom_fichier_test
 
 
 # ======================================================================================
-# FIXTURES
-# ======================================================================================
-@pytest.fixture
-def tel():
-    return {
-        "trigramme_formation": "TEL",
-        "code_IRIS": 16411,
-        "codes_IRIS": (12766, 13414, 15942, 16161, 16411),
-
-        "chemin_eval_formation": chemin_vers_unc(Path(r"P:\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\Evaluation-Stagiaires-Global-TEL.xlsx")),
-    }
-
-@pytest.fixture
-def formation(tel):
-    return Formation(tel["trigramme_formation"])
-
-# ======================================================================================
-# TESTS CLASSE EVALSTAT SESSION
+# TESTS CLASSE SESSION
 # ======================================================================================
 
 # ----------------------------------------------------------------------
@@ -35,11 +12,41 @@ def formation(tel):
 # ----------------------------------------------------------------------
 # python -m pytest -s -v tests/vte/test_session.py::test_init
 def test_init(formation, tel):
+
     session = Session(formation=formation, code_IRIS=tel["code_IRIS"])
+
     assert isinstance(session, Session)
     assert session.trigramme_formation == tel["trigramme_formation"]
     assert session.code_IRIS == tel["code_IRIS"]
     assert session.eval is None
+
+
+# ----------------------------------------------------------------------
+# Test des constructeurs alternatifs
+# ----------------------------------------------------------------------
+# python -m pytest -s -v tests/vte/test_session.py::test_avec_traitement_evalStat
+@patch("vte.domain.session.Session._ajout_evalStat_avec_traitement")
+def test_avec_traitement_evalStat(mock, formation, tel):
+
+    session = Session.avec_traitement_evalStat(
+        formation=formation,
+        code_IRIS=tel["code_IRIS"],
+        chemin_csv=None,
+        chemin_IRIS_sessions=None,
+        ecrire_eval_formation=False,
+        ouvrirDossier=False
+    )
+
+    assert session.trigramme_formation == tel["trigramme_formation"]
+    assert session.code_IRIS == tel["code_IRIS"]
+
+    mock.assert_called_once_with(
+        session=session,
+        chemin_csv=None,
+        chemin_IRIS_sessions=None,
+        ecrire_eval_formation=False,
+        ouvrirDossier=False
+    )
 
 # ----------------------------------------------------------------------
 # Test des méthodes internes
@@ -47,18 +54,22 @@ def test_init(formation, tel):
 # python -m pytest -s -v tests/vte/test_session.py::test_ajout_evalStat
 @patch("vte.domain.session.EvalStat_session")
 def test_ajout_evalStat(mock, formation, tel):
-    session = Session(formation=formation, code_IRIS=tel["code_IRIS"])
-    session._ajout_evalStat()
-    
-    mock.assert_called_once_with(session=session) # On teste que l'appel a bien été fait avec les bons arguments
-    assert session.eval == mock.return_value  # On teste la valeur retournée
 
-    #assert isinstance(session.eval, EvalStat_session)
+    session = Session(formation=formation, code_IRIS=tel["code_IRIS"])
+
+    session._ajout_evalStat()
+
+    mock.assert_called_once_with(session=session)
+
+    assert session.eval == mock.return_value
+
 
 # python -m pytest -s -v tests/vte/test_session.py::test_ajout_evalStat_avec_traitement
 @patch("vte.domain.session.EvalStat_session.avec_traitement")
 def test_ajout_evalStat_avec_traitement(mock, formation, tel):
+
     session = Session(formation=formation, code_IRIS=tel["code_IRIS"])
+
     session._ajout_evalStat_avec_traitement(
         chemin_csv=None,
         chemin_IRIS_sessions=None,
@@ -72,42 +83,9 @@ def test_ajout_evalStat_avec_traitement(mock, formation, tel):
         chemin_IRIS_sessions=None,
         ecrire_eval_formation=False,
         ouvrirDossier=False
-
     )
+
     assert session.eval == mock.return_value
-    
-
-# ----------------------------------------------------------------------
-# Test des constructeurs alternatifs
-# ----------------------------------------------------------------------
-# python -m pytest -s -v tests/vte/test_session.py::test_avec_traitement_evalStat
-@patch("vte.domain.session.Session._ajout_evalStat_avec_traitement")
-def test_avec_traitement_evalStat(mock, formation, tel):
-    session = Session.avec_traitement_evalStat(
-        formation=formation, 
-        code_IRIS=tel["code_IRIS"],
-        chemin_csv=None,
-        chemin_IRIS_sessions=None,
-        ecrire_eval_formation=False,
-        ouvrirDossier=False
-        )
-    
-
-    assert session.trigramme_formation == tel["trigramme_formation"]
-    assert session.code_IRIS == tel["code_IRIS"]
-    mock.assert_called_once_with(
-        session=session,
-        chemin_csv=None,
-        chemin_IRIS_sessions=None,
-        ecrire_eval_formation=False,
-        ouvrirDossier=False
-
-    )
-
-
-
-
-
 
 
 

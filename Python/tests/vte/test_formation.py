@@ -1,78 +1,83 @@
-from pathlib import Path
 from unittest.mock import Mock, patch
-
-import pytest
 
 from vte.domain.evalStat import EvalStat_formation
 from vte.domain.formation import Formation
 from vte.domain.session import Session
-from vte.utils.utils import backup_fichier_test, chemin_vers_unc, rollback_nom_fichier_test
 
 
 # ======================================================================================
-# FIXTURES
+# TESTS CLASSE FORMATION
 # ======================================================================================
-@pytest.fixture
-def tel():
-    return {
-        "trigramme_formation": "TEL",
-        "code_IRIS": 16411,
-        "codes_IRIS": (12766, 13414, 15942, 16161, 16411),
 
-        "chemin_eval_formation": chemin_vers_unc(Path(r"P:\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\Evaluation-Stagiaires-Global-TEL.xlsx")),
-    }
-
-
-
-# ======================================================================================
-# TESTS CLASSE EVALSTAT FORMATION
-# ======================================================================================
+# ----------------------------------------------------------------------
+# Test de __init__
+# ----------------------------------------------------------------------
 # python -m pytest -s -v tests/vte/test_formation.py::test_init
 def test_init(tel):
+
     formation = Formation(tel["trigramme_formation"])
 
     assert formation.trigramme_formation == tel["trigramme_formation"]
-    assert formation.eval == None
+    assert formation.eval is None
     assert formation.sessions == {}
 
-# python -m pytest -s -v tests/vte/test_formation.py::test_avec_ouverture_evalStat
+
+# ----------------------------------------------------------------------
+# Test des constructeurs alternatifs
+# ----------------------------------------------------------------------
 @patch("vte.domain.formation.EvalStat_formation.avec_ouverture")
 def test_avec_ouverture_evalStat(mock, tel):
+
     mock.return_value = Mock(spec=EvalStat_formation)
 
     formation = Formation.avec_ouverture_evalStat(tel["trigramme_formation"])
 
     assert formation.eval is mock.return_value
 
+
+# ----------------------------------------------------------------------
+# Test des méthodes internes
+# ----------------------------------------------------------------------
+# python -m pytest -s -v tests/vte/test_formation.py::test_avec_ouverture_evalStat
+# def test_ajout_sessions(tel):
+
+    formation = Formation(tel["trigramme_formation"])
+
+    formation.ajout_sessions(tel["codes_IRIS"])
+
+    for code_IRIS in tel["codes_IRIS"]:
+        assert isinstance(formation.sessions[code_IRIS], Session)
+
+
+# ----------------------------------------------------------------------
+# Test des méthodes externes
+# ----------------------------------------------------------------------
 # python -m pytest -s -v tests/vte/test_formation.py::test_ajout_sessions
-def test_ajout_sessions(tel):
-    formation = Formation(tel["trigramme_formation"])
-    formation.ajout_sessions(tel["codes_IRIS"])
-
-    for indice, code_IRIS in enumerate(tel["codes_IRIS"]):
-        formation.sessions[code_IRIS] = isinstance(indice, Session)
-
-# python -m pytest -s -v tests/vte/test_formation.py::test_traiter_eval_sessions
 @patch("vte.domain.formation.Session.eval", new_callable=Mock)
-def test_traiter_eval_sessions(mock, tel): 
-    
+def test_traiter_eval_sessions(mock, tel):
+
     formation = Formation(tel["trigramme_formation"])
+
     formation.ajout_sessions(tel["codes_IRIS"])
 
-    # Mock des evals
     for session in formation.sessions.values():
         session.eval = Mock()
+
     formation.eval = Mock()
-    
+
     formation.traiter_eval_sessions(
         chemin_csv=None,
         chemin_IRIS_sessions=None,
-        ouvrirDossier=False)
+        ouvrirDossier=False
+    )
 
-    # Vérifie que chaque session.eval.traiter_eval a été appelé
     for session in formation.sessions.values():
         session.eval.traiter_eval.assert_called_once()
+
     formation.eval.ecritdf_et_sauve_siModif.assert_called_once()
+
+
+
 
 
 """

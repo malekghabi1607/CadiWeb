@@ -1,63 +1,26 @@
-from unittest.mock import Mock, patch
-
-import pytest
+import pandas as pd
+from unittest.mock import patch
 
 from vte.domain.formation import Formation
-from vte.domain.evalStat import *
-from vte.domain.session import Session
+from vte.domain.evalStat import EvalStat, EvalStat_session, EvalStat_formation
 
-
-#DATA_DIR = Path(__file__).parent / "data"
-
-
-# ======================================================================================
-# FIXTURES
-# ======================================================================================
-@pytest.fixture
-def tel():
-    return {
-        "trigramme_formation": "TEL",
-        "code_IRIS": 16411,
-        "chemin_eval_formation": chemin_vers_unc(Path(r"P:\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\Evaluation-Stagiaires-Global-TEL.xlsx")),
-        "chemin_csv_session": chemin_vers_unc(Path(r"P:\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-16411-rapports-session-evaluations\S-16411-FC25-TEL-VTE-CAR-Stagiaires.csv")),
-        "chemin_csv_session_non_present_eval_formation": chemin_vers_unc(Path(r"P:\FORMATIONS_C\948\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\2022-11-S-12995 UEM\S-12995-FC22-948-VTE-SNA-Stagiaires.csv")),
-        "chemin_eval_session": chemin_vers_unc(Path(r"P:\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-16411-rapports-session-evaluations\S-16411-FC25-TEL-VTE-CAR-Stagiaires.xlsx")),
-
-        "chemin_IRIS_sessions": chemin_vers_unc(Path(r"R:\_Echanges\VTE\Prog\IRIS\Extracts complets\TESTS - TEL - R04110_Sessions-COMPLET.xlsx")),
-
-        "resultat_1er_elem_eval_formation": "S-12766-FC22-TEL-JVI-LRA",
-    }
-
-
-@pytest.fixture
-def formation(tel):
-    """Formation réelle avec son EvalStat ouvert"""
-    return Formation.avec_ouverture_evalStat(tel["trigramme_formation"])
-
-
-@pytest.fixture
-def session(formation, tel):
-    """Session réelle attachée à la formation"""
-    formation.ajout_sessions(codes_IRIS=tel["code_IRIS"])
-    session = formation.sessions[tel["code_IRIS"]]
-    return session
-
-
+from vte.utils.utils import backup_fichier_test, rollback_nom_fichier_test
 
 
 # ======================================================================================
 # TESTS CLASSE EVALSTAT
 # ======================================================================================
+
 # ----------------------------------------------------------------------
 # Test de __init__
 # ----------------------------------------------------------------------
 # python -m pytest -s -v tests/vte/test_evalStat.py::test_init
-def test_init(tel):
+def test_init():
+
     evalStat = EvalStat()
+
     assert isinstance(evalStat, EvalStat)
     assert evalStat.fe is None
-
-
 
 
 # ----------------------------------------------------------------------
@@ -83,10 +46,10 @@ def test_init(tel):
 
 
 
-
 # ======================================================================================
 # TESTS CLASSE EVALSTAT SESSION
 # ======================================================================================
+
 # ----------------------------------------------------------------------
 # Test de __init__
 # ----------------------------------------------------------------------
@@ -97,7 +60,6 @@ def test_init_evalStat_session(session):
 
     assert es._session == session
     assert es.fe is None
-
 
 
 # ----------------------------------------------------------------------
@@ -111,10 +73,6 @@ def test_avec_traitement_evalStat_session(mock_traiter, session):
     assert isinstance(es, EvalStat_session)
 
     mock_traiter.assert_called_once()
-
-
-
-
 
 
 # ----------------------------------------------------------------------
@@ -139,6 +97,7 @@ def test_charger_csv_stagiaire(mock_read_csv, mock_encodage, session, tel):
 
     assert isinstance(result, pd.DataFrame)
     assert not result.empty
+
 
 # TODO : bug
 """
@@ -182,11 +141,9 @@ def test_maj_dataframes_eval_formation(session):
 """
 
 
-
 # ----------------------------------------------------------------------
 # Test des méthodes externes
 # ----------------------------------------------------------------------
-
 
 
 
@@ -232,10 +189,6 @@ def test_avec_ouverture_evalStat_formation(mock_ouvrir, formation):
 # Test des méthodes externes
 # ----------------------------------------------------------------------
 
-
-
-
-
 # TODO : bug
 """
 @patch("vte.domain.evalStat.hash_df")
@@ -256,47 +209,89 @@ def test_ecritdf_et_sauve_siModif(mock_hash, formation):
 """
 
 
-#Mes anciens tests
-"""
-# python -m pytest -s -v tests/vte/test_evalStat.py::test_creation_nouvel_eval_formation
-def test_creation_nouvel_eval_formation(tel_csv_existant):
-    # Backup et vérif que le fichier n'est pas présent au départ
-    backup_fichier_test(tel_csv_existant["chemin_eval_formation"])
-    assert not tel_csv_existant["chemin_eval_formation"].is_file()
 
-    try :
-        formation = Formation.avec_ouverture_evalStat(tel_csv_existant["trigramme_formation"])
+
+
+
+
+
+
+# ======================================================================================
+# TESTS MÉTIER (PIPELINE COMPLET)
+# ======================================================================================
+
+# ----------------------------------------------------------------------
+# Création nouvel eval formation
+# ----------------------------------------------------------------------
+# python -m pytest -s -v tests/vte/test_evalStat.py::test_creation_nouvel_eval_formation
+def test_creation_nouvel_eval_formation(tel):
+
+    # from vte.utils.utils import backup_fichier_test, rollback_nom_fichier_test
+    # from vte.domain.formation import Formation
+
+    backup_fichier_test(tel["chemin_eval_formation"])
+    assert not tel["chemin_eval_formation"].is_file()
+
+    try:
+
+        formation = Formation.avec_ouverture_evalStat(
+            tel["trigramme_formation"]
+        )
         #print("\n")
         #print(len(formation.eval.df_stagiaires))
-        
+
         assert formation.eval.fe is not None
-        if formation.eval.fe is not None :
-            assert (formation.eval.chemin_fe == tel_csv_existant["chemin_eval_formation"])
+
+        if formation.eval.fe is not None:
+
+            assert formation.eval.chemin_fe == tel["chemin_eval_formation"]
+
             assert len(formation.eval.df_stagiaires) == 0
 
     finally:
-        rollback_nom_fichier_test(tel_csv_existant["chemin_eval_formation"])
 
+        rollback_nom_fichier_test(tel["chemin_eval_formation"])
+
+
+# ----------------------------------------------------------------------
+# ouverture eval formation existant
+# ----------------------------------------------------------------------
 # python -m pytest -s -v tests/vte/test_evalStat.py::test_creation_ouvrir_eval_formation_existant
-def test_creation_ouvrir_eval_formation_existant(tel_csv_existant):
-    # Backup et vérif que le fichier est présent au départ
-    backup_fichier_test(tel_csv_existant["chemin_eval_formation"], deplacement=False)
-    assert tel_csv_existant["chemin_eval_formation"].is_file()
+def test_creation_ouvrir_eval_formation_existant(tel):
+
+    # from vte.utils.utils import backup_fichier_test, rollback_nom_fichier_test
+    # from vte.domain.formation import Formation
+
+    backup_fichier_test(tel["chemin_eval_formation"], deplacement=False)
+    assert tel["chemin_eval_formation"].is_file()
 
     try:
-        formation = Formation.avec_ouverture_evalStat(tel_csv_existant["trigramme_formation"])
+
+        formation = Formation.avec_ouverture_evalStat(
+            tel["trigramme_formation"]
+        )
         #print("\n")
         #print(len(formation.eval.df_stagiaires))
-        
+
         assert formation.eval.fe is not None
-        if formation.eval.fe is not None :
-            assert (formation.eval.chemin_fe == tel_csv_existant["chemin_eval_formation"])
+
+        if formation.eval.fe is not None:
+
+            assert formation.eval.chemin_fe == tel["chemin_eval_formation"]
+
             assert len(formation.eval.df_stagiaires) > 0
 
     finally:
-        rollback_nom_fichier_test(tel_csv_existant["chemin_eval_formation"])
 
+        rollback_nom_fichier_test(tel["chemin_eval_formation"])
+
+
+
+
+# ----------------------------------------------------------------------
 # Création avec eval formation existant ne contenant pas la ref du CSV (on le remplit)
+# ----------------------------------------------------------------------
+# TODO : peut-être à finir
 def test_eval_session_refCSV_inexistant_dans_eval_formation(tel_csv_existant):
 
     # Backup et vérif que le fichier est présent au départ
@@ -310,7 +305,7 @@ def test_eval_session_refCSV_inexistant_dans_eval_formation(tel_csv_existant):
             codes_IRIS=tel_csv_existant["code_IRIS"]
         )
         # chemin_csv_session_non_present_eval_formation
-        print("\n")
+        #print("\n")
         #print(len(formation.eval.df_stagiaires))
         
         assert formation.eval.fe is not None
@@ -322,7 +317,15 @@ def test_eval_session_refCSV_inexistant_dans_eval_formation(tel_csv_existant):
     finally:
         rollback_nom_fichier_test(tel_csv_existant["chemin_eval_formation"])
 
-"""
+
+
+
+
+
+
+
+
+
 
 
 # Création avec eval formation existant mais contenant la ref du CSV (on saute le traitement) instance._statut_csv = "Exclu - CSV déjà dans fichier global" ; instance._fe = None
