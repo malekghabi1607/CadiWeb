@@ -40,7 +40,7 @@ class Session:
         self._eval:Optional[EvalStat_session] = None
    
     @classmethod
-    def avec_traitement_evalStat(cls, formation:Formation_protocol, code_IRIS: int, chemin_csv:Optional[Path|str]=None, chemin_IRIS_sessions:Optional[Path]=None, ecrire_eval_formation:bool=False, ouvrirDossier:bool=False) -> Session:
+    def avec_traitement_evalStat(cls, formation:Formation_protocol, code_IRIS: int, chemin_csv:Optional[Path|str]=None, chemin_IRIS_sessions:Optional[Path]=None, ecrire_eval_formation:bool=True, ouvrirDossier:bool=False) -> Session:
         """
         Crée une l'instance de Session en traitant son EvalStat.
 
@@ -64,7 +64,6 @@ class Session:
         """
         instance = cls(formation = formation, code_IRIS = code_IRIS)
         instance.ajout_evalStat_avec_traitement(
-            session=instance,
             chemin_csv=chemin_csv,
             chemin_IRIS_sessions=chemin_IRIS_sessions,
             ecrire_eval_formation=ecrire_eval_formation,
@@ -84,7 +83,7 @@ class Session:
     # =========================
     # === METHODES EXTERNES ===
     # =========================
-    def ajout_evalStat_avec_traitement(self, chemin_csv:Optional[Path|str]=None, chemin_IRIS_sessions:Optional[Path]=None, ecrire_eval_formation:bool=False, ouvrirDossier:bool=False) -> None:
+    def ajout_evalStat_avec_traitement(self, chemin_csv:Optional[Path|str]=None, chemin_IRIS_sessions:Optional[Path]=None, ecrire_eval_formation:bool=True, ouvrirDossier:bool=False) -> None:
         """
         Crée l'Excel EvalStat d'une session.
 
@@ -93,12 +92,12 @@ class Session:
         L'évaluation de la formation est mise à jour avec ces nouvelles données.
         L'évaluation de la formation est sauvée en fin de traitement. Ca pourrait être fait ailleurs si boucle de traitement de plusieurs EvalStat de sessions d'une même formation.
 
-        :param session: La session à laquelle est affectée l'EvalStat
-        :type session: Session_protocol
         :param chemin_csv: chemin du CSV à traiter. S'il est None, on ouvre un filedialog
         :type chemin_csv: Optional[Path|str]
         :param chemin_IRIS_sessions: Chemin du fichier IRIS sessions à employer si l'utilisateur ne veut pas celui par défaut. Defaults = None = Fichier généré le plus récent dans le répertoire donné en config.
         :type chemin_IRIS_sessions: Optional[Path]
+        :param ecrire_eval_formation: Pour écrire physiquement l'Excel eval formation en fin de traitement. Si False, il devra être écrit ailleurs (à l'endroit où il y a la boucle pour du multi-traitement typiquement). Défaut = True.
+        :type ecrire_eval_formation: bool
         :param ouvrirDossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
         :type ouvrirDossier: bool
         """

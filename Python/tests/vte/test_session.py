@@ -25,7 +25,7 @@ def test_init(formation, tel):
 # Test des constructeurs alternatifs
 # ----------------------------------------------------------------------
 # python -m pytest -s -v tests/vte/test_session.py::test_avec_traitement_evalStat
-@patch("vte.domain.session.Session._ajout_evalStat_avec_traitement")
+@patch("vte.domain.session.Session.ajout_evalStat_avec_traitement")
 def test_avec_traitement_evalStat(mock, formation, tel):
 
     session = Session.avec_traitement_evalStat(
@@ -41,7 +41,6 @@ def test_avec_traitement_evalStat(mock, formation, tel):
     assert session.code_IRIS == tel["code_IRIS"]
 
     mock.assert_called_once_with(
-        session=session,
         chemin_csv=None,
         chemin_IRIS_sessions=None,
         ecrire_eval_formation=False,

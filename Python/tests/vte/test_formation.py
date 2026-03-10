@@ -25,6 +25,7 @@ def test_init(tel):
 # ----------------------------------------------------------------------
 # Test des constructeurs alternatifs
 # ----------------------------------------------------------------------
+# python -m pytest -s -v tests/vte/test_formation.py::test_avec_ouverture_evalStat
 @patch("vte.domain.formation.EvalStat_formation.avec_ouverture")
 def test_avec_ouverture_evalStat(mock, tel):
 
@@ -34,6 +35,34 @@ def test_avec_ouverture_evalStat(mock, tel):
 
     assert formation.eval is mock.return_value
 
+# Une seule session
+# python -m pytest -s -v tests/vte/test_formation.py::test_avec_creation_session
+@patch("vte.domain.formation.EvalStat_formation.avec_ouverture")
+def test_avec_creation_session(mock, tel):
+    formation = Formation.avec_creation_sessions(
+        trigramme_formation=tel["trigramme_formation"],
+        codes_IRIS=tel["code_IRIS"]
+        )
+
+    assert formation.trigramme_formation == tel["trigramme_formation"]
+    assert formation.eval is None
+    assert len(formation.sessions) == 1
+    assert formation.sessions[tel["code_IRIS"]].code_IRIS == tel["code_IRIS"]
+
+# Plusieurs sessions
+# python -m pytest -s -v tests/vte/test_formation.py::test_avec_creation_sessions
+@patch("vte.domain.formation.EvalStat_formation.avec_ouverture")
+def test_avec_creation_sessions(mock, tel):
+    formation = Formation.avec_creation_sessions(
+        trigramme_formation=tel["trigramme_formation"],
+        codes_IRIS=tel["codes_IRIS"]
+        )
+
+    assert formation.trigramme_formation == tel["trigramme_formation"]
+    assert formation.eval is None
+    assert len(formation.sessions) == len(tel["codes_IRIS"])
+    for code_IRIS in tel["codes_IRIS"] :
+        assert formation.sessions[code_IRIS].code_IRIS == code_IRIS
 
 # ----------------------------------------------------------------------
 # Test des méthodes internes

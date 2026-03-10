@@ -69,7 +69,7 @@ class EvalStat_services:
                         "statut": session.eval.statut_csv
                         }
 
-                print(f"Fin traitement : {code_IRIS}\t{chemin_csv.name}\t{session.eval.statut_csv}")
+                #print(f"Fin traitement : {code_IRIS}\t{chemin_csv.name}\t{session.eval.statut_csv}")
             
             # On sauvegarde l'évaluation de la formation
             formation.eval.ecritdf_et_sauve_siModif()

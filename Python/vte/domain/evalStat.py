@@ -56,8 +56,29 @@ class EvalStat:
        - la création des fichiers d'évaluation au format xlsx,
        - la création/mise à jour du fichier d'évaluation de la formation au format xlsx.
     """
-    # === Colonnes du modèle de l'evalStat
-    _colonnes_modele_evalStat = [
+    
+    # === dico_colonnes[critère d'évaluation][type d'info] ===
+    dico_colonnes:dict[str, dict[str, str]] = {
+        "Comment avez-vous connu cette formation ?": {"Type colonne": "Commentaires seuls", "Groupe critère": "Question ouverte"},
+        "Accueil, organisation et qualité des informations délivrées": {"Type colonne": "Avec commentaire", "Groupe critère": "Accueil & conseils"},
+        "Conseils et orientation avant l'inscription": {"Type colonne": "Avec commentaire", "Groupe critère": "Accueil & conseils"},
+        "Informations après l'inscription": {"Type colonne": "Avec commentaire", "Groupe critère": "Accueil & conseils"},
+        "Accueil à l'arrivée sur site": {"Type colonne": "Avec commentaire", "Groupe critère": "Accueil & conseils"},
+        "Prise en compte de vos besoins et attentes": {"Type colonne": "Avec commentaire", "Groupe critère": "Pédagogie"},
+        "Qualité des animations": {"Type colonne": "Avec commentaire", "Groupe critère": "Interventions"},
+        "Logique d'enchainement des interventions": {"Type colonne": "Avec commentaire", "Groupe critère": "Pédagogie"},
+        "Qualité des supports de cours utilisés": {"Type colonne": "Avec commentaire", "Groupe critère": "Interventions"},
+        "Qualité des moyens pédagogique": {"Type colonne": "Avec commentaire", "Groupe critère": "Pédagogie"},
+        "Accès aux outils digitaux": {"Type colonne": "Avec commentaire", "Groupe critère": "Pédagogie"},
+        "Satisfaction globale": {"Type colonne": "Avec commentaire", "Groupe critère": "Satisfaction"},
+        "Recommanderiez-vous cette formation ?": {"Type colonne": "Note seule", "Groupe critère": "Satisfaction"},
+        "Avez-vous d'autres besoins de formation ?": {"Type colonne": "Avec commentaire", "Groupe critère": "Commercial"},
+        "Commentaires, remarques, suggestions": {"Type colonne": "Commentaires seuls", "Groupe critère": "Question ouverte"},
+    }
+
+
+    # === Colonnes du CSV avec les noms qu'il faudrait (sans espaces en trop ou trucs bizares) ===
+    _colonnes_csv_bonsNoms = [
         "Chemin fichier CSV",
         "Date",
         "Prénom",
@@ -92,35 +113,11 @@ class EvalStat:
         "Lesquels ?",
         "Commentaires, remarques, suggestions"]
     
-    # === Colonnes du CSV selon traitement à avoir ===
-    # Colonnes descriptives à recopier
+    # === Colonnes descriptives à recopier ===
     _colonnes_csv_fixes = [
         "Chemin fichier CSV", "Prénom", "Nom", "Entreprise", "Code session"]
 
-    # Colonnes avec note/commentaire en binôme
-    _colonnes_csv_avec_commentaires = [
-        "Accueil, organisation et qualité des informations délivrées",
-        "Conseils et orientation avant l'inscription",
-        "Informations après l'inscription",
-        "Accueil à l'arrivée sur site",
-        "Prise en compte de vos besoins et attentes",
-        "Qualité des animations",
-        "Logique d'enchainement des interventions",
-        "Qualité des supports de cours utilisés",
-        "Qualité des moyens pédagogique",
-        "Accès aux outils digitaux",
-        "Satisfaction globale",
-        "Avez-vous d'autres besoins de formation ?"]
 
-    # Colonnes à valeur texte seule
-    _colonnes_csv_commentaires_seuls = [
-        "Comment avez-vous connu cette formation ?",
-        "Commentaires, remarques, suggestions"]
-
-    # Colonnes note seule (il se trouve que je vais aussi devoir convertir le booléen)
-    _colonnes_csv_bool = [
-        "Recommanderiez-vous cette formation ?"]
-    
     # === Colonnes de l'extract IRIS Sessions à récupérer ===
     _colonnes_sessions = [
         "N° Session",
@@ -198,7 +195,6 @@ class EvalStat:
     @property
     def chemin_fe(self) -> Path|None:
         return self._fe.chemin_fichier
-    
 
 # ======================================================================================
 # CLASSE EVALSTAT_SESSION
@@ -297,11 +293,11 @@ class EvalStat_session(EvalStat):
         # Prise en compte qu'on a plusieurs formats de CSV : on doit traiter des colonnes en + ou - en conséquences
         
         if "Date de fin" in df_csv_stagiaires.columns:
-            # Cas 1 (nouveau format de csv) : supprimer "Date de fin" → Test : r"P:\FORMATIONS_C\22B\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-17606 - 22B - 06-2025\S-17606-FC25-22B-VTE-CAR-Stagiaires.csv"
+            # Cas 1 (nouveau format de csv) : supprimer "Date de fin" → Test : r"\\instnt\PARTAGE\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-16411-rapports-session-evaluations\S-16411-FC25-TEL-VTE-CAR-Stagiaires.csv"
             df_csv_stagiaires = df_csv_stagiaires.drop(columns=["Date de fin"])
             #df_csv_stagiaires = df_csv_stagiaires.rename(columns={df_csv_stagiaires.columns[0]: "Date"})
         else:
-            # Cas 2 (ancien format de csv) : supprimer la 2e et 3e colonne (indices 1 et 2) → Test : r"P:\FORMATIONS_C\54C\P07-bilan-sessions-et-bilan-formation\rapports-sessions-evaluations\2023-06-S14317 UEM\S-14317-FC23-54C-VTE-LRA-Stagiaires.csv"
+            # Cas 2 (ancien format de csv) : supprimer la 2e et 3e colonne (indices 1 et 2) → Test : r"\\instnt\PARTAGE\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-12766-rapports-session-evaluations\S-12766-FC22-TEL-JVI-LRA-Stagiaires.csv"
             df_csv_stagiaires = df_csv_stagiaires.drop(df_csv_stagiaires.columns[[1, 2]], axis=1)
             #df_csv_stagiaires = df_csv_stagiaires.rename(columns={df_csv_stagiaires.columns[1]: "Prénom"})  
             #df_csv_stagiaires = df_csv_stagiaires.rename(columns={df_csv_stagiaires.columns[2]: "Nom"})
@@ -314,7 +310,7 @@ class EvalStat_session(EvalStat):
         #df_csv_stagiaires.columns = [col.strip() for col in df_csv_stagiaires.columns]
 
         # Je renomme à la main toutes les colonnes à la main car les CSV c'est le bordel avec des espaces qui trainent et des caractères spéciaux
-        mapping = dict(zip(df_csv_stagiaires.columns, self._colonnes_modele_evalStat))  # On fait un dictionnaire de mapping anciens noms/nouveaux noms
+        mapping = dict(zip(df_csv_stagiaires.columns, self._colonnes_csv_bonsNoms))  # On fait un dictionnaire de mapping anciens noms/nouveaux noms
         df_csv_stagiaires = df_csv_stagiaires.rename(columns=mapping)  # On renomme les colonnes
 
 
@@ -335,7 +331,7 @@ class EvalStat_session(EvalStat):
         On fait quelques traitements (ajout nom du CSV, enlever date de fin, gestion de 2 types de csv stagiaires...)
         """
         # On recrée le chemin du CSV à partir du chemin di fichier Excel
-        chemin_csv = self.chemin_fe.with_suffix(".csv")
+        #chemin_csv = self.chemin_fe.with_suffix(".csv")
         
         #print(self.df_csv)
         
@@ -370,41 +366,58 @@ class EvalStat_session(EvalStat):
             base = {col: row[col] for col in self._colonnes_csv_fixes}  # Création des colonnes qui seront répétées à chaque fois
             base["NOM Prénom"] = f"{str(row['Nom']).upper()} {row['Prénom']}".strip()  # Création du champ "NOM Prénom"
 
-            # Cas 1 : colonnes avec note + commentaire associé
-            for critere in self._colonnes_csv_avec_commentaires:
-                if critere in row:
-                    #print(f"'{critere}'")
-                    if(critere == "Avez-vous d'autres besoins de formation ?"):  # Il faut changer le booléen en 0 ou 5
-                        val = str(row[critere]).strip().lower()
-                        row[critere] = 5 if val == "oui" else (0 if val == "non" else None)
+            for critere, meta in self.dico_colonnes.items():
+                if critere not in row:
+                    continue
+                type_col = meta["Type colonne"]
+                groupe_critere = meta["Groupe critère"]
+
+                # --- Cas 1 : Note + commentaire ---
+                if type_col == "Avec commentaire":
+                    val = row[critere]
+
+                    # conversion booléenne spéciale
+                    if critere == "Avez-vous d'autres besoins de formation ?":
+                        val_str = str(val).strip().lower()
+                        val = 5 if val_str == "oui" else (0 if val_str == "non" else None)
+
                     commentaire_col = row.index[row.index.get_loc(critere) + 1]
-                    if(pd.notna(row[critere]) or pd.notna(row.get(commentaire_col, None))) :
+                    commentaire = row.get(commentaire_col, None)
+
+                    if pd.notna(val) or pd.notna(commentaire):
                         df_long.append({
                             **base,
+                            "Groupe critère": groupe_critere,
                             "Critère": critere,
-                            "Note": row[critere],
-                            "Commentaires": row.get(commentaire_col, None)
+                            "Note": val,
+                            "Commentaires": commentaire
                         })
 
-            # Cas 2 : colonnes texte seul
-            for critere in self._colonnes_csv_commentaires_seuls:
-                if critere in row:
-                    if(pd.notna(row[critere])) :
+                # --- Cas 2 : commentaires seuls ---
+                elif type_col == "Commentaires seuls":
+
+                    commentaire = row[critere]
+
+                    if pd.notna(commentaire):
                         df_long.append({
                             **base,
+                            "Groupe critère": groupe_critere,
                             "Critère": critere,
                             "Note": None,
-                            "Commentaires": row[critere]
+                            "Commentaires": commentaire
                         })
 
-            # Cas 3 : Note seule + booléens convertis
-            for critere in self._colonnes_csv_bool:
-                if critere in row:
-                    if(pd.notna(row[critere])) :
-                        val = str(row[critere]).strip().lower()
-                        note = 5 if val == "oui" else (0 if val == "non" else None)
+                # --- Cas 3 : note seule ---
+                elif type_col == "Note seule":
+
+                    val = str(row[critere]).strip().lower()
+
+                    note = 5 if val == "oui" else (0 if val == "non" else None)
+
+                    if pd.notna(row[critere]):
                         df_long.append({
                             **base,
+                            "Groupe critère": groupe_critere,
                             "Critère": critere,
                             "Note": note,
                             "Commentaires": None

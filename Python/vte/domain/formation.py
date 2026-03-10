@@ -148,8 +148,8 @@ class Formation:
         self,
         chemin_csv: Optional[Path|str],
         chemin_IRIS_sessions: Optional[Path],
-        ecrire_eval_formation:bool, 
-        ouvrirDossier: bool
+        ecrire_eval_formation: Optional[bool] = False, 
+        ouvrirDossier: Optional[bool] = False
         ) -> None:
         """
         Traite les EvalStat de plusieurs sessions. Pour chacune d'elle :
@@ -162,7 +162,7 @@ class Formation:
         :type chemin_csv: Optional[Path | str], optional
         :param chemin_IRIS_sessions: _description_, defaults to None
         :type chemin_IRIS_sessions: Optional[Path], optional
-        :param ecrire_eval_formation: Pour écrire physiquement l'Excel eval formation en fin de traitement. Si False, il devra être écrit ailleurs (à l'endroit où il y a la boucle pour du multi-traitement typiquement). Défaut = True.
+        :param ecrire_eval_formation: Pour écrire physiquement l'Excel eval formation en fin de traitement. Si False, il devra être écrit ailleurs (à l'endroit où il y a la boucle pour du multi-traitement typiquement). Défaut = False car ic on peut traiter plusiseurs sessions d'une même formation.
         :type ecrire_eval_formation: bool, optional
         :param ouvrirDossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
         :type ouvrirDossier: bool, optional
@@ -174,7 +174,7 @@ class Formation:
             session.eval.traiter_eval(
                 chemin_csv=chemin_csv,
                 chemin_IRIS_sessions=chemin_IRIS_sessions,
-                ecrire_eval_formation=False,  # On sauvegardera en fin de boucle
+                ecrire_eval_formation=ecrire_eval_formation,  # On sauvegardera en fin de boucle
                 ouvrirDossier=ouvrirDossier
             )
         

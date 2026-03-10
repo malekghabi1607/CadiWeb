@@ -53,8 +53,19 @@ def verifications():
 # ======================================================================================
 def traite_tous_evalStats_depuis_tuple_csv():
 
+    # Pour supprimer les anciens ficheirs globaux
+    f_eval_948 = Path(r"P:\FORMATIONS_C\948\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\Evaluation-Stagiaires-Global-948.xlsx")
+    f_eval_TEL = Path(r"P:\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\Evaluation-Stagiaires-Global-TEL.xlsx")
+    f_eval_22B = Path(r"P:\FORMATIONS_C\22B\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\Evaluation-Stagiaires-Global-22B.xlsx")
+
+    f_eval_948.unlink()
+    #f_eval_TEL.unlink()
+    #f_eval_22B.unlink()
+
+    tuple_csv_stagiaires_employe = tuple_csv_stagiaires
+
     statuts_csv = EvalStat_services.traiter_evalStat_depuis_iterable_de_csv(
-        tuple_csv_stagiaires= tuple_csv_stagiaires_22B,
+        tuple_csv_stagiaires= tuple_csv_stagiaires_employe,
         chemin_IRIS_sessions=None, #chemin_vers_unc(Path(r"R:\_Echanges\VTE\Prog\IRIS\Extracts complets\TESTS - TEL - R04110_Sessions-COMPLET.xlsx")),
         ouvrirDossier=False
     )

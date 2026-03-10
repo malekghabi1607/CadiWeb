@@ -360,6 +360,7 @@ class FichierExcel:
                 if remplace_df_par_nouveau:
                     self.remplace_df(df)
 
+            print()
             # On écrit toutes les autres lignes une par une (on garde les lignes initiales pour garder le format qu'on copiera)
             with tqdm(total=len(df), unit=' ligne', desc=Fore.CYAN + f"Écriture des lignes dans l'output {self.nom_tableau}" + Style.RESET_ALL) as pbar:
                 for i, ligne_brute in enumerate(df.itertuples(index=False), 1):
@@ -1113,6 +1114,10 @@ class FichierExcel:
         for sheet in wb.Sheets:
             for pivot in sheet.PivotTables():
                 pivot.RefreshTable()
+        
+        # Sélectionner l'onglet TCD (le premier onglet (index 1))
+        wb.Worksheets(1).Activate()
+
         if save:
             wb.Save()
         if quitter:
