@@ -1123,6 +1123,7 @@ class FichierExcel:
         if quitter:
             wb.Close(SaveChanges=False)
             excel.Quit()
+            del excel
 
     def _sauver_fichier(self, chemin_cible: Path, copier: bool = False) -> None:
         """

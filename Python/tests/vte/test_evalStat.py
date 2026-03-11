@@ -297,7 +297,16 @@ def test_creation_ouvrir_eval_formation_existant(tel):
 # PIPELINE FONCTIONNEL
 # ----------------------------------------------------------------------
 # python -m pytest -vv -s tests/vte/test_evalStat.py::test_traitement_eval_session_fonctionnel
-def test_traitement_eval_session_fonctionnel(tel):
+
+@patch("vte.domain.evalStat.FichierExcel.actualiser_TCD")
+@patch("vte.domain.evalStat.FichierExcel._TableauExcel.copierFormat_tableauStructure_xlwings")
+@patch("vte.domain.evalStat.FichierExcel._TableauExcel.maj_references_misesEnFormeConditionnelles")
+def test_traitement_eval_session_fonctionnel(
+    mock_mfc,
+    mock_copier,
+    mock_tcd,
+    tel
+    ):
     """
     Cas par défaut
     Permet de tester toute la procédure métier de création d'un evalStat :
@@ -380,7 +389,13 @@ def test_traitement_eval_session_fonctionnel(tel):
 # ======================================================================================
 # python -m pytest -v tests/vte/test_evalStat.py::test_eval_session_multi_csv
 @pytest.mark.parametrize("dataset_index", range(5))
+@patch("vte.domain.evalStat.FichierExcel.actualiser_TCD")
+@patch("vte.domain.evalStat.FichierExcel._TableauExcel.copierFormat_tableauStructure_xlwings")
+@patch("vte.domain.evalStat.FichierExcel._TableauExcel.maj_references_misesEnFormeConditionnelles")
 def test_eval_session_multi_csv(
+    mock_mfc,
+    mock_copier,
+    mock_tcd,
     formation,
     tel,
     evalstat_csv_datasets,
