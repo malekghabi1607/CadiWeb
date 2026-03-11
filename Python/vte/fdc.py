@@ -1,27 +1,34 @@
-
-# ======================================================================================
-# CLASSE FDC
-# ======================================================================================
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from vte.domain.formation import Formation
-
-
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Protocol
 
 from vte.core import config
 from vte.utils.utils import *
 from vte.utils.office import FichierExcel
 from vte.utils.utils_instn import recupere_trig_formation_depuis_chemin
 
+# TODO : Pour l'instant c'est une classe de traitemnt. Le jour où j'ai besoin d'ouvrir un EvalStat pour le lire uniquement, prendre modèle sur IRIS avec des classes de lecture et de traitement
 
+# ======================================================================================
+# PROTOCOLES
+# (pour faire passer les informations des objets parents sans ref circulaires)
+# ======================================================================================
+class Formation_protocol(Protocol):
+    """
+    Protocol de Formation : permet de simuler une formation en évitant les références circulaires
+    """
+    @property
+    def trigramme_formation(self) -> str: ...
+
+
+# ======================================================================================
+# CLASSE FDC
+# ======================================================================================
 class FdC:
     """
-    Classe qui gère tous les éléments relatifs aux fiches de coûts INSTN
+    Classe qui gère l'ouverture d'une fiche de coûts INSTN et l'accès à ses différentes valeurs
     """
 
     
@@ -34,21 +41,18 @@ class FdC:
     # ====================
     # === CONSTRUCTEUR ===
     # ====================
-    def __init__(self, formation: Optional[Formation] = None, fe: Optional[FichierExcel] = None) -> None:
+    def __init__(self, formation: Optional[Formation_protocol] = None, fe: Optional[FichierExcel] = None) -> None:
         """
         Initialise une instance FdC.
 
-        Args:
-            codeIRIS (str | None): Code IRIS de la formation.
-            chemin_fdc (Path | None): Chemin vers le fichier Excel de la fiche de coûts.
+        :param formation: l'instance de Formation pour la fiche de coûts (nécessaire uniquement pour facilite la sélection du fichier de FdC (pré-sélection répertoire))
+        :type formation: Optional[Formation_protocol], optional
+        :param fe: Objet FichierExcel de la fiche de coûts (contient le chemin de la FdC).
+        :type fe: Optional[FichierExcel], optional
         """
         # Variables propres à la FdC
-        self._formation:Optional[Formation] = None  # Trigramme de la formation ; nécessaire uniquement pour facilite la sélection du fichier de FdC (pré-sélection répertoire)
-        self._fe: Optional[FichierExcel] = None  # Objet Excel contenant la fiche de coûts
-
-        # On initialise les variables de l'instance avec les arguments
-        if formation is not None: self._formation = formation
-        if fe is not None: self._fe = fe
+        self._formation:Optional[Formation_protocol] = formation  # Trigramme de la formation ; nécessaire uniquement pour facilite la sélection du fichier de FdC (pré-sélection répertoire)
+        self._fe: Optional[FichierExcel] = fe  # Objet Excel contenant la fiche de coûts
 
         # Chargement de la FdC
         self._charger_fdc()
@@ -79,13 +83,14 @@ class FdC:
         """
 
         if self._fe is not None:
-            #  Soit le tableau avec la clef existent déjà : pas besoin de le recharger
+            #  Soit le FichierExcel et son onglet (objet TableauExcel) existent déjà : pas besoin de le recharger
             if self.nom_onglet in self._fe.tableaux:
                 pass
             else:  # Sinon _fe a été initialisé à minima (juste le chemin) et il faut le charger
                 timer.debut("Chargement fiche de coûts")
                 self._fe = FichierExcel.depuis_fichier(chemin_fichier=self.chemin, nom_onglet=self.nom_onglet)
                 timer.fin()
+        
         elif self._fe is None:  # Si aucun fichier Excel n'est dans l'instance (i.e. pas de chemin pour la FdC), alors on ouvre un filedialog
             chemin = self._choisir_fdc()
             if chemin is not None:
@@ -94,6 +99,7 @@ class FdC:
                 timer.fin()
             else:
                 vlog.log_erreur("Le fichier FdC n'a pas été sélectionné")
+        
         else: # Pas besoin de le charger
             vlog.log_erreur("Je suis sorti des conditions sans avoir chargé ma FdC")
        
@@ -201,24 +207,23 @@ class FdC:
         return self.tableau["C17"]
 
     @property
-    def date_creationFormation(self) -> int:
+    def annee_creationFormation(self) -> int:
         """
         Retourne l'année de conception de la formation (C9).
-        TODO : on retourne une année alors qu'on pourrait retourner un DateTime
         
         :return: l'année de conception de la formation
         :rtype: int
         """
-        dateCreationFormation = self.tableau["C9"]
+        anneeCreationFormation = self.tableau["C9"]
 
-        if isinstance(dateCreationFormation, int):
-            dateCreationFormation = dateCreationFormation
-        elif hasattr(dateCreationFormation, 'year'):
-            dateCreationFormation = dateCreationFormation.year
+        if isinstance(anneeCreationFormation, int):
+            anneeCreationFormation = anneeCreationFormation
+        elif hasattr(anneeCreationFormation, 'year'):
+            anneeCreationFormation = anneeCreationFormation.year
         else:
-            print(f"Valeur inattendue pour une année : {dateCreationFormation} (type {type(dateCreationFormation)})")
-            dateCreationFormation = 1900
-        return dateCreationFormation
+            print(f"Valeur inattendue pour une année : {anneeCreationFormation} (type {type(anneeCreationFormation)})")
+            anneeCreationFormation = 1900
+        return anneeCreationFormation
 
     @property
     def min_participants_cea(self) -> int:
