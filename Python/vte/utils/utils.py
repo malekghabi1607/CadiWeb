@@ -731,7 +731,7 @@ def chemin_vers_unc(path:Path|str, retour_type:Type[Path]|Type[str]=Path) -> Pat
         unc_path = uni_name_info.lpUniversalName
         return retour_type(unc_path)
     else:
-        print(f"Conversion UNC échouée (code erreur : {result}). Chemin renvoyé tel quel.")
+        #print(f"Conversion UNC échouée (code erreur : {result}). Chemin renvoyé tel quel.")
         return retour_type(path)
 
 

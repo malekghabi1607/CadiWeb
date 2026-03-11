@@ -72,7 +72,7 @@ class FdC:
 
         return choisir_fichier(titre=f"Sélectionner la fiche de coûts à employer.",
                         types_fichiers=[("Fichiers Excel", "*.xlsx")],
-                        dossier_initial=config.format_path(config.REPERTOIRE_FDC, trigramme_formation=self.trigramme_formation),
+                        dossier_initial=self.dossier_plan_classement,
                         texte_bouton_choisir=f"Choisir FdC à nouveau"
                         )
 
@@ -180,7 +180,9 @@ class FdC:
         sDateFdC = dateFdC.strftime("%d/%m/%Y")
         return sDateFdC
 
-
+    @property
+    def dossier_plan_classement(self) -> Path:
+        return config.format_path(config.REPERTOIRE_FDC, trigramme_formation=self.trigramme_formation)
 
 
     # ========================================================

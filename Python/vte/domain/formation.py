@@ -4,7 +4,7 @@ from typing import Optional
 from collections.abc import Iterable
 
 from vte.domain.evalStat import EvalStat_formation
-from vte.fdc import FdC
+from vte.domain.fdc import FdC
 from vte.domain.session import Session
 from vte.utils.utils import convertir_collection
 

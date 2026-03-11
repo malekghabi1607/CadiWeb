@@ -49,6 +49,7 @@ def tel():
         "chemin_IRIS_sessions": chemin_vers_unc(Path(r"R:\_Echanges\VTE\Prog\IRIS\Extracts complets\TESTS - TEL - R04110_Sessions-COMPLET.xlsx")),  # Extract IRIS sessions contenant le code IRIS        
 
 
+
         # ----------------------------
         # PROPRIETES PLUSIEURS SESSIONS 
         # ----------------------------         

@@ -1,13 +1,10 @@
 from __future__ import annotations
-from collections import defaultdict
 from pathlib import Path
 from typing import Optional, Protocol
 
 import pandas as pd
 
 from vte.core import config
-#from vte.domain.formation import Formation → Ref circulaire
-#from vte.domain.session import Session → Ref circulaire
 from vte.core.iris_referentiel import *
 from vte.utils.office import FichierExcel
 from vte.utils.utils import *
