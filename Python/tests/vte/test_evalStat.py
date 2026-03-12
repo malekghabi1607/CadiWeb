@@ -1,15 +1,14 @@
 from pathlib import Path
 import shutil
 
-import pandas as pd
 from unittest.mock import patch
 
 import pytest
 
 from vte.domain.formation import Formation
+from vte.domain.session import Session
 from vte.domain.evalStat import EvalStat, EvalStat_session, EvalStat_formation
 
-from vte.domain.session import Session
 from vte.utils.utils import backup_fichier_test, restore_nom_fichier_test
 
 @pytest.fixture
