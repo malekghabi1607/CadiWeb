@@ -10,7 +10,7 @@ from vte.utils.office import FichierExcel
 from vte.utils.utils import *
 from vte.utils.utils_instn import recupere_trig_formation_depuis_chemin
 
-# TODO : Pour l'instant c'est une classe de traitemnt. Le jour où j'ai besoin d'ouvrir un EvalStat pour le lire uniquement, prendre modèle sur IRIS avec des classes de lecture et de traitement
+# TODO : Pour l'instant c'est une classe de traitement. Le jour où j'ai besoin d'ouvrir un EvalStat pour le lire uniquement, prendre modèle sur IRIS avec des classes de lecture et de traitement
 
 # ======================================================================================
 # PROTOCOLES

@@ -22,7 +22,7 @@ class Formation:
         self._trigramme_formation:str = trigramme_formation
 
         # Une formation a une fiche de coûts
-        #self._fdc:Optional[FdC] = None
+        self._fdc:Optional[FdC] = None
         
         # Une formation a une évaluation stagiaire de la formation (regroupement de toutes les évaluations stagiaires de toutes les sessions)
         self._eval:Optional[EvalStat_formation] = None
@@ -127,6 +127,14 @@ class Formation:
         if self._eval is None:
             self._eval = EvalStat_formation.avec_ouverture(formation=self)
 
+    def _ajout_FdC_avec_ouverture(self, chemin_fdc:Optional[Path|str] = None) -> None:
+        """
+        Ajoute la fiche de coûts de la formation à l'instance de Formation (i.e. renseigne self._fdc)
+
+        La fiche de coût est ouverte si elle existe.
+        """
+        self._fdc = FdC.depuis_chemin(formation=self, chemin_fdc=chemin_fdc)
+
 
 
     # =========================
@@ -185,7 +193,7 @@ class Formation:
     # === GETTERS / SETTERS ===
     # =========================
     @property
-    def trigramme_formation(self) -> str|None:
+    def trigramme_formation(self) -> Optional[str]:
         """
         Renvoie le trigramme de la formation.
         
@@ -195,7 +203,7 @@ class Formation:
         return self._trigramme_formation
     
     @property
-    def sessions(self) -> dict[int, Session]|None:
+    def sessions(self) -> Optional[dict[int, Session]]:
         """
         Renvoie le dictionnaire des sessions de la formation.
         
@@ -205,9 +213,17 @@ class Formation:
         return self._sessions
     
     @property
-    def eval(self) -> EvalStat_formation|None:
+    def eval(self) -> Optional[EvalStat_formation]:
         return self._eval
     
     @eval.setter
     def eval(self, valeur:EvalStat_formation) -> None:
         self._eval = valeur
+
+    @property
+    def fdc(self) -> Optional[FdC]:
+        return self._fdc
+    
+    @fdc.setter
+    def fdc(self, valeur:FdC) -> None:
+        self._fdc = valeur

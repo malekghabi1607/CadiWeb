@@ -1208,6 +1208,20 @@ def convertir_en_liste(val: Optional[Union[str, List[str], tuple, pd.Series]]) -
         # Cas inattendu
         raise TypeError(f"Type non supporté pour conversion en liste : {type(val)}")
 
+def convertir_chemin_en_path(chemin:Optional[str|Path]) -> Optional[Path]:
+    """
+    Convertit un chemin str ou un Path en Path
+
+    :param chemin: Chemin à convertir
+    :type valeur: Optional[Path|str]
+    :return: Chemin converti en Path
+    :rtype: Optional[Path]
+    """
+    if isinstance(chemin, str):
+        return Path(chemin)
+    else:
+        return chemin
+
 def tuple_vers_liste_de_listes(t):
     """
     Permet de transformer un tuple (2, 4) en liste de listes [[2], [4]]

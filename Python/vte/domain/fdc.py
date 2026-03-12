@@ -57,6 +57,22 @@ class FdC:
         # Chargement de la FdC
         self._charger_fdc()
 
+    @classmethod
+    def depuis_chemin(cls, formation: Optional[Formation_protocol] = None, chemin_fdc: Optional[Path|str] = None) -> FdC:
+        """
+        Initialise une instance FdC à partir du chemin de la FdC.
+
+        :param formation: l'instance de Formation pour la fiche de coûts (nécessaire uniquement pour facilite la sélection du fichier de FdC (pré-sélection répertoire))
+        :type formation: Optional[Formation_protocol], optional
+        :param chemin_fdc: Objet FichierExcel de la fiche de coûts (contient le chemin de la FdC).
+        :type fe: Optional[Path|str], optional
+        """
+
+        fe = FichierExcel(chemin_fichier=convertir_chemin_en_path(chemin_fdc))
+        instance = FdC(formation=formation, fe=fe)
+
+        return instance
+        
         
     # =========================
     # === METHODES INTERNES ===

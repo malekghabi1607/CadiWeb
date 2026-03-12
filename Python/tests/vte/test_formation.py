@@ -106,7 +106,7 @@ def test_traiter_eval_sessions(mock, tel):
     formation.eval.ecritdf_et_sauve_siModif.assert_called_once()
 
 
-
+#TODO terster _ajout_FdC_avec_ouverture
 
 
 """

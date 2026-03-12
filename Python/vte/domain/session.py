@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Optional, Protocol
 
 from vte.domain.evalStat import EvalStat_session, EvalStat_formation
-#from vte.domain.evalStat import *
 
 class Formation_protocol(Protocol):
     @property

@@ -536,17 +536,18 @@ class IRIS:
     # ==========================
     # === IHM ===
     # ==========================
-    # TODO : attention, je convertis les codes IRIS en str. Pourquoi ??
+    # TODO : attention, je convertissais les codes IRIS en str. J'ai remis en int
     @staticmethod
-    def demander_liste_codes_IRIS(message="Pour exclure des sessions : entrez un ou plusieurs code IRIS (numéro à 5 chiffres) séparés par des espaces ou des virgules (ou rien pour passer) : ") -> list[str]:
+    def demander_liste_codes_IRIS(message="Pour exclure des sessions : entrez un ou plusieurs code IRIS (numéro à 5 chiffres) séparés par des espaces ou des virgules (ou rien pour passer) : ", type_sortie:int|str=int) -> list[int|str]:
         """
         Demande en console à l'utilisateur une liste de codes IRIS séparés par des virgules
 
-        Args:
-            message (str, optional): Message à afficher à l'utilisateur pour demander cette liste. Defaults = "Pour exclure des sessions : entrez un ou plusieurs code IRIS (numéro à 5 chiffres) séparés par des espaces ou des virgules (ou rien pour passer) : ".
-
-        Returns:
-            list[str]: Liste des codes IRIS sélectionnés par l'utilisateur
+        :param message: Message à afficher à l'utilisateur pour demander cette liste. Defaut = "Pour exclure des sessions : entrez un ou plusieurs code IRIS (numéro à 5 chiffres) séparés par des espaces ou des virgules (ou rien pour passer) : ".
+        :type message: str, optional
+        :param type_sortie: type des éléments de la liste de sortie (int ou str), défaut = int
+        :type type_sortie: int | str, optional
+        :return: Liste des codes IRIS sélectionnés par l'utilisateur
+        :rtype: list[int|str]
         """
         while True:
             entree = input(message).strip()
@@ -558,9 +559,13 @@ class IRIS:
             try:
                 # On teste le typage en int
                 l_entiers = [int(v.strip()) for v in entree.replace(',', ' ').split()]
-                # On reconvertit en str avant sortie méthode
-                l_str = [str(v) for v in l_entiers]
-                return l_str
+
+                if type_sortie == int:
+                    return l_entiers
+                else:
+                    # On reconvertit en str avant sortie méthode
+                    l_str = [str(v) for v in l_entiers]
+                    return l_str
 
             except ValueError:
                 print("Erreur : veuillez entrer uniquement des nombres entiers, séparés par des espaces ou des virgules.")
@@ -669,12 +674,6 @@ class IRIS_natif(IRIS):
     Classe qui gère les extracts IRIS natifs
     """
     
-    # TODO : ci-après
-    """
-    après traitement des N° session, le code_IRIS est un str dans le fichier Excel.
-    C'est "Normal" car quand on a des exceptions de mauvais nommage (et donc le regEx merde) on peut peut se retrouver avec des lettres qui trainent et donc on n'a pas un entier.
-    Voir si traitable
-    """
     # =====================
     # === CONSTRUCTEURS ===
     # =====================
@@ -1180,7 +1179,22 @@ class IRIS_traite(IRIS):
         # Retourner le chemin du fichier le plus récent
         return fichier_iris_plus_recent
 
+    # =========================
+    # === Méthodes externes ===
+    # =========================
+    def affiche_df_moins_de_colonnes(df:pd.DataFrame) -> None:
+        """
+        print le DataFrame avec filtre des colonnes pour affichage : ['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Présents', 'Statut Session', 'N° Session']
 
+        :param df: DataFrame à afficher
+        :type df: pd.DataFrame
+        """
+        print(tabulate(
+            df[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Présents', 'Statut Session', 'N° Session']], 
+            headers='keys', 
+            tablefmt='pretty', 
+            showindex=False
+        ))
 
     # ==============================
     # === Méthodes filtrer le df ===
@@ -1307,6 +1321,12 @@ class IRIS_traite(IRIS):
                     dossier_initial=self.cei._output.repertoire, # Pour aller vers mes fichiers concaténés, sinon pour les originaux il faut pointer vers input
                     texte_bouton_choisir=f"Choisir extract IRIS {str.lower(self._typeExport)} {self.cei._codeExport} à nouveau"
                     )
+
+
+    # =========================
+    # ===  GETTER / SETTER  === 
+    # =========================
+
 
 
 # ==========================

@@ -62,6 +62,7 @@ def fe_factory(chemin_fdc):
         ),
     ]
 
+
 # ---------- TESTS ----------
 """
 # Test unitaire
@@ -82,6 +83,9 @@ def test_constructeur(fe_factory, tel, ife):
     fdc = FdC(formation=formation, fe=fe)
 
     assert fdc.min_participants_cea == 3
+
+
+# TODO : rajouter constructeur depuis_chemin(...)
 
 
 """
