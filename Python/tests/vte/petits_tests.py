@@ -1,5 +1,4 @@
 from vte.utils.utils import *
-from vte.instn import *
 from vte.domain.formation import Formation
 #test = BilanFormation_V3("TEL", 2024) # Complet (sessions UEM + UECC)
 #test = BilanFormation_V3("948", 2024) # Bon test car 2023 n'a rien
@@ -11,6 +10,6 @@ from vte.domain.formation import Formation
 trigramme_formation = "TEL"
 
 formation = Formation(trigramme_formation=trigramme_formation)
-formation.ajout_session(15697)
+formation.ajout_sessions(15697)
 
 print(formation.sessions)

@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import MagicMock
 from datetime import timedelta, date, datetime
 
-from ihm_console import IHM_console
+from vte.ihm_console import IHM_console
 
 # =============================================================================
 # CLASSES FICTIVES POUR LES TESTS

@@ -1,4 +1,4 @@
-from vte.office import *  # <-- adapte avec ton vrai nom de module
+from vte.utils.office import *  # <-- adapte avec ton vrai nom de module
 
 import pytest
 from pathlib import Path
