@@ -1,4 +1,11 @@
 {
     "python.pythonPath": "C:\\Program Files\\Python313\\python.exe",
-    "python.analysis.extraPaths": ["./"]
+    "python.analysis.extraPaths": [
+        "./"
+    ],
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
 }
