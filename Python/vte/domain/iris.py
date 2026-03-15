@@ -1033,80 +1033,6 @@ class IRIS_traite(IRIS):
 
             timer.fin()
 
-    def _demande_sessions_a_exclure(self, trigramme_formation:str = None, annee:Optional[int] = None, periode:Optional[str] = None) -> Tuple[pd.DataFrame, List[int]]:
-        """
-        Demande à l'utilisateur les sessions qu'il souhaite exclure de la période choisie :
-           - on applique un filtre sur une période + trigramme au dataframe de l'extract IRIS
-           - on affiche le résultat
-           - l'utilisateur définit les codes IRIS qu'il veut exclure
-        
-        On retourne :
-           - un dataframe df_sessions_filtre à jour
-           - #la liste des codes IRIS retenus (plus maintenant : pour l'avoir on peut faire df_filtre["Code IRIS"].tolist())
-           - la liste des codes IRIS exclus
-        
-        :param trigramme_formation: trigramme de la formation à filtrer
-        :type trigramme_formation: str
-        :param annee: année à filtrer
-        :type annee: Optional[int]
-        :param periode: période à filtrer
-        :type periode: Optional[str]
-        :return: un dataframe df_sessions_filtre à jour, la liste des codes IRIS exclus
-        :rtype: Tuple[pd.Dataframe, List[int]]
-        """
-
-        # Liste des sessions qui seront exclues par l'utilisateur
-        codes_sessions_exclues_par_utilisateur = []
-
-        # Renseigne les valeurs par défaut de période et année si None
-        annee, periode = periode(annee, periode)
-
-        # On filtre sur le trigramme et la période demandée
-        df_filtre = self.df_filtre_periode(trigramme_formation=trigramme_formation, annee=annee, periode=periode)
-
-        # On affiche à l'utilisateur les sessions et dates et statuts 
-        vlog.print("Info", f"\nListe des sessions {trigramme_formation} dans {self.chemin.name} - {periode} {annee}", style=["jaune"])
-
-        # Adaptation format date
-        df_filtre['Date début ses.'] = pd.to_datetime(df_filtre['Date début ses.']).dt.strftime("%d/%m/%Y")
-        df_filtre['Date fin ses.'] = pd.to_datetime(df_filtre['Date fin ses.']).dt.strftime("%d/%m/%Y")
-
-        print(tabulate(
-            df_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Nommés', 'Statut Session', 'N° Session']], 
-            headers='keys', 
-            tablefmt='pretty', 
-            showindex=False
-        ))
-        
-        # On demande à l'utilisateur les sessions qu'il veut exclure
-        exclusionSessions = self.demander_liste_codes_IRIS()
-        if exclusionSessions:  # si la liste n'est pas vide
-            # On trace l'exclusion des sessions
-            codes_sessions_exclues_par_utilisateur = df_filtre.loc[df_filtre["Code IRIS"].isin(exclusionSessions), "N° Session"].unique().tolist()
-            #for session_exclue in exclusionSessions:
-            #    codes_sessions_exclues_par_utilisateur.append(df_filtre.loc[df_filtre["Code IRIS"] == session_exclue, "N° Session"].iloc[0])
-
-            # On met à jour _df_sessions_filtre en enlevant les sessions exclues
-            df_filtre = df_filtre[~df_filtre['Code IRIS'].isin(exclusionSessions)]
-        else:
-            # la liste est vide, on ne filtre rien, on garde tout
-            pass
-
-        # On affiche à l'utilisateur les sessions finalement retenues
-        vlog.print("Info", "\nSessions retenues pour le bilan :", style=["jaune"])
-        print(tabulate(
-            df_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Nommés', 'Statut Session', 'N° Session']], 
-            headers='keys', 
-            tablefmt='pretty', 
-            showindex=False
-        ))
-
-
-        # pour avoir la liste des codes IRIS retenus : df_filtre["Code IRIS"].tolist()
-
-        # On retourne les codes_IRIS des sessions retenues + exploitationBilan 
-        return df_filtre, codes_sessions_exclues_par_utilisateur
-
     def _convertit_types_colonnes_df(self):
         """
             L'import du df convertit en entiers ou en d'autres types certaines colonnes alors que ça ne devrait pas (ex. : trigrammes, code IRIS sur l'extract sessions).
@@ -1195,6 +1121,80 @@ class IRIS_traite(IRIS):
             tablefmt='pretty', 
             showindex=False
         ))
+
+    def demande_sessions_a_exclure(self, trigramme_formation:str = None, annee:Optional[int] = None, periode:Optional[str] = None) -> Tuple[pd.DataFrame, List[int]]:
+        """
+        Demande à l'utilisateur les sessions qu'il souhaite exclure de la période choisie :
+           - on applique un filtre sur une période + trigramme au dataframe de l'extract IRIS
+           - on affiche le résultat
+           - l'utilisateur définit les codes IRIS qu'il veut exclure
+        
+        On retourne :
+           - un dataframe df_sessions_filtre à jour
+           - #la liste des codes IRIS retenus (plus maintenant : pour l'avoir on peut faire df_filtre["Code IRIS"].tolist())
+           - la liste des codes IRIS exclus
+        
+        :param trigramme_formation: trigramme de la formation à filtrer
+        :type trigramme_formation: str
+        :param annee: année à filtrer
+        :type annee: Optional[int]
+        :param periode: période à filtrer
+        :type periode: Optional[str]
+        :return: un dataframe df_sessions_filtre à jour, la liste des codes IRIS exclus
+        :rtype: Tuple[pd.Dataframe, List[int]]
+        """
+
+        # Liste des sessions qui seront exclues par l'utilisateur
+        codes_sessions_exclues_par_utilisateur = []
+
+        # Renseigne les valeurs par défaut de période et année si None
+        annee, periode = periode(annee, periode)
+
+        # On filtre sur le trigramme et la période demandée
+        df_filtre = self.df_filtre_periode(trigramme_formation=trigramme_formation, annee=annee, periode=periode)
+
+        # On affiche à l'utilisateur les sessions et dates et statuts 
+        vlog.print("Info", f"\nListe des sessions {trigramme_formation} dans {self.chemin.name} - {periode} {annee}", style=["jaune"])
+
+        # Adaptation format date
+        df_filtre['Date début ses.'] = pd.to_datetime(df_filtre['Date début ses.']).dt.strftime("%d/%m/%Y")
+        df_filtre['Date fin ses.'] = pd.to_datetime(df_filtre['Date fin ses.']).dt.strftime("%d/%m/%Y")
+
+        print(tabulate(
+            df_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Nommés', 'Statut Session', 'N° Session']], 
+            headers='keys', 
+            tablefmt='pretty', 
+            showindex=False
+        ))
+        
+        # On demande à l'utilisateur les sessions qu'il veut exclure
+        exclusionSessions = self.demander_liste_codes_IRIS()
+        if exclusionSessions:  # si la liste n'est pas vide
+            # On trace l'exclusion des sessions
+            codes_sessions_exclues_par_utilisateur = df_filtre.loc[df_filtre["Code IRIS"].isin(exclusionSessions), "N° Session"].unique().tolist()
+            #for session_exclue in exclusionSessions:
+            #    codes_sessions_exclues_par_utilisateur.append(df_filtre.loc[df_filtre["Code IRIS"] == session_exclue, "N° Session"].iloc[0])
+
+            # On met à jour _df_sessions_filtre en enlevant les sessions exclues
+            df_filtre = df_filtre[~df_filtre['Code IRIS'].isin(exclusionSessions)]
+        else:
+            # la liste est vide, on ne filtre rien, on garde tout
+            pass
+
+        # On affiche à l'utilisateur les sessions finalement retenues
+        vlog.print("Info", "\nSessions retenues pour le bilan :", style=["jaune"])
+        print(tabulate(
+            df_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Nommés', 'Statut Session', 'N° Session']], 
+            headers='keys', 
+            tablefmt='pretty', 
+            showindex=False
+        ))
+
+
+        # pour avoir la liste des codes IRIS retenus : df_filtre["Code IRIS"].tolist()
+
+        # On retourne les codes_IRIS des sessions retenues + exploitationBilan 
+        return df_filtre, codes_sessions_exclues_par_utilisateur
 
     # ==============================
     # === Méthodes filtrer le df ===

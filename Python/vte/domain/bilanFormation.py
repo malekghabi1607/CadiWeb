@@ -61,7 +61,7 @@ class BilanFormation:
 
 
     # =========================
-    # === Propriétés === 
+    # === GETTERS / SETTERS === 
     # =========================
     @property
     def annee(self) -> Optional[int]:
@@ -173,7 +173,7 @@ class BilanFormation_V3(BilanFormation):
        
 
     @classmethod
-    def bilanUnique(cls, formation:Formation_protocol, annee:int, chemin_IRIS_sessions:Optional[Path]=None, chemin_IRIS_ventes:Optional[Path], chemin_fdc:Optional[Path]) -> None:
+    def bilanUnique(cls, formation:Formation_protocol, annee:int, chemin_IRIS_sessions:Optional[Path]=None, chemin_IRIS_ventes:Optional[Path]=None, chemin_fdc:Optional[Path]=None) -> None:
         
         instance = cls(formation=formation, annee=annee)
 

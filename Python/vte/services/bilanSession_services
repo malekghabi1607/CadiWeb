@@ -1,4 +1,4 @@
-self._codes_IRIS:Optional[List[str]] = []
+#self._codes_IRIS:Optional[List[str]] = []
 
 
 # TODO : définir à partir de code_IRIS sans avoir à rentrer formation, année... car tout ça on peut avoir de session IRIS et code IRIS
@@ -16,6 +16,10 @@ def bilanUnique_parCodeIRIS(cls, code_IRIS:int):
         #instance._periodeSessionsEvaluees = f"{numSession}"
         instance._periodeSessionsEvaluees = instance._periode
 
+# TODO : définir à partir de période sans avoir besoin de formation
+def depuis_periode(cls, codeFormation:str, annee:int, periode:str) -> None:
+     pass
+
 @classmethod
 def plusieursBilans_parCodeIRIS(cls, liste_codes_IRIS:list[int]) -> None:
     """
@@ -31,60 +35,7 @@ def plusieursBilans_parCodeIRIS_fichierConfig(cls) -> None:
     cls.plusieursBilans_parCodeIRIS(user_config.liste_codes_IRIS)
 
 
-@classmethod   
-def bilanUnique_parPeriode(cls, codeFormation:str, annee:int, periode:str) -> None:
-    """
-    Permet de générer un bilan de session selon une période qui est l'un de ces éléments : ["1er semestre", "2nd semestre", "Année"]
-    Ex : BilanSession.bilanUnique_parPeriode("948", 2024, "Année")
-    """
 
-    instance = cls()
-
-    instance._codeFormation = codeFormation
-    instance._annee = annee
-    instance._periode = periode
-    instance._periodeSessionsEvaluees = f"{instance._periode} {instance._annee}"
-
-
-    # Chemin du bilan word
-    instance._chemin_word_bilan_session_output = config.format_path(config.CHEMIN_WORD_BILAN_SESSION_OUTPUT, trigramme_formation=instance._codeFormation, annee=instance._annee, periode=instance._periodeSessionsEvaluees, unite=config.UNITE)
-
-    # On teste la pré-existance du bilan Word
-    continuer = tester_existance_fichier(instance._chemin_word_bilan_session_output)
-
-    if continuer:
-        # Ouverture / création du dataframe de l'extract IRIS sessions filtré selon la période demandée
-        instance._charger_df_sessions_filtre_selon_periode()
-
-        # On met à jour df_sessions_filtre selon les sessions que souhaite garder / exclure l'utilisateur
-        instance._demande_sessions_a_exclure()
-        #print("\nÉtat de Excel sessions filtré sur période et trigramme :")
-        #pprint(instance._df_sessions_filtre)
-
-        # S'il n'y a plus de session à lire dans _df_sessions_filtre, alors il n'y a plus de raison de faire le bilan
-        if len(instance._df_sessions_filtre) != 0 :
-            # On met à jour l'Excel evalstat de la formation si des sessions demandées par l'utilisateur ne s'y trouvent pas
-            instance._maj_evalstat_formation()
-
-            # On calcule les stats
-            instance._calculer_stats_criteres()
-            #pprint(instance._stats_stagiaires)
-
-            # On construit le bilan de session (bilan de session V3)
-            instance._bilanSessionV3()
-
-            # On ouvre le word
-            FichierWord.depuisFichier(chemin_fichier=instance._chemin_word_bilan_session_output, charger_contentControl=False, afficherWord=True)
-
-            # On envoie un mail au chef d'unité pour la signature du pdf
-            instance._envoyer_mail_chef_unite()
-
-
-        else:
-            vlog.print("Info", f"⚠️ Toutes les sessions sont exclues : il n'y a plus de raison de faire le bilan de session.")
-    
-    else:
-        print("❌  Bilan de session déjà existant → Arrêt du traitement du bilan par l'utilisateur")
 
 
 
