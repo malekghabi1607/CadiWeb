@@ -21,7 +21,7 @@ class EvalStat_services:
     Services métier autour des exports IRIS.
     """
     @staticmethod
-    def traiter_evalStat_depuis_dico_csv(dico_csv:dict[str, dict[int, Path]], chemin_IRIS_sessions:Optional[Path]=None, ouvrirDossier:bool=False) -> dict[str, dict[str, str]]:
+    def traiter_evalStat_depuis_dico_csv(dico_csv:dict[str, dict[int, Path]], ouvrirDossier:bool=False) -> dict[str, dict[str, str]]:
         """
         A partir d'un dictionnaire CSV stagiaire
         Permet de :
@@ -32,8 +32,6 @@ class EvalStat_services:
 
         :param dico_csv: dictionnaire CSV généré par EvalStat_session.construire_dictionnaire_trigrammeFormation_codeIRIS_cheminsCSV_depuis_iterableCSV
         :type dico_csv: dict[str, dict[int, Path]]
-        :param chemin_IRIS_sessions: Chemin du fichier IRIS sessions à employer si l'utilisateur ne veut pas celui par défaut. Defaults = None = Fichier généré le plus récent dans le répertoire donné en config.
-        :type chemin_IRIS_sessions: Optional[Path], optional
         :param ouvrirDossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
         :type ouvrirDossier: bool, optional
         :return: Une liste de dictionnaires {codeIRIS,{"fichier": chemin_csv,"statut": statut_csv}}. Je pourrai accéder à la valeur par nom_dico[codeIRIS]["fichier"] ou nom_dico[codeIRIS]["statut"]
@@ -54,7 +52,6 @@ class EvalStat_services:
                 session = formation.sessions[code_IRIS]
                 session.ajout_evalStat_avec_traitement(
                     chemin_csv=chemin_csv,
-                    chemin_IRIS_sessions=chemin_IRIS_sessions,
                     ecrire_eval_formation=False,  # On sauvegardera après la boucle de traitement
                     ouvrirDossier=ouvrirDossier
                 )
@@ -73,7 +70,7 @@ class EvalStat_services:
         return statuts_csv
 
     @staticmethod
-    def traiter_evalStat_depuis_iterable_de_csv(tuple_csv_stagiaires:Iterable[Path|str], chemin_IRIS_sessions:Optional[Path]=None, ouvrirDossier:bool=False) -> dict[str, dict[str, str]]:
+    def traiter_evalStat_depuis_iterable_de_csv(tuple_csv_stagiaires:Iterable[Path|str], ouvrirDossier:bool=False) -> dict[str, dict[str, str]]:
         """
         A partir d'un itérable de chemins de CSV stagiaire
         Permet de :
@@ -84,8 +81,6 @@ class EvalStat_services:
 
         :param tuple_csv_stagiaires: Itérable des CSV des évaluations à traiter.
         :type tuple_csv_stagiaires: Iterable[Path | str]
-        :param chemin_IRIS_sessions: Chemin du fichier IRIS sessions à employer si l'utilisateur ne veut pas celui par défaut. Defaults = None = Fichier généré le plus récent dans le répertoire donné en config.
-        :type chemin_IRIS_sessions: Optional[Path], optional
         :param ouvrirDossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
         :type ouvrirDossier: bool, optional
         :return: Une liste de dictionnaires {codeIRIS,{"fichier": chemin_csv,"statut": statut_csv}}. Je pourrai accéder à la valeur par nom_dico[codeIRIS]["fichier"] ou nom_dico[codeIRIS]["statut"]
@@ -95,12 +90,12 @@ class EvalStat_services:
         dico_csv = EvalStat_session.construire_dictionnaire_trigrammeFormation_codeIRIS_cheminsCSV_depuis_iterableCSV(tuple_csv_stagiaires)
 
         # Dictionnaire des retours du traitement
-        statuts_csv = EvalStat_services.traiter_evalStat_depuis_dico_csv(dico_csv=dico_csv, chemin_IRIS_sessions=chemin_IRIS_sessions, ouvrirDossier=ouvrirDossier)
+        statuts_csv = EvalStat_services.traiter_evalStat_depuis_dico_csv(dico_csv=dico_csv, ouvrirDossier=ouvrirDossier)
         
         return statuts_csv
 
     @staticmethod
-    def traiter_evalStat_depuis_liste_codes_IRIS(codes_IRIS:Iterable[int], formation:Optional[Formation]=None, chemin_IRIS_sessions:Optional[Path]=None, ouvrirDossier:bool=False) -> dict[str, dict[str, str]]:
+    def traiter_evalStat_depuis_liste_codes_IRIS(codes_IRIS:Iterable[int], formation:Optional[Formation]=None, ouvrirDossier:bool=False) -> dict[str, dict[str, str]]:
         """
         A partir d'un itérable de codes IRIS
         Permet de :
@@ -111,17 +106,15 @@ class EvalStat_services:
         :type codes_IRIS: Iterable[int]
         :param formation: l'evalFormation pour vérifier si on doit traiter l'EvalStat + le trigramme de la formation qui sert à mieux pointer le répertoire pour sélectrionner le CSV.
         :type formation: Optional[Formation_protocol], Optional
-        :param chemin_IRIS_sessions: Chemin du fichier IRIS sessions à employer si l'utilisateur ne veut pas celui par défaut. Defaults = None = Fichier généré le plus récent dans le répertoire donné en config.
-        :type chemin_IRIS_sessions: Optional[Path], optional
         :param ouvrirDossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
         :type ouvrirDossier: bool, optional
         :return: Une liste de dictionnaires {codeIRIS,{"fichier": chemin_csv,"statut": statut_csv}}. Je pourrai accéder à la valeur par nom_dico[codeIRIS]["fichier"] ou nom_dico[codeIRIS]["statut"]
         :rtype: dict[str, dict[str, str]]
         """
         # Dictionnaire des csv sous une forme qui nous arrange pour le traitement à venir ; on fait une première exclusion des EvalStat déjà dans eval formation
-        dico_csv = EvalStat_session.construire_dictionnaire_trigrammeFormation_codeIRIS_cheminsCSV_depuis_iterableCodesIRIS(codes_IRIS=codes_IRIS, formation=formation, chemin_IRIS_sessions=chemin_IRIS_sessions)
+        dico_csv = EvalStat_session.construire_dictionnaire_trigrammeFormation_codeIRIS_cheminsCSV_depuis_iterableCodesIRIS(codes_IRIS=codes_IRIS, formation=formation)
 
         # Dictionnaire des retours du traitement
-        statuts_csv = EvalStat_services.traiter_evalStat_depuis_dico_csv(dico_csv=dico_csv, chemin_IRIS_sessions=chemin_IRIS_sessions, ouvrirDossier=ouvrirDossier)
+        statuts_csv = EvalStat_services.traiter_evalStat_depuis_dico_csv(dico_csv=dico_csv, ouvrirDossier=ouvrirDossier)
 
         return statuts_csv

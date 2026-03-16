@@ -96,7 +96,6 @@ def test_traiter_eval_sessions(mock, tel):
 
     formation.traiter_eval_sessions(
         chemin_csv=None,
-        chemin_IRIS_sessions=None,
         ouvrirDossier=False
     )
 

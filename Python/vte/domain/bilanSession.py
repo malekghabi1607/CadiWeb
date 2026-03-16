@@ -109,7 +109,7 @@ class BilanSession:
     (foramtion, codes_iris, période, année...) → Peut-être mettre dans __init__ ?
     """
     @classmethod   
-    def depuis_codesIRIS(cls, formation:Formation_protocol, codes_IRIS:Iterable[int], chemin_IRIS_sessions:Optional[Path]=None) -> BilanSession:
+    def depuis_codesIRIS(cls, formation:Formation_protocol, codes_IRIS:Iterable[int]) -> BilanSession:
         """
         Génère un bilan de session à partir d'un code IRIS (un bilan pour une session)
 
@@ -117,8 +117,6 @@ class BilanSession:
         :type formation: Formation_protocol
         :param codes_IRIS: Codes IRIS de/des session(s) pour laquelle/lesquells on souhaite faire un bilan
         :type codes_IRIS: Iterable[int]
-        :param chemin_IRIS_sessions: chemin IRIS sessions à employer si l'utilisateur en souhaite un différent que celui par défaut
-        :type chemin_IRIS_sessions: Optional[Path], optional
         :return: Un objet bilan de session de ce code IRIS
         :rtype: BilanSession
         """
@@ -126,7 +124,7 @@ class BilanSession:
 
 
     @classmethod   
-    def depuis_codeIRIS(cls, formation:Formation_protocol, code_IRIS:int, annee:Optional[int]=None, chemin_IRIS_sessions:Optional[Path]=None) -> BilanSession:
+    def depuis_codeIRIS(cls, formation:Formation_protocol, code_IRIS:int, annee:Optional[int]=None) -> BilanSession:
         """
         Génère un bilan de session à partir d'un code IRIS (un bilan pour une session)
 
@@ -136,20 +134,18 @@ class BilanSession:
         :type formation: Formation_protocol
         :param annee: Année du bilan (s'il n'est pas donné on l'obtiendra d'IRIS sessions)
         :type annee: Optional[int], optional
-        :param chemin_IRIS_sessions: chemin IRIS sessions à employer si l'utilisateur en souhaite un différent que celui par défaut
-        :type chemin_IRIS_sessions: Optional[Path], optional
         :return: Un objet bilan de session de ce code IRIS
         :rtype: BilanSession
         """
         # === ON VERIFIE QU'IRIS SESSIONS CONTIENT BIEN LE CODE IRIS ===
         # On charge IRIS sessions et on vérifie qu'on a bien une ligne sinon on sort
-        # J'ai viré cette méthode car redondant : df_sessions_filtre_codeIRIS = BilanSession.charge_IRIS_session_et_verifie_codeIRIS(code_IRIS=code_IRIS, chemin_IRIS_sessions=chemin_IRIS_sessions)
+        # J'ai viré cette méthode car redondant : df_sessions_filtre_codeIRIS = BilanSession.charge_IRIS_session_et_verifie_codeIRIS(code_IRIS=code_IRIS)
         if annee is None:
             annee = int(self.df_sessions_filtre_codeIRIS["Année début ses."].iloc[0])
 
         # On initialise l'instance 
         instance = cls(formation=formation, annee=annee)
-        instance._iris_sessions = get_iris(typeExport="Sessions", chemin=chemin_IRIS_sessions)
+        instance._iris_sessions = get_iris(typeExport="Sessions")
 
 
         # === ON FAIT LES AUTRES VERIFICATIONS QUI ANNULERAIENT LE TRAITEMENT ===
@@ -172,7 +168,7 @@ class BilanSession:
         # On affecte les autres données de base à la main
         # instance.code_IRIS = code_IRIS  # Déjà affecté plus haut
         #instance._periode = instance.periode_session  # Déjà mis par défaut à "Année"    
-        #instance._iris_sessions = get_iris(typeExport="Sessions", chemin=chemin_IRIS_sessions)
+        #instance._iris_sessions = get_iris(typeExport="Sessions")
 
         # On met à jour l'Excel evalstat de la formation si la session demandée par l'utilisateur ne s'y trouve pas
         instance._maj_evalstat()
@@ -198,7 +194,7 @@ class BilanSession:
     # TODO : j'ai fait en sorte que les méthodes soient pas en warning, à tester bilan_unique puis adapter pour que par période marche
     # TODO : A faire ; refactoriser ce qui est mutualisable
     @classmethod   
-    def depuis_periode(cls, formation:Formation_protocol, annee:int, periode:str, chemin_IRIS_sessions:Optional[Path]=None) -> None:
+    def depuis_periode(cls, formation:Formation_protocol, annee:int, periode:str) -> None:
         """
         Permet de générer un bilan de session selon une période qui est l'un de ces éléments : ["1er semestre", "2nd semestre", "Année"]
         Ex : BilanSession.bilanUnique_parPeriode("948", 2024, "Année")
@@ -219,7 +215,7 @@ class BilanSession:
 
         # Ouverture / création du dataframe de l'extract IRIS sessions filtré selon la période demandée
         #instance._charger_df_sessions_filtre_selon_periode()  
-        instance._iris_sessions = get_iris(typeExport="Sessions", chemin=chemin_IRIS_sessions)
+        instance._iris_sessions = get_iris(typeExport="Sessions")
 
         # On met à jour df_sessions_filtre selon les sessions que souhaite garder / exclure l'utilisateur
         df_filtre, codes_sessions_exclues_par_utilisateur = instance._iris_sessions.demande_sessions_a_exclure()
@@ -253,7 +249,7 @@ class BilanSession:
     # =========================
     # === METHODES INTERNES === 
     # =========================
-    def _maj_evalstat(self, chemin_IRIS_sessions:Optional[Path]=None) -> None:
+    def _maj_evalstat(self) -> None:
         """
         Crée les EvalStat de la/les sessions demandées et met à jour le fichier EvalStat de la formation
         Ne s'applique que si des sessions demandées par l'utilisateur ne s'y trouvent pas
@@ -263,7 +259,7 @@ class BilanSession:
         # On traite le ou les EvalStats non déjà créés
         # TODO : avec des codes IRIS et sans autrs sauvegardes des chemins des CSV traités par ailleurs, l'utilisateur est potentiellement obligé de sélectionner des CSV déjà traités (i.e. non pertinents) à la main → A améliorer
         # fe_evaluations_formation, statuts_csv = EvalStat.depuis_liste_codes_IRIS(self._codes_IRIS, fe_IRIS_sessions=self._fe_IRIS_sessions)
-        statuts_csv = EvalStat_services.traiter_evalStat_depuis_liste_codes_IRIS(codes_IRIS=self._codes_IRIS, formation=self._formation, chemin_IRIS_sessions=chemin_IRIS_sessions)
+        statuts_csv = EvalStat_services.traiter_evalStat_depuis_liste_codes_IRIS(codes_IRIS=self._codes_IRIS, formation=self._formation)
 
         # A ce stade, toutes les valeurs de _codes_IRIS sont sensées être a minima présents dans IRIS avec données pour stats générales
         for code_IRIS in self._codes_IRIS:
@@ -561,7 +557,7 @@ class BilanSession:
     # === METHODES STATIQUES ===
     # ==========================
     @staticmethod
-    def AVIRER_charge_IRIS_session_et_verifie_codeIRIS(code_IRIS:int, chemin_IRIS_sessions:Optional[Path]=None) -> DataFrame:
+    def AVIRER_charge_IRIS_session_et_verifie_codeIRIS(code_IRIS:int) -> DataFrame:
         """
         Charge IRIS Sessions, puis vérifie qu'il contient bien une ligne avec le code IRIS.
 
@@ -571,13 +567,11 @@ class BilanSession:
 
         :param code_IRIS: code IRIS à tester
         :type code_IRIS: int
-        :param chemin_IRIS_sessions: chemin IRIS sessions à employer si l'utilisateur en souhaite un différent que celui par défaut
-        :type chemin_IRIS_sessions: Optional[Path], optional
         :return: le dataframe df_session filtré sur le code IRIS
         :rtype: DataFrame
         """
         # On charge IRIS sessions
-        iris_sessions = get_iris(typeExport="Sessions", chemin=chemin_IRIS_sessions)
+        iris_sessions = get_iris(typeExport="Sessions")
 
         # On filtre le DataFrame d'IRIS avec le code IRIS
         df_sessions_filtre_codeIRIS = iris_sessions.df[iris_sessions.df['Code IRIS'] == code_IRIS]
@@ -662,7 +656,7 @@ class BilanSession:
     # Liens avec IRIS
     @property
     def iris_sessions(self) -> IRIS_traite:
-        return get_iris(typeExport="Sessions", )
+        return get_iris(typeExport="Sessions")
     
     @property
     def df_sessions_filtre(self) -> DataFrame:

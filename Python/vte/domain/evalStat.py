@@ -225,7 +225,7 @@ class EvalStat_session(EvalStat):
 
 
     @classmethod
-    def avec_traitement(cls, session:Session_protocol, chemin_csv:Optional[Path|str]=None, chemin_IRIS_sessions:Optional[Path]=None, ecrire_eval_formation:bool=True, ouvrirDossier:bool=False) -> EvalStat_session:
+    def avec_traitement(cls, session:Session_protocol, chemin_csv:Optional[Path|str]=None, ecrire_eval_formation:bool=True, ouvrirDossier:bool=False) -> EvalStat_session:
         """
         Crée l'instance EvalStat d'une session et traite cet EvalStat.
 
@@ -237,8 +237,6 @@ class EvalStat_session(EvalStat):
         :type session: Session_protocol
         :param chemin_csv: chemin du CSV à traiter. S'il est None, on ouvre un filedialog
         :type chemin_csv: Optional[Path|str]
-        :param chemin_IRIS_sessions: Chemin du fichier IRIS sessions à employer si l'utilisateur ne veut pas celui par défaut. Defaults = None = Fichier généré le plus récent dans le répertoire donné en config.
-        :type chemin_IRIS_sessions: Optional[Path]
         :param ecrire_eval_formation: Pour écrire physiquement l'Excel eval formation en fin de traitement. Si False, il devra être écrit ailleurs (à l'endroit où il y a la boucle pour du multi-traitement typiquement). Défaut = True.
         :type ecrire_eval_formation: bool
         :param ouvrirDossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
@@ -247,7 +245,6 @@ class EvalStat_session(EvalStat):
         instance = cls(session)
         instance.traiter_eval(
             chemin_csv=chemin_csv,
-            chemin_IRIS_sessions=chemin_IRIS_sessions,
             ecrire_eval_formation=ecrire_eval_formation,
             ouvrirDossier=ouvrirDossier
         )
@@ -490,7 +487,7 @@ class EvalStat_session(EvalStat):
     # ==================================================================================
     # MÉTHODES EXTERNES - TRAITEMENT INDIVIDUEL
     # ==================================================================================
-    def verification_traitement_eval(self, chemin_csv:Optional[Path]=None, chemin_IRIS_sessions:Optional[Path]=None) -> Tuple[bool, str]:
+    def verification_traitement_eval(self, chemin_csv:Optional[Path]=None) -> Tuple[bool, str]:
         """
         Vérifie si l'on doit traiter l'EvalStat session à partir de :
             - la présence dans eval formation (code_IRIS ou chemin_csv) ;
@@ -498,8 +495,6 @@ class EvalStat_session(EvalStat):
 
         :param chemin_csv: chemin du csv de l'évaluation de la session, défaut = None
         :type chemin_csv: Optional[Path], optional
-        :param chemin_IRIS_sessions: Chemin du fichier IRIS sessions à employer si l'utilisateur ne veut pas celui par défaut. Defaults = None = Fichier généré le plus récent dans le répertoire donné en config.
-        :type chemin_IRIS_sessions: Optional[Path], optional
         :return:
         - Un bool pour dire si le traitement doit continuer 
             - True il faut traiter l'EvalStat (code IRIS ou CSV non détectés dans EvalStat + code IRIS présent dans IRIS sessions) ; 
@@ -507,10 +502,10 @@ class EvalStat_session(EvalStat):
         - un string avec le statut pour connaitre l'exclusion de traitement le cas échéant (pertinent ssi False ; si True on renvoie chaine vide).
         :rtype: Tuple[bool, str]
         """        
-        return self.eval_formation.verification_traitement_eval(code_IRIS=self.code_IRIS, chemin_csv=chemin_csv, chemin_IRIS_sessions=chemin_IRIS_sessions)
+        return self.eval_formation.verification_traitement_eval(code_IRIS=self.code_IRIS, chemin_csv=chemin_csv)
 
 
-    def traiter_eval(self, chemin_csv:Optional[Path|str]=None, chemin_IRIS_sessions:Optional[Path]=None, ecrire_eval_formation:bool=True, ouvrirDossier:bool=False) -> None:
+    def traiter_eval(self, chemin_csv:Optional[Path|str]=None, ecrire_eval_formation:bool=True, ouvrirDossier:bool=False) -> None:
         """
         Crée l'Excel EvalStat d'une session à partir d'un CSV (s'il n'est pas donné, on ouvre un filedialog).
 
@@ -518,8 +513,6 @@ class EvalStat_session(EvalStat):
 
         :param chemin_csv: chemin du CSV à traiter. S'il est None, on ouvre un filedialog
         :type chemin_csv: Optional[Path|str]
-        :param chemin_IRIS_sessions: Chemin du fichier IRIS sessions à employer si l'utilisateur ne veut pas celui par défaut. Defaults = None = Fichier généré le plus récent dans le répertoire donné en config.
-        :type chemin_IRIS_sessions: Optional[Path]
         :param ecrire_eval_formation: Pour écrire physiquement l'Excel eval formation en fin de traitement. Si False, il devra être écrit ailleurs (à l'endroit où il y a la boucle pour du multi-traitement typiquement). Défaut = True.
         :type ecrire_eval_formation: bool
         :param ouvrirDossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
@@ -530,7 +523,7 @@ class EvalStat_session(EvalStat):
 
 
         # On vérifie s'il est perinent de faire le traitement de l'EvalStat (on vérifie notemment sa déjà présence dans l'EvalStat formation)
-        continuer, self.statut_csv = self.verification_traitement_eval(chemin_csv=chemin_csv, chemin_IRIS_sessions=chemin_IRIS_sessions)
+        continuer, self.statut_csv = self.verification_traitement_eval(chemin_csv=chemin_csv)
         if not continuer:
             return
 
@@ -586,7 +579,7 @@ class EvalStat_session(EvalStat):
     # MÉTHODES EXTERNES
     # ==================================================================================
     @staticmethod
-    def construire_dictionnaire_trigrammeFormation_codeIRIS_cheminsCSV_depuis_iterableCSV(chemins_csv: Iterable[Union[str, Path]], formation:Optional[Formation_protocol]=None, chemin_IRIS_sessions:Optional[Path]=None) -> Dict[str, Dict[int, Path]]:
+    def construire_dictionnaire_trigrammeFormation_codeIRIS_cheminsCSV_depuis_iterableCSV(chemins_csv: Iterable[Union[str, Path]], formation:Optional[Formation_protocol]=None) -> Dict[str, Dict[int, Path]]:
         """
         Construit un dictionnaire imbriqué de la forme {trigramme_formation: {code_IRIS: chemin_csv}} à partir de chemins CSV.
 
@@ -598,8 +591,6 @@ class EvalStat_session(EvalStat):
         :type chemins_csv: Iterable[Union[str, Path]]
         :param formation: l'evalFormation pour vérifier si on doit traiter l'EvalStat + le trigramme de la formation qui sert à mieux pointer le répertoire pour sélectrionner le CSV.
         :type formation: Optional[Formation_protocol], Optional
-        :param chemin_IRIS_sessions: Chemin du fichier IRIS sessions à employer si l'utilisateur ne veut pas celui par défaut. Defaults = None = Fichier généré le plus récent dans le répertoire donné en config.
-        :type chemin_IRIS_sessions: Optional[Path], optional
         :return: Un dictionnaire imbriqué où les clés de premier niveau sont les trigrammes de formation,
             et les clés de second niveau sont les codes IRIS.
         :rtype: Dict[str, Dict[int, Path]]
@@ -611,9 +602,7 @@ class EvalStat_session(EvalStat):
         for chemin in chemins_csv:
             # Si formation est donné, alors je peux faire des vérifications de pertinence de traiter l'EvalStat session en regardant s'il est déjà présent dans l'eval formation
             if formation is not None:
-                continuer, statut = formation.eval.verification_traitement_eval(
-                    chemin_csv=chemin, 
-                    chemin_IRIS_sessions=chemin_IRIS_sessions)
+                continuer, statut = formation.eval.verification_traitement_eval(chemin_csv=chemin)
                 trigramme_formation = formation.trigramme_formation
             else:
                 trigramme_formation = None
@@ -640,7 +629,7 @@ class EvalStat_session(EvalStat):
 
 
     @staticmethod
-    def construire_dictionnaire_trigrammeFormation_codeIRIS_cheminsCSV_depuis_iterableCodesIRIS(codes_IRIS: Iterable[int], formation:Optional[Formation_protocol]=None, chemin_IRIS_sessions:Optional[Path]=None) -> Dict[str, Dict[int, Path]]:
+    def construire_dictionnaire_trigrammeFormation_codeIRIS_cheminsCSV_depuis_iterableCodesIRIS(codes_IRIS: Iterable[int], formation:Optional[Formation_protocol]=None) -> Dict[str, Dict[int, Path]]:
         """
         Construit un dictionnaire imbriqué de la forme {trigramme_formation: {code_IRIS: chemin_csv}} à partir de codes IRIS.
 
@@ -652,8 +641,6 @@ class EvalStat_session(EvalStat):
         :type codes_IRIS: Iterable[int]
         :param formation: l'evalFormation pour vérifier si on doit traiter l'EvalStat + le trigramme de la formation qui sert à mieux pointer le répertoire pour sélectrionner le CSV.
         :type formation: Optional[Formation_protocol], Optional
-        :param chemin_IRIS_sessions: Chemin du fichier IRIS sessions à employer si l'utilisateur ne veut pas celui par défaut. Defaults = None = Fichier généré le plus récent dans le répertoire donné en config.
-        :type chemin_IRIS_sessions: Optional[Path], optional
         :return: Un dictionnaire imbriqué où les clés de premier niveau sont les trigrammes de formation,
             et les clés de second niveau sont les codes IRIS.
         :rtype: Dict[str, Dict[int, Path]]
@@ -668,9 +655,7 @@ class EvalStat_session(EvalStat):
         for code_IRIS in codes_IRIS:
             # Si formation est donné, alors je peux faire des vérifications de pertinence de traiter l'EvalStat session en regardant s'il est déjà présent dans l'eval formation
             if formation is not None:
-                continuer, statut = formation.eval.verification_traitement_eval(
-                    code_IRIS=code_IRIS, 
-                    chemin_IRIS_sessions=chemin_IRIS_sessions)
+                continuer, statut = formation.eval.verification_traitement_eval(code_IRIS=code_IRIS)
                 trigramme_formation = formation.trigramme_formation
             else:
                 trigramme_formation = None
@@ -931,7 +916,7 @@ class EvalStat_formation(EvalStat):
         else:
             return False
 
-    def verification_traitement_eval(self, code_IRIS:Optional[int]=None, chemin_csv:Optional[Path]=None, chemin_IRIS_sessions:Optional[Path]=None) -> Tuple[bool, str]:
+    def verification_traitement_eval(self, code_IRIS:Optional[int]=None, chemin_csv:Optional[Path]=None) -> Tuple[bool, str]:
         """
         Vérifie si l'on doit traiter un EvalStat session à partir de :
             - la présence dans eval formation (code_IRIS ou chemin_csv) ;
@@ -941,8 +926,6 @@ class EvalStat_formation(EvalStat):
         :type code_IRIS: Optional[int], optional
         :param chemin_csv: chemin du csv de l'évaluation de la session, défaut = None
         :type chemin_csv: Optional[Path], optional
-        :param chemin_IRIS_sessions: Chemin du fichier IRIS sessions à employer si l'utilisateur ne veut pas celui par défaut. Defaults = None = Fichier généré le plus récent dans le répertoire donné en config.
-        :type chemin_IRIS_sessions: Optional[Path], optional
         :return:
         - Un bool pour dire si le traitement doit continuer 
             - True il faut traiter l'EvalStat (code IRIS ou CSV non détectés dans EvalStat + code IRIS présent dans IRIS sessions) ; 
@@ -991,7 +974,8 @@ class EvalStat_formation(EvalStat):
 
 
         # Vérifications 3 : on vérifie si le code_IRIS est bien existant dans l'extract IRIS
-        df_IRIS_sessions = get_iris(typeExport="Sessions", chemin=chemin_IRIS_sessions).df  # On charge IRIS
+        # TODO : lui j'ai moyen d'en faire un parameter
+        df_IRIS_sessions = get_iris(typeExport="Sessions").df  # On charge IRIS
         if code_IRIS not in df_IRIS_sessions["Code IRIS"].values:
             print(f"⚠️  Code IRIS {code_IRIS} non trouvé dans l’extract IRIS.")
             statut = "Exclu - Code IRIS pas dans Extract IRIS sessions"

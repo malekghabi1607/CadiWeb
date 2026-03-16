@@ -173,7 +173,7 @@ class BilanFormation_V3(BilanFormation):
        
 
     @classmethod
-    def bilanUnique(cls, formation:Formation_protocol, annee:int, chemin_IRIS_sessions:Optional[Path]=None, chemin_IRIS_ventes:Optional[Path]=None, chemin_fdc:Optional[Path]=None) -> None:
+    def bilanUnique(cls, formation:Formation_protocol, annee:int, chemin_fdc:Optional[Path]=None) -> None:
         
         instance = cls(formation=formation, annee=annee)
 
@@ -184,8 +184,10 @@ class BilanFormation_V3(BilanFormation):
             
             # === On charge les éléments dont on va avoir besoin ===
             # IRIS sessions et ventes
-            instance._iris_sessions = get_iris(typeExport="Sessions", chemin=chemin_IRIS_sessions)
-            instance._iris_ventes = get_iris(typeExport="Ventes", chemin=chemin_IRIS_ventes)
+            
+            # set_iris_chemin_specifique(typeExport="Sessions", chemin=Path(r"C:\..."))  # On redéfinit le chemin d'IRIS Sessions
+            instance._iris_sessions = get_iris(typeExport="Sessions")
+            instance._iris_ventes = get_iris(typeExport="Ventes")
 
             # FdC
             if instance.fdc is None:

@@ -302,7 +302,7 @@ class FdC:
 
         """
         # On charge le fichier fdc si non déjà ouvert
-        self._fe_IRIS_sessions = IRIS.charger_excel_IRIS_sessions(fe_IRIS_sessions=self._fe_IRIS_sessions, chemin_IRIS_sessions=chemin_IRIS_sessions)
+        self._fe_IRIS_sessions = IRIS.charger_excel_IRIS_sessions(fe_IRIS_sessions=self._fe_IRIS_sessions)
 
 
 

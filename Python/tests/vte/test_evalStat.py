@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
+from vte.core.iris_referentiel import set_iris_chemin_specifique
 from vte.domain.formation import Formation
 from vte.domain.session import Session
 from vte.domain.evalStat import EvalStat, EvalStat_session, EvalStat_formation
@@ -336,12 +337,12 @@ def test_traitement_eval_session_fonctionnel(
     shutil.copy(str(tel["chemin_eval_formation_sans16411_sans12766_sans11090"]), str(tel["chemin_eval_formation"]))
 
     try:
+        set_iris_chemin_specifique(typeExport="Sessions", chemin=tel["chemin_IRIS_sessions"])  # On redéfinit le chemin d'IRIS Sessions
         formation = Formation.avec_ouverture_evalStat(tel["trigramme_formation"])
         session = Session.avec_traitement_evalStat(
             formation=formation,
             code_IRIS=tel["code_IRIS"],
             chemin_csv=tel["chemin_csv_session"],
-            chemin_IRIS_sessions=tel["chemin_IRIS_sessions"],
             # ecrire_eval_formation=True,  # Valeur par défaut = True
             ouvrirDossier=True
         )
@@ -410,13 +411,13 @@ def test_eval_session_multi_csv(
 
     try:
         dataset = evalstat_csv_datasets[dataset_index]
+        set_iris_chemin_specifique(typeExport="Sessions", chemin=tel["chemin_IRIS_sessions"])  # On redéfinit le chemin d'IRIS Sessions
 
         formation = Formation.avec_ouverture_evalStat(tel["trigramme_formation"])
         session = Session.avec_traitement_evalStat(
             formation=formation,
             code_IRIS=dataset["code_IRIS"],
             chemin_csv=dataset["csv"],
-            chemin_IRIS_sessions=tel["chemin_IRIS_sessions"],
             # ecrire_eval_formation=True,  # Valeur par défaut = True
             ouvrirDossier=False
         )

@@ -72,7 +72,6 @@ class Formation:
         trigramme_formation: str, 
         code_IRIS:int, 
         chemin_csv:Optional[Path|str]=None, 
-        chemin_IRIS_sessions:Optional[Path]=None, 
         ecrire_eval_formation:bool=True, 
         ouvrirDossier:bool=False
         ) -> Formation:
@@ -90,8 +89,6 @@ class Formation:
         :type code_IRIS: int
         :param chemin_csv: _description_, defaults to None
         :type chemin_csv: Optional[Path | str], optional
-        :param chemin_IRIS_sessions: _description_, defaults to None
-        :type chemin_IRIS_sessions: Optional[Path], optional
         :param ecrire_eval_formation: Pour écrire physiquement l'Excel eval formation en fin de traitement. Si False, il devra être écrit ailleurs (à l'endroit où il y a la boucle pour du multi-traitement typiquement). Défaut = True.
         :type ecrire_eval_formation: bool, optional
         :param ouvrirDossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
@@ -106,7 +103,6 @@ class Formation:
 
         instance.traiter_eval_sessions(
             chemin_csv=chemin_csv,
-            chemin_IRIS_sessions=chemin_IRIS_sessions,
             ecrire_eval_formation=ecrire_eval_formation,
             ouvrirDossier=ouvrirDossier
         )
@@ -155,7 +151,6 @@ class Formation:
     def traiter_eval_sessions(
         self,
         chemin_csv: Optional[Path|str],
-        chemin_IRIS_sessions: Optional[Path],
         ecrire_eval_formation: Optional[bool] = False, 
         ouvrirDossier: Optional[bool] = False
         ) -> None:
@@ -168,8 +163,6 @@ class Formation:
 
         :param chemin_csv: _description_, defaults to None
         :type chemin_csv: Optional[Path | str], optional
-        :param chemin_IRIS_sessions: _description_, defaults to None
-        :type chemin_IRIS_sessions: Optional[Path], optional
         :param ecrire_eval_formation: Pour écrire physiquement l'Excel eval formation en fin de traitement. Si False, il devra être écrit ailleurs (à l'endroit où il y a la boucle pour du multi-traitement typiquement). Défaut = False car ic on peut traiter plusiseurs sessions d'une même formation.
         :type ecrire_eval_formation: bool, optional
         :param ouvrirDossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
@@ -181,7 +174,6 @@ class Formation:
         for session in self.sessions.values():
             session.eval.traiter_eval(
                 chemin_csv=chemin_csv,
-                chemin_IRIS_sessions=chemin_IRIS_sessions,
                 ecrire_eval_formation=ecrire_eval_formation,  # On sauvegardera en fin de boucle
                 ouvrirDossier=ouvrirDossier
             )

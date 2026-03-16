@@ -1,5 +1,6 @@
 from pprint import pprint
 
+from vte.core.iris_referentiel import set_iris_chemin_specifique
 from vte.domain.formation import Formation
 from vte.services.evalStat_services import EvalStat_services
 from vte.utils.utils import *
@@ -35,6 +36,8 @@ def verifications():
     backup_fichier_test(tel_csv_existant["chemin_eval_formation"])
     backup_fichier_test(tel_csv_existant["chemin_eval_session"])
 
+    set_iris_chemin_specifique(typeExport="Sessions", chemin=tel_csv_existant["chemin_IRIS_sessions"])  # On redéfinit le chemin d'IRIS Sessions
+    
     formation = Formation.avec_ouverture_evalStat("TEL")
     formation.ajout_sessions(codes_IRIS=16411)
     #formation.ajout_evalStat()  # EvalStat formation
@@ -44,7 +47,6 @@ def verifications():
     formation.sessions[16411].eval_session.avec_traitement_depuis_chemin_csv(
         session=formation.sessions[16411],
         chemin_csv=tel_csv_existant["chemin_csv_session"],
-        chemin_IRIS_sessions=tel_csv_existant["chemin_IRIS_sessions"],
         ouvrirDossier=True)
 
 
@@ -66,7 +68,6 @@ def traite_tous_evalStats_depuis_tuple_csv():
 
     statuts_csv = EvalStat_services.traiter_evalStat_depuis_iterable_de_csv(
         tuple_csv_stagiaires= tuple_csv_stagiaires_employe,
-        chemin_IRIS_sessions=None, #chemin_vers_unc(Path(r"R:\_Echanges\VTE\Prog\IRIS\Extracts complets\TESTS - TEL - R04110_Sessions-COMPLET.xlsx")),
         ouvrirDossier=False
     )
 
