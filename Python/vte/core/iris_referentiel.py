@@ -17,7 +17,7 @@ from vte.domain.iris import IRIS, IRIS_traite
 # ======================================================================================
 
 _cache: Dict[str, IRIS] = {}
-
+_chemins_specifiques: Dict[str, Optional[Path]] = {}
 
 
 # ======================================================================================
@@ -36,7 +36,11 @@ def get_iris(typeExport: str, chemin:Optional[Path]=None) -> IRIS_traite:
     :return: le fichier IRIS traité
     :rtype: IRIS_traite
     """
+    # On affecte chemin si l'utilisateur en a spécifié un différent à un moment
+    if chemin is None:
+        chemin = _chemins_specifiques.get(typeExport)  # Si aucun chemin spécifique n'a été rentré, alors ça renverra None et on retrouvera le cas par défaut
 
+    # On charge IRIS selon le type d'export s'il n'a pas déjà été chargé auparavant
     if typeExport not in _cache:
         iris = IRIS_traite(typeExport=typeExport, chemin=chemin)
         _cache[typeExport] = iris
@@ -56,6 +60,20 @@ def clear_iris() -> None:
     """
     _cache.clear()
 
+def set_iris_chemin_specifique(typeExport: str, chemin: Path) -> None:
+    """
+    Affecte un chemin spécifique à un type d'export
+
+    :param typeExport: Type de l'export iris à considérer. Doit être dans cette liste : ["Sessions", "Formations", "Ventes", "Insciptions"]
+    :type typeExport: str
+    :param chemin: Chemin spécifique à affecter
+    :type chemin: Path
+    """
+    _chemins_specifiques[typeExport] = chemin
+
 # Emploi :
 #iris_sessions = get_iris("Sessions")
 #df = iris_sessions.df
+
+# Si chemin spécifique :
+#set_iris_path("Sessions", chemin_test)
