@@ -100,7 +100,7 @@ class EvalStat_services:
         return statuts_csv
 
     @staticmethod
-    def traiter_evalStat_depuis_liste_codes_IRIS(codes_IRIS:Iterable[int], chemin_IRIS_sessions:Optional[Path]=None, ouvrirDossier:bool=False) -> dict[str, dict[str, str]]:
+    def traiter_evalStat_depuis_liste_codes_IRIS(codes_IRIS:Iterable[int], formation:Optional[Formation]=None, chemin_IRIS_sessions:Optional[Path]=None, ouvrirDossier:bool=False) -> dict[str, dict[str, str]]:
         """
         A partir d'un itérable de codes IRIS
         Permet de :
@@ -109,6 +109,8 @@ class EvalStat_services:
 
         :param codes_IRIS: Itérable des codes IRIS à traiter.
         :type codes_IRIS: Iterable[int]
+        :param formation: l'evalFormation pour vérifier si on doit traiter l'EvalStat + le trigramme de la formation qui sert à mieux pointer le répertoire pour sélectrionner le CSV.
+        :type formation: Optional[Formation_protocol], Optional
         :param chemin_IRIS_sessions: Chemin du fichier IRIS sessions à employer si l'utilisateur ne veut pas celui par défaut. Defaults = None = Fichier généré le plus récent dans le répertoire donné en config.
         :type chemin_IRIS_sessions: Optional[Path], optional
         :param ouvrirDossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
@@ -116,9 +118,9 @@ class EvalStat_services:
         :return: Une liste de dictionnaires {codeIRIS,{"fichier": chemin_csv,"statut": statut_csv}}. Je pourrai accéder à la valeur par nom_dico[codeIRIS]["fichier"] ou nom_dico[codeIRIS]["statut"]
         :rtype: dict[str, dict[str, str]]
         """
-        # Dictionnaire des csv sous une forme qui nous arrange pour le traitement à venir
-        dico_csv = EvalStat_session.construire_dictionnaire_trigrammeFormation_codeIRIS_cheminsCSV_depuis_iterableCodesIRIS(codes_IRIS)
-        
+        # Dictionnaire des csv sous une forme qui nous arrange pour le traitement à venir ; on fait une première exclusion des EvalStat déjà dans eval formation
+        dico_csv = EvalStat_session.construire_dictionnaire_trigrammeFormation_codeIRIS_cheminsCSV_depuis_iterableCodesIRIS(codes_IRIS=codes_IRIS, formation=formation, chemin_IRIS_sessions=chemin_IRIS_sessions)
+
         # Dictionnaire des retours du traitement
         statuts_csv = EvalStat_services.traiter_evalStat_depuis_dico_csv(dico_csv=dico_csv, chemin_IRIS_sessions=chemin_IRIS_sessions, ouvrirDossier=ouvrirDossier)
 

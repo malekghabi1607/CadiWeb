@@ -143,12 +143,13 @@ class BilanSession:
         """
         # === ON VERIFIE QU'IRIS SESSIONS CONTIENT BIEN LE CODE IRIS ===
         # On charge IRIS sessions et on vérifie qu'on a bien une ligne sinon on sort
-        df_sessions_filtre_codeIRIS = BilanSession.charge_IRIS_session_et_verifie_codeIRIS(code_IRIS=code_IRIS, chemin_IRIS_sessions=chemin_IRIS_sessions)
+        # J'ai viré cette méthode car redondant : df_sessions_filtre_codeIRIS = BilanSession.charge_IRIS_session_et_verifie_codeIRIS(code_IRIS=code_IRIS, chemin_IRIS_sessions=chemin_IRIS_sessions)
         if annee is None:
-            annee = int(df_sessions_filtre_codeIRIS["Année début ses."].iloc[0])
+            annee = int(self.df_sessions_filtre_codeIRIS["Année début ses."].iloc[0])
 
         # On initialise l'instance 
         instance = cls(formation=formation, annee=annee)
+        instance._iris_sessions = get_iris(typeExport="Sessions", chemin=chemin_IRIS_sessions)
 
 
         # === ON FAIT LES AUTRES VERIFICATIONS QUI ANNULERAIENT LE TRAITEMENT ===
@@ -159,8 +160,8 @@ class BilanSession:
             return
     
         # On vérifie la pré-existance du bilan Word ; si il existe déjà, alors on arrête le traitement
-        bilan_preexistant = verifier_existance_fichier(instance.chemin_word_bilan_output)
-        if bilan_preexistant:
+        continuer = verifier_existance_fichier(instance.chemin_word_bilan_output)
+        if not continuer:
             print("❌  Bilan de session déjà existant → Arrêt du traitement du bilan par l'utilisateur")
             return
         
@@ -171,7 +172,7 @@ class BilanSession:
         # On affecte les autres données de base à la main
         # instance.code_IRIS = code_IRIS  # Déjà affecté plus haut
         #instance._periode = instance.periode_session  # Déjà mis par défaut à "Année"    
-        instance._iris_sessions = get_iris(typeExport="Sessions", chemin=chemin_IRIS_sessions)
+        #instance._iris_sessions = get_iris(typeExport="Sessions", chemin=chemin_IRIS_sessions)
 
         # On met à jour l'Excel evalstat de la formation si la session demandée par l'utilisateur ne s'y trouve pas
         instance._maj_evalstat()
@@ -211,8 +212,8 @@ class BilanSession:
         # TODO : besoin ?
         
         # On teste la pré-existance du bilan Word
-        bilan_preexistant = verifier_existance_fichier(instance.chemin_word_bilan_output)
-        if bilan_preexistant:
+        continuer = verifier_existance_fichier(instance.chemin_word_bilan_output)
+        if not continuer:
             print("❌  Bilan de session déjà existant → Arrêt du traitement du bilan par l'utilisateur")
             return
 
@@ -262,7 +263,7 @@ class BilanSession:
         # On traite le ou les EvalStats non déjà créés
         # TODO : avec des codes IRIS et sans autrs sauvegardes des chemins des CSV traités par ailleurs, l'utilisateur est potentiellement obligé de sélectionner des CSV déjà traités (i.e. non pertinents) à la main → A améliorer
         # fe_evaluations_formation, statuts_csv = EvalStat.depuis_liste_codes_IRIS(self._codes_IRIS, fe_IRIS_sessions=self._fe_IRIS_sessions)
-        statuts_csv = EvalStat_services.traiter_evalStat_depuis_liste_codes_IRIS(codes_IRIS=self._codes_IRIS, chemin_IRIS_sessions=chemin_IRIS_sessions)
+        statuts_csv = EvalStat_services.traiter_evalStat_depuis_liste_codes_IRIS(codes_IRIS=self._codes_IRIS, formation=self._formation, chemin_IRIS_sessions=chemin_IRIS_sessions)
 
         # A ce stade, toutes les valeurs de _codes_IRIS sont sensées être a minima présents dans IRIS avec données pour stats générales
         for code_IRIS in self._codes_IRIS:
@@ -275,11 +276,15 @@ class BilanSession:
 
             # === Gestion retour du traitement des CSV ===
             for code_IRIS, donnees in statuts_csv.items():
+                # TODO : rajouter ici les 2 nouveaux statuts rajoutés dimanche 15/03 soir pour la vérif des code_IRIS ?
                 if donnees["statut"] in ("Traité", "Exclu - CSV déjà dans fichier global"):
                     self._exploitationBilan["Exploités pour les évaluations (CSV présents)"].append(code_IRIS)
 
                 if donnees["statut"] == "Exclu - Problème lecture CSV":
                     self._exploitationBilan["Exclus des évaluations (problème traitement CSV)"].append(code_IRIS)
+
+                #if donnees["statut"] == "Exclu - Code IRIS déjà dans fichier global":
+                #    self._exploitationBilan["Exclus des évaluations (problème traitement CSV)"].append(code_IRIS)
 
                 if donnees["statut"] == "Exclu - Fichier non existant":
                     self._exploitationBilan["Exclus des évaluations (CSV manquants)"].append(code_IRIS)
@@ -295,15 +300,21 @@ class BilanSession:
 
 
             # === Préparation des dataframes des évaluations de la formation pour calcul des stats ===
-            #self._df_stagiaires = fe_evaluations_formation._tableaux["Stagiaires"]._df  # Création d'un alias pour faciliter le code
             #TODO : est-ce que j'arrive à virer ces df d'ici pour ne pas faire de variables d'instance ou de return avec ces valeurs ?
             # df_stagiaires filtré sur les codes IRIS exploités pour le bilan (infos générales)
             # TODO : besoin _df_stagiaires_final dans _calculer_stats_criteres + __construit_champsFusionV3 ; _df_stagiaires_final_1ligne_session dans __construit_champsFusionV3
-            self._df_stagiaires_final = self._df_stagiaires[self._df_stagiaires['Code IRIS'].isin(self._exploitationBilan["Exploités pour les stats générales"])]
+            # TODO : Pas utilisé ici → voir si je peux mettre uniquement dans _calculer_stats_criteres + __construit_champsFusionV3
+            
+            # _df_stagiaires_final → df_sessions_filtre_stats_generales
+            
+            #self._df_stagiaires_final = self._df_stagiaires[self._df_stagiaires['Code IRIS'].isin(self._exploitationBilan["Exploités pour les stats générales"])]
             #vlog.print("Info", self._df_stagiaires_final)
 
             # df_stagiaires avec 1 ligne pour chaque session différente (pour avoir les infos globales issues de IRIS comme le nb d'apprenants)
-            self._df_stagiaires_final_1ligne_session = self._df_stagiaires_final.drop_duplicates(subset=['Code IRIS'])  # Ne garde qu'une ligne par Code IRIS (la première rencontrée)
+            #self._df_stagiaires_final_1ligne_session = self._df_stagiaires_final.drop_duplicates(subset=['Code IRIS'])  # Ne garde qu'une ligne par Code IRIS (la première rencontrée)
+            
+            # _df_stagiaires_final_1ligne_session → df_sessions_filtre_stats_generales_code_IRIS_unique
+            
             #vlog.print("Info", self._df_stagiaires_final_1ligne_session)
 
         # Cas s'il n'y a aucun CSV
@@ -313,9 +324,10 @@ class BilanSession:
                 self._exploitationBilan["Exclus des évaluations (CSV manquants)"].append(code_IRIS)
             
             #TODO : est-ce que j'arrive à virer ces df d'ici pour ne pas faire de variables d'instance ou de return avec ces valeurs ?
-            self._df_stagiaires = None
-            self._df_stagiaires_final = None
-            self._df_stagiaires_final_1ligne_session = None
+            # TODO : comment gérer ce None ? (j'ai des vues là) → Je teste sans on verra
+            #self._df_stagiaires = None
+            #self._df_stagiaires_final = None
+            #self._df_stagiaires_final_1ligne_session = None
             
 
 
@@ -344,14 +356,14 @@ class BilanSession:
 
         # S'il n'y a pas de CSV disponibles pour les stats, alors ce n'est pas la peine de faire les stats
         if len(self._exploitationBilan["Exploités pour les évaluations (CSV présents)"]) != 0 :
-            liste_criteres = self._df_stagiaires_final['Critère'].dropna().unique()
+            liste_criteres = self.df_sessions_filtre_stats_generales['Critère'].dropna().unique()
 
             #for critere in liste_criteres:
             #    if critere in self._criteres_a_enlever:
             #        continue
 
             for critere in liste_criteres:
-                df_filtre = self._df_stagiaires_final[self._df_stagiaires_final['Critère'] == critere]
+                df_filtre = self.df_sessions_filtre_stats_generales[self.df_sessions_filtre_stats_generales['Critère'] == critere]
                 nb = len(df_filtre)
                 moyenne = df_filtre['Note'].mean() if nb > 0 else None
 
@@ -417,7 +429,7 @@ class BilanSession:
 
         self._titreFormation = self.intitule_formation
         # self._codeFormation = codeFormation  # (donné en argument)
-        self._periodeSessionsEvaluees = self.periode_sessions_evaluees  # Evalué plus haut
+        #self._periodeSessionsEvaluees = self.periodeSessionsEvaluees  # Evalué plus haut
         self._nbSessionsEvaluees = f"{len(self.df_sessions_filtre)} sessions"  # Valeur toutes les données  
         self._numerosSessions = "\n".join(self.df_sessions_filtre["N° Session"].dropna().astype(str).unique())
         self._nbApprenants = f"{self.df_sessions_filtre['Nb. Nommés'].sum()}"  # Valeur toutes les données
@@ -431,8 +443,8 @@ class BilanSession:
         if len(self._exploitationBilan["Exploités pour les évaluations (CSV présents)"]) != 0 :
 
             # On évalue les données requises pour les stats
-            nb_stagiaires_retours = self._df_stagiaires_final['NOM Prénom'].nunique()
-            nb_apprenants = self._df_stagiaires_final_1ligne_session['Nb présents'].sum()
+            nb_stagiaires_retours = self.df_sessions_filtre_stats_generales['NOM Prénom'].nunique()
+            nb_apprenants = self.df_sessions_filtre_stats_generales_code_IRIS_unique['Nb présents'].sum()
 
             stats_sous_3 = { # Dictionnaire pour les critères dont la moyenne est inférieure à 3 et non exclus (critères dans la liste self._CRITERES_A_ENLEVER)
                 critere: valeurs
@@ -549,9 +561,9 @@ class BilanSession:
     # === METHODES STATIQUES ===
     # ==========================
     @staticmethod
-    def charge_IRIS_session_et_verifie_codeIRIS(code_IRIS:int, chemin_IRIS_sessions:Optional[Path]=None) -> DataFrame:
+    def AVIRER_charge_IRIS_session_et_verifie_codeIRIS(code_IRIS:int, chemin_IRIS_sessions:Optional[Path]=None) -> DataFrame:
         """
-        Charge IRIS Sessions, puis vérifie qu'il contient bienune ligne avec le code IRIS.
+        Charge IRIS Sessions, puis vérifie qu'il contient bien une ligne avec le code IRIS.
 
         Si IRIS session ne contient pas code IRIS, alors on coupe la procédure.
 
@@ -592,15 +604,26 @@ class BilanSession:
         :return: Chemin de sortie du bilan de formation.
         :rtype: Path
         """
-        return config.format_path(config.CHEMIN_WORD_BILAN_SESSION_OUTPUT, trigramme_formation=self.trigramme_formation, annee=self._annee, periode=f"{self._periodeSessionsEvaluees}", unite=config.UNITE)
+        return config.format_path(config.CHEMIN_WORD_BILAN_SESSION_OUTPUT, trigramme_formation=self.trigramme_formation, annee=self._annee, periode=self.periodeSessionsEvaluees, unite=config.UNITE)
 
     @property
-    def periodeSessionsEvaluees(self):
-        if self._periodeSessionsEvaluees is None:
-            if len(self.code_IRIS == 1):  # Cas code IRIS unique
-                f"Session {self.numero_session} uniquement ({self.mois_session} {self._annee})"
-            else:
+    def periodeSessionsEvaluees(self) -> str:
+        """
+        Période de la session dans le cadre d'une session unique (len(codes_IRIS)=1).
+
+        Construction :
+            - si un seul code IRIS : f"Session {self.numero_session} uniquement ({self.mois_session} {self._annee})"
+            - si plusieurs codes IRIS : f"{self._periode} {self._annee}"
+        """
+        if self._periodeSessionsEvaluees == "":
+            if len(self._codes_IRIS) == 1:  # Cas code IRIS unique
+                self._periodeSessionsEvaluees = f"Session {self.numero_session} uniquement ({self.mois_session} {self._annee})"
+            elif len(self._codes_IRIS) > 1:
                 self._periodeSessionsEvaluees = f"{self._periode} {self._annee}"
+            else:
+                vlog.log_erreur("J'appelle periodeSessionsEvaluees alors que len(self.codes_IRIS)<=0")
+        
+        return self._periodeSessionsEvaluees
 
     @property
     def code_IRIS(self) -> int:
@@ -638,6 +661,10 @@ class BilanSession:
     
     # Liens avec IRIS
     @property
+    def iris_sessions(self) -> IRIS_traite:
+        return get_iris(typeExport="Sessions", )
+    
+    @property
     def df_sessions_filtre(self) -> DataFrame:
         """
         Renvoie le dataframe de l'extract IRIS filtré VTE selon plusieurs critères :
@@ -674,11 +701,31 @@ class BilanSession:
         df_sessions_filtre_codeIRIS = self.df_sessions_filtre[self.df_sessions_filtre['Code IRIS'] == self.code_IRIS]
         #print(self.df_sessions_filtre)
 
-        if len(df_sessions_filtre_codeIRIS) < 1:
-            print(df_sessions_filtre_codeIRIS)
-            vlog.log_erreur(f"Le fichier IRIS Sessions ne contient pas ce code IRIS : {self.code_IRIS}")        
+        #if len(df_sessions_filtre_codeIRIS) < 1:
+        #    print(df_sessions_filtre_codeIRIS)
+        #    vlog.log_erreur(f"Le fichier IRIS Sessions ne contient pas ce code IRIS : {self.code_IRIS}")        
 
         return df_sessions_filtre_codeIRIS
+
+    @property
+    def df_sessions_filtre_stats_generales(self) -> DataFrame: #_df_stagiaires_final → df_sessions_filtre_stats_generales
+        """
+        df_stagiaires filtré sur les codes IRIS exploités pour le bilan (infos générales)
+
+        :return: df_stagiaires filtré sur les codes IRIS exploités pour le bilan
+        :rtype: DataFrame
+        """
+        return self.df_sessions_filtre_codeIRIS[self.df_sessions_filtre_codeIRIS['Code IRIS'].isin(self._exploitationBilan["Exploités pour les stats générales"])]
+
+    @property
+    def df_sessions_filtre_stats_generales_code_IRIS_unique(self) -> DataFrame: # _df_stagiaires_final_1ligne_session → df_sessions_filtre_stats_generales_code_IRIS_unique
+        """
+        df_stagiaires avec 1 ligne pour chaque session différente (pour avoir les infos globales issues de IRIS comme le nb d'apprenants)
+
+        :return: df_stagiaires avec 1 ligne pour chaque session différente
+        :rtype: DataFrame
+        """
+        return self.df_sessions_filtre_stats_generales.drop_duplicates(subset=['Code IRIS'])  # Ne garde qu'une ligne par Code IRIS (la première rencontrée)
 
     @property
     def mois_session(self) -> str:
@@ -694,22 +741,7 @@ class BilanSession:
         """
         return self.df_sessions_filtre_codeIRIS["N° Session"].iloc[0]
 
-    @property
-    def periode_sessions_evaluees(self) -> str:
-        """
-        Période de la session dans le cadre d'une session unique (len(codes_IRIS)=1).
 
-        Construction :
-            - si un seul code IRIS : f"Session {self.numero_session} uniquement ({self.mois_session} {self._annee})"
-            - si plusieurs codes IRIS : f"{self._periode} {self._annee}"
-        """
-        if len(self._codes_IRIS) == 1:
-            return f"Session {self.numero_session} uniquement ({self.mois_session} {self._annee})"
-        elif len(self._codes_IRIS) > 1:
-            return f"{self._periode} {self._annee}"
-        else:
-            vlog.log_erreur("J'appelle periode_sessions_evaluees alors que len(self.codes_IRIS)=0")
-    
     
     
 

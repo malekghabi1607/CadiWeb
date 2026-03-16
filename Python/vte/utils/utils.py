@@ -1775,8 +1775,11 @@ def verifier_existance_fichier(chemin_fichier: Path) -> bool:
     Teste l'existence d'un fichier Word et propose à l'utilisateur
     une interface Tkinter plus lisible et au premier plan.
     
-    Retourne True si l'utilisateur choisit d'écraser (avec ou sans backup),
-    False si Annuler.
+    Retourne 
+        - True si :
+            - le fichier n'existe pas,
+            - ou si l'utilisateur choisit d'écraser (avec ou sans backup) ;
+        - False si Annuler.
     """
     if not chemin_fichier.exists() or not chemin_fichier.is_file():
         return True  # le fichier n'existe pas, on continue

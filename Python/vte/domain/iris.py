@@ -1225,7 +1225,7 @@ class IRIS_traite(IRIS):
         """
         match self._typeExport:
             case "Sessions":
-                return self.df_filtre_periode_sessions(self, annee=annee, periode=periode, trigramme_formation=trigramme_formation)
+                return self.df_filtre_periode_sessions(trigramme_formation=trigramme_formation, annee=annee, periode=periode)
 
     def df_filtre_periode_sessions(self, trigramme_formation:Optional[str] = None, annee:Optional[int] = None, periode:Optional[str] = None) -> pd.DataFrame:
         """

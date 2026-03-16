@@ -214,6 +214,16 @@ class Formation:
     
     @property
     def eval(self) -> Optional[EvalStat_formation]:
+        """
+        Renvoie self._eval (objet EvalStat de la formation).
+
+        Si EvalStat est None (jamais ouvert/créé), alors on l'ouvre/on le crée avec EvalStat_formation.avec_ouverture
+
+        :return: _description_
+        :rtype: Optional[EvalStat_formation]
+        """
+        if self._eval is None:
+            self._eval = EvalStat_formation.avec_ouverture(formation=self)
         return self._eval
     
     @eval.setter
