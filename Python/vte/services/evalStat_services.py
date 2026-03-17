@@ -49,8 +49,8 @@ class EvalStat_services:
             # On crée les EvalStat pour chaque code IRIS de la formation
             for code_IRIS, chemin_csv in dico_csv[trigramme_formation].items():
                 formation.ajout_sessions(code_IRIS)
-                session = formation.sessions[code_IRIS]
-                session.ajout_evalStat_avec_traitement(
+                session = formation.sessions[code_IRIS]  # Alias
+                session.eval = EvalStat_session.avec_ouverture_ou_traitement(
                     chemin_csv=chemin_csv,
                     ecrire_eval_formation=False,  # On sauvegardera après la boucle de traitement
                     ouvrirDossier=ouvrirDossier

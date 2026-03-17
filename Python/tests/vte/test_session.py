@@ -25,10 +25,10 @@ def test_init(formation, tel):
 # Test des constructeurs alternatifs
 # ----------------------------------------------------------------------
 # python -m pytest -s -v tests/vte/test_session.py::test_avec_traitement_evalStat
-@patch("vte.domain.session.Session.ajout_evalStat_avec_traitement")
+@patch("vte.domain.session.EvalStat_session.avec_ouverture_ou_traitement")
 def test_avec_traitement_evalStat(mock, formation, tel):
 
-    session = Session.avec_traitement_evalStat(
+    session = Session.avec_ouverture_ou_traitement_evalStat(
         formation=formation,
         code_IRIS=tel["code_IRIS"],
         chemin_csv=None,
@@ -40,6 +40,7 @@ def test_avec_traitement_evalStat(mock, formation, tel):
     assert session.code_IRIS == tel["code_IRIS"]
 
     mock.assert_called_once_with(
+        session=session,
         chemin_csv=None,
         ecrire_eval_formation=False,
         ouvrirDossier=False
@@ -48,19 +49,8 @@ def test_avec_traitement_evalStat(mock, formation, tel):
 # ----------------------------------------------------------------------
 # Test des méthodes internes
 # ----------------------------------------------------------------------
-# python -m pytest -s -v tests/vte/test_session.py::test_ajout_evalStat
-@patch("vte.domain.session.EvalStat_session")
-def test_ajout_evalStat(mock, formation, tel):
 
-    session = Session(formation=formation, code_IRIS=tel["code_IRIS"])
-
-    session._ajout_evalStat()
-
-    mock.assert_called_once_with(session=session)
-
-    assert session.eval == mock.return_value
-
-
+"""
 # python -m pytest -s -v tests/vte/test_session.py::test_ajout_evalStat_avec_traitement
 @patch("vte.domain.session.EvalStat_session.avec_traitement")
 def test_ajout_evalStat_avec_traitement(mock, formation, tel):
@@ -81,7 +71,7 @@ def test_ajout_evalStat_avec_traitement(mock, formation, tel):
     )
 
     assert session.eval == mock.return_value
-
+"""
 
 
 

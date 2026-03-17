@@ -251,9 +251,9 @@ class EvalStat_session(EvalStat):
         :type ecrire_eval_formation: bool
         :param ouvrirDossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
         :type ouvrirDossier: bool
-        :param ouvrir_fe: _description_, defaults to False
+        :param ouvrir_fe: Si True, ouvre et charge l'Objet FichierExcel dans fe (i.e. si les données de eval formation ne suffisent pas)
         :type ouvrir_fe: bool, optional
-        :return: _description_
+        :return: l'EvalStat session
         :rtype: EvalStat_session
         """
         instance = cls(session)

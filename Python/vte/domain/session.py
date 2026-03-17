@@ -18,7 +18,11 @@ class Formation_protocol(Protocol):
 
 
 class Session:
-    def __init__(self, formation:Formation_protocol, code_IRIS: int):
+    def __init__(
+            self, 
+            formation:Formation_protocol, 
+            code_IRIS: int
+            ):
         """
         Crée une instance de Session a minima.
 
@@ -36,9 +40,16 @@ class Session:
         
         # Une session a une évaluation stagiaire de la session /!\ Faire distinction entre EvalStat natif et le mien → On va prendre le mien
         self._eval:Optional[EvalStat_session] = None
-   
+
     @classmethod
-    def avec_traitement_evalStat(cls, formation:Formation_protocol, code_IRIS: int, chemin_csv:Optional[Path|str]=None, ecrire_eval_formation:bool=True, ouvrirDossier:bool=False) -> Session:
+    def avec_ouverture_ou_traitement_evalStat(
+        cls, 
+        formation:Formation_protocol, 
+        code_IRIS: int, 
+        chemin_csv:Optional[Path|str]=None, 
+        ecrire_eval_formation:bool=True, 
+        ouvrirDossier:bool=False
+        ) -> Session:
         """
         Crée une l'instance de Session en traitant son EvalStat.
 
@@ -59,7 +70,9 @@ class Session:
         :type ouvrirDossier: bool
         """
         instance = cls(formation = formation, code_IRIS = code_IRIS)
-        instance.ajout_evalStat_avec_traitement(
+        
+        instance._eval = EvalStat_session.avec_ouverture_ou_traitement(
+            session=instance,
             chemin_csv=chemin_csv,
             ecrire_eval_formation=ecrire_eval_formation,
             ouvrirDossier=ouvrirDossier
@@ -69,38 +82,11 @@ class Session:
     # =========================
     # === METHODES INTERNES ===
     # =========================
-    def _ajout_evalStat(self) -> None:
-        """
-        Crée un objet EvalStat vide d'une session.
-        """
-        self._eval = EvalStat_session(session=self)
+
 
     # =========================
     # === METHODES EXTERNES ===
     # =========================
-    def ajout_evalStat_avec_traitement(self, chemin_csv:Optional[Path|str]=None, ecrire_eval_formation:bool=True, ouvrirDossier:bool=False) -> None:
-        """
-        Crée l'Excel EvalStat d'une session.
-
-        Si CSV non donné, alors on ouvre un filedialog.
-
-        L'évaluation de la formation est mise à jour avec ces nouvelles données.
-        L'évaluation de la formation est sauvée en fin de traitement. Ca pourrait être fait ailleurs si boucle de traitement de plusieurs EvalStat de sessions d'une même formation.
-
-        :param chemin_csv: chemin du CSV à traiter. S'il est None, on ouvre un filedialog
-        :type chemin_csv: Optional[Path|str]
-        :param ecrire_eval_formation: Pour écrire physiquement l'Excel eval formation en fin de traitement. Si False, il devra être écrit ailleurs (à l'endroit où il y a la boucle pour du multi-traitement typiquement). Défaut = True.
-        :type ecrire_eval_formation: bool
-        :param ouvrirDossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
-        :type ouvrirDossier: bool
-        """
-        self._eval = EvalStat_session.avec_traitement(
-            session=self,
-            chemin_csv=chemin_csv,
-            ecrire_eval_formation=ecrire_eval_formation,
-            ouvrirDossier=ouvrirDossier
-            )
-        
 
 
 
@@ -111,17 +97,21 @@ class Session:
     # GETTERS / SETTERS
     # ==================================================================================    
     @property
-    def code_IRIS(self) -> int|None:
+    def code_IRIS(self) -> int:
         return self._code_IRIS
     
     @property
-    def trigramme_formation(self) -> str|None:
+    def trigramme_formation(self) -> str:
         return self._formation.trigramme_formation
     
     @property
-    def eval(self) -> EvalStat_session:
+    def eval(self) -> Optional[EvalStat_session]:
         return self._eval
     
+    @eval.setter
+    def eval(self, valeur:Optional[EvalStat_session]) -> None:
+        self._eval = valeur
+
     @property
     def eval_formation(self) -> EvalStat_formation:
         return self._formation.eval

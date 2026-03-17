@@ -350,7 +350,7 @@ def test_traitement_eval_session_fonctionnel(
     try:
         set_iris_chemin_specifique(typeExport="Sessions", chemin=tel["chemin_IRIS_sessions"])  # On redéfinit le chemin d'IRIS Sessions
         formation = Formation.avec_ouverture_evalStat(tel["trigramme_formation"])
-        session = Session.avec_traitement_evalStat(
+        session = Session.avec_ouverture_ou_traitement_evalStat(
             formation=formation,
             code_IRIS=tel["code_IRIS"],
             chemin_csv=tel["chemin_csv_session"],
@@ -425,7 +425,7 @@ def test_eval_session_multi_csv(
         set_iris_chemin_specifique(typeExport="Sessions", chemin=tel["chemin_IRIS_sessions"])  # On redéfinit le chemin d'IRIS Sessions
 
         formation = Formation.avec_ouverture_evalStat(tel["trigramme_formation"])
-        session = Session.avec_traitement_evalStat(
+        session = Session.avec_ouverture_ou_traitement_evalStat(
             formation=formation,
             code_IRIS=dataset["code_IRIS"],
             chemin_csv=dataset["csv"],
