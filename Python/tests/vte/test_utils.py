@@ -16,7 +16,7 @@ def test_chemin_vers_unc_local_path():
     result = chemin_vers_unc(path_input)
     print(result)
     # Comme il n'y a pas de lecteur réseau réel, la fonction devrait retourner le path normalisé
-    assert os.path.normpath(path_input) == result or result.startswith("\\\\")  # UNC éventuel
+    assert os.path.normpath(path_input) == result or str(result).startswith("\\\\")  # UNC éventuel
 
 def test_optimiseCheminRepertoire():
     chemin = r"C:\Windows\System32\drivers\etc\salut\toto\maman"

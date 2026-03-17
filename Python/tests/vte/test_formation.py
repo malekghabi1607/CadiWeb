@@ -18,7 +18,8 @@ def test_init(tel):
     formation = Formation(tel["trigramme_formation"])
 
     assert formation.trigramme_formation == tel["trigramme_formation"]
-    assert formation.eval is None
+    assert formation._eval is None
+    assert formation.eval is not None
     assert formation.sessions == {}
 
 
@@ -45,7 +46,8 @@ def test_avec_creation_session(mock, tel):
         )
 
     assert formation.trigramme_formation == tel["trigramme_formation"]
-    assert formation.eval is None
+    assert formation._eval is None
+    assert formation.eval is not None
     assert len(formation.sessions) == 1
     assert formation.sessions[tel["code_IRIS"]].code_IRIS == tel["code_IRIS"]
 
@@ -59,7 +61,8 @@ def test_avec_creation_sessions(mock, tel):
         )
 
     assert formation.trigramme_formation == tel["trigramme_formation"]
-    assert formation.eval is None
+    assert formation._eval is None
+    assert formation.eval is not None
     assert len(formation.sessions) == len(tel["codes_IRIS"])
     for code_IRIS in tel["codes_IRIS"] :
         assert formation.sessions[code_IRIS].code_IRIS == code_IRIS

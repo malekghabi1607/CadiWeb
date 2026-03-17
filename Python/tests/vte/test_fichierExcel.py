@@ -10,9 +10,9 @@ DATA_DIR = Path(__file__).parent / "data"
 @pytest.fixture
 def excel_complexe():
     return {
-        "chemin": DATA_DIR / r"S-15697-FC24-948-VTE-VCA-Stagiaires.xlsx",
+        "chemin": DATA_DIR / r"Evaluation-Stagiaires-Global-TEL.xlsx",
         "nom_onglet": "Stagiaires",
-        "nb_tableaux": 3
+        "nb_tableaux": 2
     }
     
 @pytest.fixture
