@@ -39,7 +39,6 @@ class BilanSession:
     C'est la classe qui contient tous les éléments de ma formation pour mon bilan de session V3
     """
     # === VARIABLES PARTAGÉES ENTRE TOUTES LES INSTANCES
-    _iris_sessions:Optional[IRIS_traite] = None  # Fichier Excel qui contient les extracts IRIS Sessions (ou a minima celles de la période en cours) → Plusieurs bilan peuvent être fait à partir de cet extract, c'est donc une variable de classe
 
 
     _CRITERES_A_ENLEVER:list[str] = [  # Critères à ne pas retenir pour le calcul des moyennes < 3
@@ -102,25 +101,6 @@ class BilanSession:
         self._evalInf3_com:str = ""
         self._tauxRetours_val:str = ""
 
-    # TODO : adapter pour pouvoir prendre plusieurs codes IRIS avec un itérable de int.
-    """
-    Cette classe sera celle qui sera lancée à partir de "par période" ou "par code IRIS unique" 
-    qui auront traité/généré toutes les données d'entrée requises :
-    (foramtion, codes_iris, période, année...) → Peut-être mettre dans __init__ ?
-    """
-    @classmethod   
-    def depuis_codesIRIS(cls, formation:Formation_protocol, codes_IRIS:Iterable[int]) -> BilanSession:
-        """
-        Génère un bilan de session à partir d'un code IRIS (un bilan pour une session)
-
-        :param formation: Objet formation associé à ce bilan
-        :type formation: Formation_protocol
-        :param codes_IRIS: Codes IRIS de/des session(s) pour laquelle/lesquells on souhaite faire un bilan
-        :type codes_IRIS: Iterable[int]
-        :return: Un objet bilan de session de ce code IRIS
-        :rtype: BilanSession
-        """
-        pass
 
 
     @classmethod   
@@ -137,33 +117,16 @@ class BilanSession:
         :return: Un objet bilan de session de ce code IRIS
         :rtype: BilanSession
         """
-        # === ON VERIFIE QU'IRIS SESSIONS CONTIENT BIEN LE CODE IRIS ===
-        # On charge IRIS sessions et on vérifie qu'on a bien une ligne sinon on sort
-        # J'ai viré cette méthode car redondant : df_sessions_filtre_codeIRIS = BilanSession.charge_IRIS_session_et_verifie_codeIRIS(code_IRIS=code_IRIS)
-        if annee is None:
-            annee = int(self.df_sessions_filtre_codeIRIS["Année début ses."].iloc[0])
-
         # On initialise l'instance 
-        instance = cls(formation=formation, annee=annee)
-        instance._iris_sessions = get_iris(typeExport="Sessions")
-
+        instance = cls(formation=formation, annee=-1)
+        instance.code_IRIS = code_IRIS
+        instance._annee = annee if annee is not None else int(instance.df_sessions_filtre_codeIRIS["Année début ses."].iloc[0])
 
         # === ON FAIT LES AUTRES VERIFICATIONS QUI ANNULERAIENT LE TRAITEMENT ===
-        # On vérifie que code_iris est bien un entier à 5 chiffres
-        est_code_IRIS_valide, instance.code_IRIS = IRIS.verifier_code_IRIS(code_IRIS, int)
-        if not est_code_IRIS_valide:
-            vlog.log_erreur(f"Code IRIS en entrée non valide : {instance.code_IRIS} non traité", continuer=True)
-            return
-    
-        # On vérifie la pré-existance du bilan Word ; si il existe déjà, alors on arrête le traitement
-        continuer = verifier_existance_fichier(instance.chemin_word_bilan_output)
+        continuer, statut = instance.verifier_traitement_bilan()
         if not continuer:
-            print("❌  Bilan de session déjà existant → Arrêt du traitement du bilan par l'utilisateur")
             return
         
-
-    
-
         # === TRAITEMENT DU BILAN DE SESSION ===
         # On affecte les autres données de base à la main
         # instance.code_IRIS = code_IRIS  # Déjà affecté plus haut
@@ -189,6 +152,33 @@ class BilanSession:
 
 
         return instance
+
+
+
+
+
+
+
+
+    # TODO : adapter pour pouvoir prendre plusieurs codes IRIS avec un itérable de int.
+    """
+    Cette classe sera celle qui sera lancée à partir de "par période" ou "par code IRIS unique" 
+    qui auront traité/généré toutes les données d'entrée requises :
+    (foramtion, codes_iris, période, année...) → Peut-être mettre dans __init__ ?
+    """
+    @classmethod   
+    def depuis_codesIRIS(cls, formation:Formation_protocol, codes_IRIS:Iterable[int]) -> BilanSession:
+        """
+        Génère un bilan de session à partir d'un code IRIS (un bilan pour une session)
+
+        :param formation: Objet formation associé à ce bilan
+        :type formation: Formation_protocol
+        :param codes_IRIS: Codes IRIS de/des session(s) pour laquelle/lesquells on souhaite faire un bilan
+        :type codes_IRIS: Iterable[int]
+        :return: Un objet bilan de session de ce code IRIS
+        :rtype: BilanSession
+        """
+        pass
 
 
     # TODO : j'ai fait en sorte que les méthodes soient pas en warning, à tester bilan_unique puis adapter pour que par période marche
@@ -246,6 +236,12 @@ class BilanSession:
         
 
 
+
+
+
+
+
+
     # =========================
     # === METHODES INTERNES === 
     # =========================
@@ -260,6 +256,8 @@ class BilanSession:
         # TODO : avec des codes IRIS et sans autrs sauvegardes des chemins des CSV traités par ailleurs, l'utilisateur est potentiellement obligé de sélectionner des CSV déjà traités (i.e. non pertinents) à la main → A améliorer
         # fe_evaluations_formation, statuts_csv = EvalStat.depuis_liste_codes_IRIS(self._codes_IRIS, fe_IRIS_sessions=self._fe_IRIS_sessions)
         statuts_csv = EvalStat_services.traiter_evalStat_depuis_liste_codes_IRIS(codes_IRIS=self._codes_IRIS, formation=self._formation)
+        # OK
+
 
         # A ce stade, toutes les valeurs de _codes_IRIS sont sensées être a minima présents dans IRIS avec données pour stats générales
         for code_IRIS in self._codes_IRIS:
@@ -553,42 +551,56 @@ class BilanSession:
         document.write(self.chemin_word_bilan_output)
 
 
-    # ==========================
-    # === METHODES STATIQUES ===
-    # ==========================
-    @staticmethod
-    def AVIRER_charge_IRIS_session_et_verifie_codeIRIS(code_IRIS:int) -> DataFrame:
+    # =========================
+    # === METHODES EXTERNES ===
+    # =========================
+
+    def verifier_traitement_bilan(self) -> Tuple[bool, str]:
         """
-        Charge IRIS Sessions, puis vérifie qu'il contient bien une ligne avec le code IRIS.
+        Vérifie si l'on doit traiter un bilan de sessions à partir :
+            - du code IRIS (bien à 5 caractères + bien présent dans IRIS sessions) ;
+            - le bilan Word n'existe pas déjà.
 
-        Si IRIS session ne contient pas code IRIS, alors on coupe la procédure.
-
-        Renvoie le dataframe df_session filtré sur le code IRIS
-
-        :param code_IRIS: code IRIS à tester
-        :type code_IRIS: int
-        :return: le dataframe df_session filtré sur le code IRIS
-        :rtype: DataFrame
+        :return:
+        - Un bool pour dire si le traitement doit continuer 
+            - True il faut traiter l'EvalStat (code IRIS ou CSV non détectés dans EvalStat + code IRIS présent dans IRIS sessions) ; 
+            - False il ne faut pas traiter l'EvalStat.
+        - un string avec le statut pour connaitre l'exclusion de traitement le cas échéant (pertinent ssi False ; si True on renvoie chaine vide).
+        :rtype: Tuple[bool, str]
         """
-        # On charge IRIS sessions
-        iris_sessions = get_iris(typeExport="Sessions")
+        # Vérification 1 : on vérifie la pré-existance du bilan Word ; si il existe déjà, alors on arrête le traitement
+        continuer = verifier_existance_fichier(self.chemin_word_bilan_output)
+        if not continuer:
+            vlog.log_erreur("❌  Bilan de session déjà existant → Arrêt du traitement du bilan par l'utilisateur")
+            
+        
+        
+        # Vérifications 2 : liés à code_IRIS
+        if self.code_IRIS is not None:
+            # 2.1 : On vérifie que code_iris est bien un entier à 5 chiffres
+            est_code_IRIS_valide, _ = IRIS.verifier_code_IRIS(self.code_IRIS, int)
+            if not est_code_IRIS_valide:
+                vlog.log_erreur(f"❌  Code IRIS renseigné non valide : {self.code_IRIS} non traité")
+                #statut = "Exclu - Code IRIS renseigné non valide"
+                #return False, statut
 
-        # On filtre le DataFrame d'IRIS avec le code IRIS
-        df_sessions_filtre_codeIRIS = iris_sessions.df[iris_sessions.df['Code IRIS'] == code_IRIS]
 
-        # On vérifie qu'on a bien une ligne sinon on sort
-        if len(df_sessions_filtre_codeIRIS) < 1:
-            print(df_sessions_filtre_codeIRIS)
-            vlog.log_erreur(f"Le fichier IRIS Sessions ne contient pas ce code IRIS : {code_IRIS}")   
+            # 2.2 : On vérifie si le code_IRIS est bien existant dans l'extract IRIS sessions
+            if self.code_IRIS not in self.df_sessions_filtre["Code IRIS"].values:
+                print(f"⚠️  Code IRIS {self.code_IRIS} non trouvé dans l’extract IRIS.")
+                statut = "Exclu - Code IRIS pas dans Extract IRIS sessions"
+                return False, statut
+ 
 
-        return df_sessions_filtre_codeIRIS
+        # Si aucun Test n'est vérifié
+        return True, ""
 
 
 
     # =========================
     # === GETTERS / SETTERS === 
     # =========================
-    
+    # Getters / setters liés à BilanSession
     @property
     def chemin_word_bilan_output(self) -> Path:
         """
@@ -670,7 +682,7 @@ class BilanSession:
         :return: extract IRIS VTE filtré
         :rtype: DataFrame
         """
-        return self._iris_sessions.df_filtre_periode(trigramme_formation=self.trigramme_formation, annee=self._annee, periode=self._periode)
+        return self.iris_sessions.df_filtre_periode(trigramme_formation=self.trigramme_formation, annee=self._annee, periode=self._periode)
 
     @property
     def intitule_formation(self) -> str:

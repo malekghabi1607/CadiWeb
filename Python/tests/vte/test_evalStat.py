@@ -127,12 +127,23 @@ def test_init_evalStat_session(session):
 
     assert es.fe is None
     assert es._session == session
-    assert es._statut_csv is None
+    assert es._chemin_csv is None
+    assert es._statut is None
 
 
 # ----------------------------------------------------------------------
 # Test des constructeurs alternatifs
 # ----------------------------------------------------------------------
+def test_avec_ouverture_evalStat_session(session, tel):
+    # TODO : je ne teste pas avec ouvrir_fe=True
+    es = EvalStat_session.avec_ouverture(session=session, ouvrir_fe=False)
+
+    assert es.fe is None
+    assert es._session == session
+    assert es._chemin_csv == tel["chemin_csv_session"]
+    assert es._statut == "Traité"
+
+
 # python -m pytest -s -v tests/vte/test_evalStat.py::test_avec_traitement_evalStat_session
 @patch("vte.domain.evalStat.EvalStat_session.traiter_eval")
 def test_avec_traitement_evalStat_session(mock_traiter, session):
@@ -348,7 +359,7 @@ def test_traitement_eval_session_fonctionnel(
         )
         # Vérifications de session
         assert session.eval.fe is not None
-        assert session.eval.statut_csv == "Traité"
+        assert session.eval.statut == "Traité"
         assert session.eval.chemin_fe == tel["chemin_eval_session"]
         assert len(session.eval.df_stagiaires) == tel["resultat_apresTraitement_evalSession_nbLignes"]
 
@@ -430,7 +441,7 @@ def test_eval_session_multi_csv(
             assert session.eval.fe is not None
         else:
             assert session.eval.fe is None
-        assert session.eval.statut_csv == dataset["statut"]
+        assert session.eval.statut == dataset["statut"]
 
 
         # Vérification de formation

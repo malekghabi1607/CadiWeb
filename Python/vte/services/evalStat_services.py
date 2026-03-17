@@ -21,7 +21,7 @@ class EvalStat_services:
     Services métier autour des exports IRIS.
     """
     @staticmethod
-    def traiter_evalStat_depuis_dico_csv(dico_csv:dict[str, dict[int, Path]], ouvrirDossier:bool=False) -> dict[str, dict[str, str]]:
+    def traiter_evalStat_depuis_dico_csv(dico_csv:dict[str, dict[int, Path]], ouvrirDossier:bool=False) -> dict[int, dict[str, str]]:
         """
         A partir d'un dictionnaire CSV stagiaire
         Permet de :
@@ -30,15 +30,15 @@ class EvalStat_services:
         
         On exclue du traitement les chemin_csv_session qui sont déjà dans l'évaluation de la formation (on considère que le CSV a déjà été traité)
 
-        :param dico_csv: dictionnaire CSV généré par EvalStat_session.construire_dictionnaire_trigrammeFormation_codeIRIS_cheminsCSV_depuis_iterableCSV
+        :param dico_csv: dictionnaire CSV [trigramme_formation][code_IRIS]: chemin_csv généré par EvalStat_session.construire_dictionnaire_trigrammeFormation_codeIRIS_cheminsCSV_depuis_iterableCSV
         :type dico_csv: dict[str, dict[int, Path]]
         :param ouvrirDossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
         :type ouvrirDossier: bool, optional
         :return: Une liste de dictionnaires {codeIRIS,{"fichier": chemin_csv,"statut": statut_csv}}. Je pourrai accéder à la valeur par nom_dico[codeIRIS]["fichier"] ou nom_dico[codeIRIS]["statut"]
-        :rtype: dict[str, dict[str, str]]
+        :rtype: dict[int, dict[str, str]]
         """
         # Dictionnaire des retours du traitement
-        statuts_csv:dict[str, dict[str, str]] = {}
+        statuts_csv:dict[int, dict[str, str]] = {}  # [trigramme_formation][code_IRIS]: chemin_csv
         
         # On boucle sur les trigrammes des formations
         for trigramme_formation in dico_csv.keys():
@@ -59,7 +59,7 @@ class EvalStat_services:
                 # On met à jour le statut CSV de sortie
                 statuts_csv[code_IRIS] = {
                         "fichier": chemin_csv.name,
-                        "statut": session.eval.statut_csv
+                        "statut": session.eval.statut
                         }
 
                 #print(f"Fin traitement : {code_IRIS}\t{chemin_csv.name}\t{session.eval.statut_csv}")

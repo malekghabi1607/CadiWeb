@@ -97,10 +97,10 @@ def evalstat_csv_datasets(tel):
     return [
 
         {
-            "nom": "csv_deja_dans_eval_formation",
+            "nom": "code_iris_deja_dans_eval_formation",
             "code_IRIS": 13414,
             "csv": Path(r"\\instnt\PARTAGE\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-13414-rapports-session-evaluations\S-13414-FC22-TEL-JVI-LRA-Stagiaires.csv"),
-            "statut": "Exclu - CSV déjà dans fichier global",
+            "statut": "Exclu - Code IRIS déjà dans fichier global",
             "nbLignes_evalFormation": tel["resultat_sansTraitement_evalFormation_nbLignes"],
         },
 
