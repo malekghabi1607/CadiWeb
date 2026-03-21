@@ -37,7 +37,15 @@ class Session_protocol(Protocol):
     def trigramme_formation(self) -> str: ...
 
     @property
+    def eval(self) -> Optional[EvalStat_session]: ...
+
+    @eval.setter
+    def eval(self, valeur:Optional[EvalStat_session]) -> None: ...
+
+    @property
     def eval_formation(self) -> EvalStat_formation: ...
+
+
 
 
 # ======================================================================================
@@ -53,7 +61,10 @@ class EvalStat:
        - la création des fichiers d'évaluation au format xlsx,
        - la création/mise à jour du fichier d'évaluation de la formation au format xlsx.
     """
-    
+    # ===========================
+    # === VARIABLES DE CLASSE ===
+    # ===========================
+        
     # === dico_colonnes[critère d'évaluation][type d'info] ===
     dico_colonnes:dict[str, dict[str, str]] = {
         "Comment avez-vous connu cette formation ?": {"Type colonne": "Commentaires seuls", "Groupe critère": "Question ouverte"},
@@ -128,9 +139,11 @@ class EvalStat:
         "Trigramme AF",
         "Nb. Nommés"]
 
-    # ==================================================================================
-    # CONSTRUCTEUR
-    # ==================================================================================
+
+
+    # ====================
+    # === CONSTRUCTEUR ===
+    # ====================
     def __init__(self) -> None:
         """
         Crée une instance d'EvalStat à minima (self_fe = None)
@@ -138,9 +151,10 @@ class EvalStat:
         self._fe:Optional[FichierExcel] = None  # Objet Excel contenant les données EvalStat stagiaire individuel
 
 
-    # ==================================================================================
-    # METHODES INTERNES
-    # ==================================================================================
+
+    # =========================
+    # === METHODES INTERNES ===
+    # =========================
     def _ecrit_df_et_sauve(self, nouveau_chemin_fichier:Optional[Path] = None) -> None:
         """
         Ecrit les dataframes csv et stagiaires dans le fichier excel.
@@ -166,9 +180,10 @@ class EvalStat:
         self._fe.actualiser_TCD()
 
 
-    # ==================================================================================
-    # GETTERS / SETTERS
-    # ==================================================================================
+
+    # =========================
+    # === GETTERS / SETTERS ===
+    # =========================
     @property
     def fe(self) -> FichierExcel|None:
         return self._fe
@@ -204,6 +219,10 @@ class EvalStat:
     def df_IRIS_sessions(self) -> pd.DataFrame:
         return self.iris_sessions.df
 
+
+
+
+
 # ======================================================================================
 # CLASSE EVALSTAT_SESSION
 # ======================================================================================
@@ -231,7 +250,7 @@ class EvalStat_session(EvalStat):
 
         self._session:Session_protocol = session  # C'est un protocol pour éviter les références circulaires
         self._chemin_csv: Optional[Path] = None
-        self._statut: Optional[str] = None  # ex: "Traité", "Exclu - Code IRIS déjà dans fichier global", "Exclu - CSV déjà dans fichier global", "Exclu - Aucun CSV fourni", "Exclu - Code IRIS pas dans Extract IRIS sessions", "Exclu - Problème lecture CSV", "Exclu - CSV vide / Aucun retour"
+        self._statut: Optional[str] = None  # ex: "A traiter", "Traité", "Traité - Code IRIS déjà dans l'évaluation de la formation", "Traité - CSV déjà dans l'évaluation de la formation", "Exclu - Aucun CSV fourni", "Exclu - Code IRIS pas dans Extract IRIS sessions", "Exclu - Problème lecture CSV", "Exclu - CSV vide / Aucun retour"
 
     @classmethod
     def avec_ouverture_ou_traitement(cls, session:Session_protocol, chemin_csv:Optional[Path|str]=None, ecrire_eval_formation:bool=True, ouvrirDossier:bool=False, ouvrir_fe:bool=False) -> EvalStat_session:
@@ -263,10 +282,7 @@ class EvalStat_session(EvalStat):
         
         if code_IRIS_present_eval_formation :
             # === CAS avec code IRIS déjà traité (i.e. qui est dans eval formation) ===
-            instance._chemin_csv = instance.eval_formation.chemin_csv_depuis_code_IRIS(instance.code_IRIS)
-            instance._statut = "Traité"
-            if ouvrir_fe:
-                instance._fe = FichierExcel.depuis_fichier(chemin_fichier=instance.chemin_excel)
+            instance.ouvrir_eval(session=session, ouvrir_fe=ouvrir_fe)
         
         else:
             # === CAS avec code IRIS non traité (i.e. qui n'est pas dans eval formation) ===
@@ -275,9 +291,6 @@ class EvalStat_session(EvalStat):
                 ecrire_eval_formation=ecrire_eval_formation,
                 ouvrirDossier=ouvrirDossier
             )
-
-
-        #instance._ouvrir_ou_creer_eval_formation()
 
         return instance
 
@@ -311,12 +324,9 @@ class EvalStat_session(EvalStat):
 
         
 
-
-
-
-    # ==================================================================================
-    # MÉTHODES D’INSTANCE - TRAITEMENT INDIVIDUEL
-    # ==================================================================================
+    # ===================================================
+    # === MÉTHODES D’INSTANCE - TRAITEMENT INDIVIDUEL ===
+    # ===================================================
     def _charger_csv_stagiaire(self) -> Optional[pd.DataFrame] :
         """
         Permet de stocker un CSV dans un dataframe en employant le bon encodage
@@ -342,64 +352,35 @@ class EvalStat_session(EvalStat):
             self._statut = "Exclu - CSV vide / Aucun retour"
             return None
         
-        # On traite les csv selon leur type / renomme les colonnes / ...
         # Prise en compte qu'on a plusieurs formats de CSV : on doit traiter des colonnes en + ou - en conséquences
-        
         if "Date de fin" in df_csv_stagiaires.columns:
             # Cas 1 (nouveau format de csv) : supprimer "Date de fin" → Test : r"\\instnt\PARTAGE\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-16411-rapports-session-evaluations\S-16411-FC25-TEL-VTE-CAR-Stagiaires.csv"
             df_csv_stagiaires = df_csv_stagiaires.drop(columns=["Date de fin"])
-            #df_csv_stagiaires = df_csv_stagiaires.rename(columns={df_csv_stagiaires.columns[0]: "Date"})
         else:
             # Cas 2 (ancien format de csv) : supprimer la 2e et 3e colonne (indices 1 et 2) → Test : r"\\instnt\PARTAGE\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-12766-rapports-session-evaluations\S-12766-FC22-TEL-JVI-LRA-Stagiaires.csv"
             df_csv_stagiaires = df_csv_stagiaires.drop(df_csv_stagiaires.columns[[1, 2]], axis=1)
-            #df_csv_stagiaires = df_csv_stagiaires.rename(columns={df_csv_stagiaires.columns[1]: "Prénom"})  
-            #df_csv_stagiaires = df_csv_stagiaires.rename(columns={df_csv_stagiaires.columns[2]: "Nom"})
-        #print(df_csv_stagiaires)
 
         # On rajoute le chemin du CSV en première colonne
         df_csv_stagiaires.insert(0, "Chemin fichier CSV", str(self._chemin_csv))
-
-        # On nettoie les espaces en début et fin des noms d'en-tête
-        #df_csv_stagiaires.columns = [col.strip() for col in df_csv_stagiaires.columns]
 
         # Je renomme à la main toutes les colonnes à la main car les CSV c'est le bordel avec des espaces qui trainent et des caractères spéciaux
         mapping = dict(zip(df_csv_stagiaires.columns, self._colonnes_csv_bonsNoms))  # On fait un dictionnaire de mapping anciens noms/nouveaux noms
         df_csv_stagiaires = df_csv_stagiaires.rename(columns=mapping)  # On renomme les colonnes
 
-
-    
         # Mise au format jj/mm/aaaa de la colonne "Date" (si elle existe)
         try:
             df_csv_stagiaires["Date"] = pd.to_datetime(df_csv_stagiaires["Date"], dayfirst=True, errors="coerce").dt.strftime("%d/%m/%Y")  # dayfirst=True indique que le premier nombre correspond au jour (format jj/mm/aaaa)
         except Exception as e:
             print(f"Erreur de conversion de la colonne Date : {e}")
 
-
-        #print(df_csv_stagiaires)
         return df_csv_stagiaires
 
     def _traiter_df_csv(self) -> None:
         """
         On génère le DataFrame du CSV et on l'affecte à self.df_csv.
-        On fait quelques traitements (ajout nom du CSV, enlever date de fin, gestion de 2 types de csv stagiaires...)
         """
-        # On recrée le chemin du CSV à partir du chemin di fichier Excel
-        #chemin_csv = self.chemin_fe.with_suffix(".csv")
-        
-        #print(self.df_csv)
-        
-        # On colle le chemin du CSV en première colonne
-        #self.df_csv.insert(0, "Chemin fichier CSV", str(chemin_csv))
-        #self.df_csv["Chemin fichier CSV"] = str(chemin_csv)
-
         # Met à jour ou crée la colonne "Code session" avec self._codeIRIS
         self.df_csv["Code session"] = self.code_IRIS
-
-
-
-        #print(self.df_csv)
-
-        #return self.df_csv
 
     def _traiter_df_stagiaires(self) ->None:
         """
@@ -543,9 +524,9 @@ class EvalStat_session(EvalStat):
 
 
 
-    # ==================================================================================
-    # MÉTHODES EXTERNES - TRAITEMENT INDIVIDUEL
-    # ==================================================================================
+    # =================================================
+    # === MÉTHODES EXTERNES - TRAITEMENT INDIVIDUEL ===
+    # =================================================
     def verification_traitement_eval(self) -> Tuple[bool, str]:
         """
         Vérifie si l'on doit traiter l'EvalStat session à partir de :
@@ -561,8 +542,38 @@ class EvalStat_session(EvalStat):
         - un string avec le statut pour connaitre l'exclusion de traitement le cas échéant (pertinent ssi False ; si True on renvoie chaine vide).
         :rtype: Tuple[bool, str]
         """        
-        return self.eval_formation.verifier_traitement_eval(code_IRIS=self.code_IRIS, chemin_csv=self._chemin_csv)
+        return self.eval_formation.verifier_traitement_evalStat_session(code_IRIS=self.code_IRIS, chemin_csv=self._chemin_csv)
 
+
+    def ouvrir_eval(self, session:Session_protocol, ouvrir_fe:bool=False) -> None:
+        """
+        Ouvre un EvalStat session déjà traité (i.e. déjà existant dans EvalStat formation).
+
+        On stocke l'EvalStat dans session.eval
+
+        Si l'objet EvalStat_session de la session n'est pas défini (None), alors on le crée et on l'affecte.
+
+        :param session: La session à laquelle est affectée l'EvalStat
+        :type session: Session_protocol
+        :param ouvrir_fe: Si True, ouvre et charge l'Objet FichierExcel dans fe (i.e. si les données de eval formation ne suffisent pas)
+        :type ouvrir_fe: bool, optional
+        :return: l'EvalStat session
+        :rtype: EvalStat_session
+        """
+        
+        # On récupère le chemin du CSV depuis l'eval de la formation
+        self._chemin_csv = self.eval_formation.chemin_csv_depuis_code_IRIS(self.code_IRIS)
+        
+        # On défini le statut
+        self._statut = "Traité - Code IRIS déjà dans l'évaluation de la formation"
+        
+        # On ouvre le fichier si demandé
+        if ouvrir_fe:
+            self._fe = FichierExcel.depuis_fichier(chemin_fichier=self.chemin_excel)
+        
+        # Si session n'a pas encore son EvalStat de créé, alors on le crée
+        if session.eval is None:
+            session.eval = self   
 
     def traiter_eval(self, chemin_csv:Optional[Path|str]=None, ecrire_eval_formation:bool=True, ouvrirDossier:bool=False) -> None:
         """
@@ -587,8 +598,6 @@ class EvalStat_session(EvalStat):
 
 
 
-
-        
 
         print("\n")
         timer.debut(f"{Style.BRIGHT}{Fore.YELLOW}Gestion du CSV {self._chemin_csv.name}") 
@@ -622,7 +631,7 @@ class EvalStat_session(EvalStat):
 
         # 3.2 : On sauvegade selon argument utilisateur ; normalement si et seulement si nous ne faisons pas un traitement en boucle (sinon on le fait en fin de traitement de boucle)
         if ecrire_eval_formation:
-            self.eval_formation.ecritdf_et_sauve_siModif()
+            self.eval_formation.ecrit_et_sauve_df_siModif()
     
     
     
@@ -632,9 +641,11 @@ class EvalStat_session(EvalStat):
 
         timer.fin()       
 
-    # ==================================================================================
-    # MÉTHODES EXTERNES
-    # ==================================================================================
+
+
+    # =========================
+    # === MÉTHODES EXTERNES ===
+    # =========================
     @staticmethod
     def construire_dictionnaire_trigrammeFormation_codeIRIS_cheminsCSV_depuis_iterableCSV(chemins_csv: Iterable[Union[str, Path]], formation:Optional[Formation_protocol]=None) -> Dict[str, Dict[int, Path]]:
         """
@@ -659,7 +670,7 @@ class EvalStat_session(EvalStat):
         for chemin in chemins_csv:
             # Si formation est donné, alors je peux faire des vérifications de pertinence de traiter l'EvalStat session en regardant s'il est déjà présent dans l'eval formation
             if formation is not None:
-                continuer, statut = formation.eval.verifier_traitement_eval(chemin_csv=chemin)
+                continuer, statut = formation.eval.verifier_traitement_evalStat_session(chemin_csv=chemin)
                 trigramme_formation = formation.trigramme_formation
             else:
                 trigramme_formation = None
@@ -684,10 +695,13 @@ class EvalStat_session(EvalStat):
 
         return dictionnaire
 
-
     @staticmethod
     def construire_dictionnaire_trigrammeFormation_codeIRIS_cheminsCSV_depuis_iterableCodesIRIS(codes_IRIS: Iterable[int], formation:Optional[Formation_protocol]=None) -> Dict[str, Dict[int, Path]]:
         """
+        Pour une liste de codes IRIS :
+            - Soit les EvalStat sont déjà traités (présents dans EvalStat foramtion) → On ouvre l'evalStat de la session (on remplit son statut) ;
+            - Soit les EvalStat 
+
         Construit un dictionnaire imbriqué de la forme {trigramme_formation: {code_IRIS: chemin_csv}} à partir de codes IRIS.
 
         On n'y inscrit que les sessions qui sont à traiter (on vérifie si non-présent dans eval formation).
@@ -706,13 +720,19 @@ class EvalStat_session(EvalStat):
         continuer = True
         statut = ""  # Non employé # TODO : je n'emploie pas la donnée de statut, mais en première réflexion ici ce n'est pas pertinent (uniquement pertinent lorsque l'on fait les bilans de sessions)
 
-        # TODO : je dois exclure les code IRIS déjà dans eval formation avec verifier_code_iris_deja_present
+        
         # TODO : si l'utilisateur exclut un fichier, alors on doit le tracer qq par et le traiter eficacement (ex : si chemin =="", alors exclut par utilisateur) ; dans traitement eval stat vérifier effets de bord
 
         for code_IRIS in codes_IRIS:
+            # Il me faut le trigramme de la formation pour vérifier la pertinence de traiter l'EvalStat session en regardant s'il est déjà présent dans l'eval formation
+            # Si formation n'est pas donné, je récupère le trigramme depuis IRIS sessions
+            #if formation is None:
+            #    trigramme_formation = 
+
+
             # Si formation est donné, alors je peux faire des vérifications de pertinence de traiter l'EvalStat session en regardant s'il est déjà présent dans l'eval formation
             if formation is not None:
-                continuer, statut = formation.eval.verifier_traitement_eval(code_IRIS=code_IRIS)
+                continuer, statut = formation.eval.verifier_traitement_evalStat_session(code_IRIS=code_IRIS)
                 trigramme_formation = formation.trigramme_formation
             else:
                 trigramme_formation = None
@@ -736,16 +756,17 @@ class EvalStat_session(EvalStat):
 
         return dictionnaire
 
-    # ==================================================================================
-    # POPUP
-    # ==================================================================================
+
+
+    # =============
+    # === POPUP ===
+    # =============
     def _filedialog_csv(self) -> Path | None:
         """
         Ouvre un filedialog pour demander à l'utilisateur de sélectionner un CSV.
         On pointe au mieux sur le répertoire des CSV de cette formation pour la boîte de dialogue.
         """
         return self.filedialog_csv(self.trigramme_formation, self.code_IRIS)
-
 
     @staticmethod
     def filedialog_csv(trigramme_formation:Optional[str]=None, code_IRIS:Optional[int]=None) -> Path | None:
@@ -788,9 +809,9 @@ class EvalStat_session(EvalStat):
 
 
 
-    # ==================================================================================
-    # GETTERS / SETTERS
-    # ==================================================================================
+    # =========================
+    # === GETTERS / SETTERS ===
+    # =========================
     # Lié à EvalStat_session
     @property
     def chemin_csv(self) -> Path:
@@ -840,9 +861,9 @@ class EvalStat_formation(EvalStat):
     Gère la création ou la mise à jour du fichier d'évaluation de la formation au format xlsx.
     """
 
-    # ==================================================================================
-    # CONSTRUCTEURS
-    # ==================================================================================
+    # =====================
+    # === CONSTRUCTEURS ===
+    # =====================
     def __init__(self, formation:Formation_protocol):
         """
         Initialisation d'un EvalStat formation a minima
@@ -856,9 +877,8 @@ class EvalStat_formation(EvalStat):
         self._df_initial_hash:Optional[str] = None  # hash du df initial pour savoir s'il a été modifié, auquel cas on sauvegardera à la fin
         self._supprimeEtRemplace_donneesEval:Optional[bool] = None
 
-
     @classmethod
-    def avec_ouverture(cls, formation:Formation_protocol) -> EvalStat_formation:
+    def avec_ouverture_ou_creation(cls, formation:Formation_protocol) -> EvalStat_formation:
         """
         Initialisation d'un EvalStat formation avec (ouverture ou création) du fichier d'évaluation de la formation
         """
@@ -869,9 +889,10 @@ class EvalStat_formation(EvalStat):
         return instance
 
 
-    # ==================================================================================
-    # METHODES INTERNES
-    # ==================================================================================
+
+    # =========================
+    # === METHODES INTERNES ===
+    # =========================
     def _ouvrir_ou_creer_eval_formation(self) -> None:  # -> Tuple[FichierExcel, bool]:
         """
         Ouvre ou crée le fichier Excel d'évaluations d'une formation.
@@ -893,8 +914,6 @@ class EvalStat_formation(EvalStat):
         # On regarde si Evaluation-Stagiaires-Global-XXX.xlsx existe
         # Auquel cas on l'ouvre et on ne supprimera pas les données existantes
         if chemin_excel_eval.is_file():
-            #print("Ouverture EvalStat formation existant")
-
             # Alors on l'ouvre
             self._fe = FichierExcel.depuis_fichier(chemin_fichier=chemin_excel_eval)
             vlog.ajouter_message("Ouverture EvalStat Global formation", self.chemin_fe, style=["vert"])
@@ -938,10 +957,11 @@ class EvalStat_formation(EvalStat):
         #return self._fe_evaluations_formation, self._df_evaluations_formation, supprimeDonneesEtRemplace
 
 
-    # ==================================================================================
-    # METHODES EXTERNES
-    # ==================================================================================
-    def ecritdf_et_sauve_siModif(self):
+
+    # =========================
+    # === METHODES EXTERNES ===
+    # =========================
+    def ecrit_et_sauve_df_siModif(self):
         """
         Sauvegarde et fermeture du fichier d'évaluation de la formation.
 
@@ -983,7 +1003,7 @@ class EvalStat_formation(EvalStat):
         else:
             return False
 
-    def verifier_traitement_eval(self, code_IRIS:Optional[int]=None, chemin_csv:Optional[Path]=None) -> Tuple[bool, str]:
+    def verifier_traitement_evalStat_session(self, code_IRIS:Optional[int]=None, chemin_csv:Optional[Path]=None) -> Tuple[bool, str]:
         """
         Vérifie si l'on doit traiter un EvalStat session à partir de :
             - la présence dans eval formation (code_IRIS ou chemin_csv) ;
@@ -1007,31 +1027,8 @@ class EvalStat_formation(EvalStat):
         # On vérifie que l'eval formation est ouvert en mémoire sinon c'est le premier appel → on ouvre ou crée
         if self._fe is None:
             self._ouvrir_ou_creer_eval_formation()
-        
 
-        # Vérifications 1 : liés à code_IRIS
-        if code_IRIS is not None:
-            # 1.1 : On vérifie que code_iris est bien un entier à 5 chiffres
-            est_code_IRIS_valide, code_IRIS = IRIS.verifier_code_IRIS(code_IRIS, int)
-            if not est_code_IRIS_valide:
-                vlog.log_erreur(f"❌  Code IRIS {code_IRIS} non valide : EvalStat {code_IRIS} non traité.", continuer=True)
-                statut = "Exclu - Code IRIS renseigné non valide"
-                return False, statut
-        
-            #1.2 : On vérifie que le code IRIS n'est pas déjà dans le fichier global de la session sinon on n'a pas besoin de traiter (déjà fait)
-            if self.verifier_presence_code_IRIS_dans_eval(code_IRIS):  
-                print(f"✅  Code IRIS {code_IRIS} déjà présent dans fichier eval de la formation : EvalStat {code_IRIS} exclu du traitement.")
-                statut = "Exclu - Code IRIS déjà dans fichier global"
-                return False, statut
-
-            # 1.3 : On vérifie si le code_IRIS est bien existant dans l'extract IRIS
-            if code_IRIS not in self.df_IRIS_sessions["Code IRIS"].values:
-                print(f"⚠️  Code IRIS {code_IRIS} non trouvé dans l’extract IRIS  : EvalStat {code_IRIS} exclu du traitement.")
-                statut = "Exclu - Code IRIS pas dans Extract IRIS sessions"
-                return False, statut
-        
-
-        # Vérifications 2 : liés au chemin du CSV
+        # Vérifications 1 : liés au chemin du CSV
         if chemin_csv is not None:
             # Soit on a déjà un chemin, soit on va pointer le csv manuellement – Partie obsolète car il n'y a aucun cas où on peut rentrer ici
             """
@@ -1051,15 +1048,39 @@ class EvalStat_formation(EvalStat):
             if str(chemin_csv) in self.df_stagiaires["Chemin fichier CSV"].drop_duplicates().tolist():  
                 print(f"✅  CSV déjà présent dans fichier eval de la formation : EvalStat {chemin_csv} exclu du traitement.")
                 #pprint(self._df_evaluations_formation["Chemin fichier CSV"])
-                statut = "Exclu - CSV déjà dans fichier global"
+                statut = "Traité - CSV déjà dans l'évaluation de la formation"
                 return False, statut
+
+
+        # Vérifications 2 : liés à code_IRIS
+        if code_IRIS is not None:
+            # 2.1 : On vérifie que code_iris est bien un entier à 5 chiffres
+            est_code_IRIS_valide, code_IRIS = IRIS.verifier_code_IRIS(code_IRIS, int)
+            if not est_code_IRIS_valide:
+                vlog.log_erreur(f"❌  Code IRIS {code_IRIS} non valide : EvalStat {code_IRIS} non traité.", continuer=True)
+                statut = "Exclu - Code IRIS renseigné non valide"
+                return False, statut
+        
+            # 2.2 : On vérifie que le code IRIS n'est pas déjà dans le fichier global de la session sinon on n'a pas besoin de traiter (déjà fait)
+            if self.verifier_presence_code_IRIS_dans_eval(code_IRIS):  
+                print(f"✅  Code IRIS {code_IRIS} déjà présent dans fichier eval de la formation : EvalStat {code_IRIS} exclu du traitement.")
+                statut = "Traité - Code IRIS déjà dans l'évaluation de la formation"
+                return False, statut
+
+            # 2.3 : On vérifie si le code_IRIS est bien existant dans l'extract IRIS
+            if code_IRIS not in self.df_IRIS_sessions["Code IRIS"].values:
+                print(f"⚠️  Code IRIS {code_IRIS} non trouvé dans l’extract IRIS  : EvalStat {code_IRIS} exclu du traitement.")
+                statut = "Exclu - Code IRIS pas dans Extract IRIS sessions"
+                return False, statut
+        
+
 
 
 
 
 
         # Si aucun Test n'est vérifié
-        return True, ""
+        return True, "A traiter"
 
     def chemin_csv_depuis_code_IRIS(self, code_IRIS:int) -> Optional[Path] :
         """
@@ -1077,9 +1098,11 @@ class EvalStat_formation(EvalStat):
         
         return Path(df["Chemin fichier CSV"].iloc[0])
 
-    # ==================================================================================
-    # GETTERS / SETTERS
-    # ==================================================================================
+
+
+    # =========================
+    # === GETTERS / SETTERS ===
+    # =========================
 
     @property
     def trigramme_formation(self) -> str:

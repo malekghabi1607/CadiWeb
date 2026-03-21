@@ -4,6 +4,7 @@ from pathlib import Path
 from pprint import *
 
 from vte.core.iris_referentiel import set_iris_chemin_specifique
+from vte.domain.evalStat import EvalStat_session
 from vte.domain.formation import Formation
 from vte.domain.bilanSession import BilanSession
 from vte.utils.utils import backup_fichier_test, restore_nom_fichier_test
@@ -17,9 +18,22 @@ def verif_initial_bilanSession():
 
     tel = tel_data()
     set_iris_chemin_specifique(typeExport="Sessions", chemin=tel["chemin_IRIS_sessions"])  # On redéfinit le chemin d'IRIS Sessions
-    formation = Formation(tel["trigramme_formation"])
-    
-    BilanSession.depuis_codeIRIS(formation=formation, code_IRIS=tel["code_IRIS"])
+    formation = Formation.avec_ajout_sessions(trigramme_formation=tel["trigramme_formation"], codes_IRIS=tel["code_IRIS"])
+
+    # Si session.eval est vide, alors BilanSession.depuis_codeIRIS devrait gérer l'ouverture ou le traitement
+    """    
+    session = formation.sessions[tel["code_IRIS"]]  # Alias
+
+    session.eval = EvalStat_session.avec_ouverture_ou_traitement(
+        session=session,
+        chemin_csv=tel["chemin_csv_session"],
+        ecrire_eval_formation=True, # Bilan unique ici, donc True
+        ouvrirDossier=True,
+        ouvrir_fe=False
+    )
+
+    """
+    BilanSession.depuis_codesIRIS(formation=formation, codes_IRIS=tel["code_IRIS"])
 
     
     # Restauration de mon environnement de travail

@@ -178,7 +178,7 @@ def test_init_evalStat_formation(formation):
 @patch("vte.domain.evalStat.EvalStat_formation._ouvrir_ou_creer_eval_formation")
 def test_avec_ouverture_evalStat_formation(mock_ouvrir, formation):
 
-    es = EvalStat_formation.avec_ouverture(formation)
+    es = EvalStat_formation.avec_ouverture_ou_creation(formation)
 
     assert isinstance(es, EvalStat_formation)
 
@@ -246,7 +246,7 @@ def test_creation_nouvel_eval_formation(tel):
 
     try:
 
-        formation = Formation.avec_ouverture_evalStat(
+        formation = Formation.avec_ouverture_ou_creation_evalStat(
             tel["trigramme_formation"]
         )
         #print("\n")
@@ -283,7 +283,7 @@ def test_creation_ouvrir_eval_formation_existant(tel):
 
     try:
 
-        formation = Formation.avec_ouverture_evalStat(
+        formation = Formation.avec_ouverture_ou_creation_evalStat(
             tel["trigramme_formation"]
         )
         #print("\n")
@@ -349,7 +349,7 @@ def test_traitement_eval_session_fonctionnel(
 
     try:
         set_iris_chemin_specifique(typeExport="Sessions", chemin=tel["chemin_IRIS_sessions"])  # On redéfinit le chemin d'IRIS Sessions
-        formation = Formation.avec_ouverture_evalStat(tel["trigramme_formation"])
+        formation = Formation.avec_ouverture_ou_creation_evalStat(tel["trigramme_formation"])
         session = Session.avec_ouverture_ou_traitement_evalStat(
             formation=formation,
             code_IRIS=tel["code_IRIS"],
@@ -424,7 +424,7 @@ def test_eval_session_multi_csv(
         dataset = evalstat_csv_datasets[dataset_index]
         set_iris_chemin_specifique(typeExport="Sessions", chemin=tel["chemin_IRIS_sessions"])  # On redéfinit le chemin d'IRIS Sessions
 
-        formation = Formation.avec_ouverture_evalStat(tel["trigramme_formation"])
+        formation = Formation.avec_ouverture_ou_creation_evalStat(tel["trigramme_formation"])
         session = Session.avec_ouverture_ou_traitement_evalStat(
             formation=formation,
             code_IRIS=dataset["code_IRIS"],

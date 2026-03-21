@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
@@ -70,6 +71,26 @@ def set_iris_chemin_specifique(typeExport: str, chemin: Path) -> None:
     :type chemin: Path
     """
     _chemins_specifiques[typeExport] = chemin
+
+def dico_trigrammes_codes_IRIS_a_partir_de_codes_IRIS(codes_IRIS:int|Iterable[int], chemin:Optional[Path]=None) -> dict[str:tuple(int)]:
+    """
+    A partir d'un itérable de codes IRIS, je crée un dictionnaire {trigrammes: tuple(codes_IRIS)}
+
+    :param codes_IRIS: Codes IRIS dont il faut récupérer le trigramme
+    :type codes_IRIS: int | Iterable[int]
+    :param chemin: Si chemin spécifique pour IRIS sessions, défaut = None
+    :type chemin: Optional[Path], optional
+    :return: dictionnaire {trigrammes: tuple(codes_IRIS)}
+    :rtype: dict[str:tuple(int)
+    """
+    if isinstance(codes_IRIS, int):
+        codes_IRIS = (codes_IRIS, )
+    
+    df = get_iris(typeExport="Sessions", chemin=chemin).df  # Alias
+
+    # Possible avant .tolist() : .unique() pour valeurs uniques ; .dropna() pour gérer valeurs manquantes
+    #return df[df["Code IRIS"].isin(codes_IRIS)]["Trigramme formation"].unique().tolist()
+    return df.groupby("Trigramme formation")["Code IRIS"].apply(tuple).to_dict()
 
 # Emploi :
 #iris_sessions = get_iris("Sessions")

@@ -34,10 +34,10 @@ class Formation:
         #self.bilans_session:Optional[dict[int, dict[int, BilanSession]]] = {}  #bilans_session[2025][0] : Index1 = année du bilan ; Index2 = période du bilan (1 = 1er semestre ; 2 = 2nd semestre ; 0 = annuel)
 
         # Une formation a une ou plusieurs sessions
-        self._sessions:dict[int, Session] = {}  # Index = code IRIS de la formation
+        self._sessions:list[Session] = []
 
     @classmethod
-    def avec_ouverture_evalStat(cls, trigramme_formation: str) -> Formation:
+    def avec_ouverture_ou_creation_evalStat(cls, trigramme_formation: str) -> Formation:
         """
         Crée une instance de Formation en créant un evalStat formation (ou en l'ouvrant s'il existe déjà)
 
@@ -47,11 +47,11 @@ class Formation:
         :rtype: Formation
         """
         instance = cls(trigramme_formation=trigramme_formation)
-        instance._ajout_evalStat_avec_ouverture()
+        instance.ouvrir_ou_creer_evalStat()
         return instance
 
     @classmethod
-    def avec_creation_sessions(cls, trigramme_formation: str, codes_IRIS:int|Iterable[int]) -> Formation:
+    def avec_ajout_sessions(cls, trigramme_formation: str, codes_IRIS:int|Iterable[int]) -> Formation:
         """
         Initialise une instance de Formation contenant une ou plusieurs instances de Session.
 
@@ -65,9 +65,18 @@ class Formation:
         instance = cls(trigramme_formation=trigramme_formation)
         instance.ajout_sessions(codes_IRIS=codes_IRIS)
         return instance
-    
+
+
+
+
+
+
+
+
+
+
     @classmethod
-    def avec_creation_session_et_traitement_EvalStat(
+    def avec_creation_session_et_ouverture_ou_traitement_EvalStat(
         cls, 
         trigramme_formation: str, 
         code_IRIS:int, 
@@ -97,8 +106,10 @@ class Formation:
         :rtype: Formation
         """
 
+        #On crée l'instance avec ouverture de l'EvalStat formation
+        instance = cls.avec_ouverture_ou_creation_evalStat(trigramme_formation=trigramme_formation)
 
-        instance = cls.avec_ouverture_evalStat(trigramme_formation=trigramme_formation)
+        # On ajoute la session 
         instance.ajout_sessions(codes_IRIS=code_IRIS)
 
         instance.traiter_eval_sessions(
@@ -114,15 +125,6 @@ class Formation:
     # =========================
     # === METHODES INTERNES ===
     # =========================
-    def _ajout_evalStat_avec_ouverture(self) -> None:
-        """
-        Ajoute l'évaluation de la formation à l'instance de Formation (i.e. renseigne self._eval)
-
-        L'évaluation est créée si elle n'existe pas ou est ouverte si elle existe.
-        """
-        if self._eval is None:
-            self._eval = EvalStat_formation.avec_ouverture(formation=self)
-
     def _ajout_FdC_avec_ouverture(self, chemin_fdc:Optional[Path|str] = None) -> None:
         """
         Ajoute la fiche de coûts de la formation à l'instance de Formation (i.e. renseigne self._fdc)
@@ -136,6 +138,19 @@ class Formation:
     # =========================
     # === METHODES EXTERNES ===
     # =========================
+    def session(self, code_IRIS:int) -> Optional[Session]:
+        """
+        Renvoie la session de la liste self._sessions avec le code_IRIS.
+
+        Renvoie None si non trouvé.
+
+        :param code_IRIS: Code IRIS de la session à retourner
+        :type code_IRIS: int
+        :return: L'objet Session de self._sessions avec ce code IRIS. None si non trouvé.
+        :rtype: Optional[Session]
+        """
+        return next((session for session in self.sessions if session.code_IRIS == code_IRIS), None)
+
     def ajout_sessions(self, codes_IRIS:int|Iterable[int]) -> None:
         """
         Ajouter une ou plusieurs sessions au dictionnaire de la formation
@@ -146,7 +161,17 @@ class Formation:
         codes = convertir_collection(codes_IRIS)
 
         for code_IRIS in codes:
-            self._sessions[code_IRIS] = Session(formation=self, code_IRIS=code_IRIS)
+            self._sessions.append(Session(formation=self, code_IRIS=code_IRIS))
+
+    def ouvrir_ou_creer_evalStat(self) -> None:
+        """
+        Définit self._eval en créant ou ouvrant l'évaluation de la formation à l'instance de Formation.
+
+        L'évaluation est créée si elle n'existe pas ou est ouverte si elle existe.
+        """
+        if self._eval is None:
+            self._eval = EvalStat_formation.avec_ouverture_ou_creation(formation=self)
+
 
     def traiter_eval_sessions(
         self,
@@ -179,7 +204,7 @@ class Formation:
             )
         
         # Sauvegarde de l'eval formation
-        self.eval.ecritdf_et_sauve_siModif()
+        self.eval.ecrit_et_sauve_df_siModif()
 
     # =========================
     # === GETTERS / SETTERS ===
@@ -195,7 +220,7 @@ class Formation:
         return self._trigramme_formation
     
     @property
-    def sessions(self) -> Optional[dict[int, Session]]:
+    def sessions(self) -> list[Session]: #Optional[dict[int, Session]]:
         """
         Renvoie le dictionnaire des sessions de la formation.
         
@@ -204,6 +229,16 @@ class Formation:
         """
         return self._sessions
     
+    @property
+    def tuple_codesIRIS_de_sessions(self) -> tuple[int]:
+        """
+        Renvoie le tuple des codes IRIS de la liste self._sessions
+
+        :return: le tuple des code_IRIS de la liste self._sessions
+        :rtype: tuple[int]
+        """
+        return (session.code_IRIS for session in self.sessions)
+
     @property
     def eval(self) -> Optional[EvalStat_formation]:
         """
@@ -215,7 +250,7 @@ class Formation:
         :rtype: Optional[EvalStat_formation]
         """
         if self._eval is None:
-            self._eval = EvalStat_formation.avec_ouverture(formation=self)
+            self._eval = EvalStat_formation.avec_ouverture_ou_creation(formation=self)
         return self._eval
     
     @eval.setter

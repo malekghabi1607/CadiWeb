@@ -11,8 +11,10 @@ from typing import Optional, Tuple
 
 from colorama import Fore
 
+from vte.core.iris_referentiel import dico_trigrammes_codes_IRIS_a_partir_de_codes_IRIS
 from vte.domain.formation import Formation
 from vte.domain.evalStat import EvalStat_session
+from vte.domain.session import Session
 from vte.utils.utils_instn import recupere_trig_formation_depuis_chemin
 
 
@@ -21,7 +23,7 @@ class EvalStat_services:
     Services métier autour des exports IRIS.
     """
     @staticmethod
-    def traiter_evalStat_depuis_dico_csv(dico_csv:dict[str, dict[int, Path]], ouvrirDossier:bool=False) -> dict[int, dict[str, str]]:
+    def ouvrir_ou_traiter_evalStat_depuis_dico_csv(dico_csv:dict[str, dict[int, Path]], ouvrirDossier:bool=False) -> dict[int, dict[str, str]]:
         """
         A partir d'un dictionnaire CSV stagiaire
         Permet de :
@@ -44,7 +46,7 @@ class EvalStat_services:
         for trigramme_formation in dico_csv.keys():
             print(f"\n\n{Style.BRIGHT}{Fore.RED}Gestion des formations {trigramme_formation}")
             # Création de l'instance formation
-            formation = Formation.avec_ouverture_evalStat(trigramme_formation)
+            formation = Formation.avec_ouverture_ou_creation_evalStat(trigramme_formation)
             
             # On crée les EvalStat pour chaque code IRIS de la formation
             for code_IRIS, chemin_csv in dico_csv[trigramme_formation].items():
@@ -65,12 +67,12 @@ class EvalStat_services:
                 #print(f"Fin traitement : {code_IRIS}\t{chemin_csv.name}\t{session.eval.statut_csv}")
             
             # On sauvegarde l'évaluation de la formation
-            formation.eval.ecritdf_et_sauve_siModif()
+            formation.eval.ecrit_et_sauve_df_siModif()
 
         return statuts_csv
 
     @staticmethod
-    def traiter_evalStat_depuis_iterable_de_csv(tuple_csv_stagiaires:Iterable[Path|str], ouvrirDossier:bool=False) -> dict[str, dict[str, str]]:
+    def ouvrir_ou_traiter_evalStat_depuis_iterable_de_csv(tuple_csv_stagiaires:Iterable[Path|str], ouvrirDossier:bool=False) -> dict[str, dict[str, str]]:
         """
         A partir d'un itérable de chemins de CSV stagiaire
         Permet de :
@@ -90,12 +92,13 @@ class EvalStat_services:
         dico_csv = EvalStat_session.construire_dictionnaire_trigrammeFormation_codeIRIS_cheminsCSV_depuis_iterableCSV(tuple_csv_stagiaires)
 
         # Dictionnaire des retours du traitement
-        statuts_csv = EvalStat_services.traiter_evalStat_depuis_dico_csv(dico_csv=dico_csv, ouvrirDossier=ouvrirDossier)
+        statuts_csv = EvalStat_services.ouvrir_ou_traiter_evalStat_depuis_dico_csv(dico_csv=dico_csv, ouvrirDossier=ouvrirDossier)
         
         return statuts_csv
 
     @staticmethod
-    def traiter_evalStat_depuis_liste_codes_IRIS(codes_IRIS:Iterable[int], formation:Optional[Formation]=None, ouvrirDossier:bool=False) -> dict[str, dict[str, str]]:
+    #def ouvrir_ou_traiter_evalStat_depuis_liste_codes_IRIS(codes_IRIS:Iterable[int], formation:Optional[Formation]=None, ouvrirDossier:bool=False) -> dict[str, dict[str, str]]:
+    def ouvrir_ou_traiter_evalStat_depuis_liste_codes_IRIS(codes_IRIS:Iterable[int], formation:Optional[Formation]=None, ouvrirDossier:bool=False) -> None:
         """
         A partir d'un itérable de codes IRIS
         Permet de :
@@ -108,13 +111,78 @@ class EvalStat_services:
         :type formation: Optional[Formation_protocol], Optional
         :param ouvrirDossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
         :type ouvrirDossier: bool, optional
-        :return: Une liste de dictionnaires {codeIRIS,{"fichier": chemin_csv,"statut": statut_csv}}. Je pourrai accéder à la valeur par nom_dico[codeIRIS]["fichier"] ou nom_dico[codeIRIS]["statut"]
+        :return: Une liste de dictionnaires {codeIRIS,{"fichier": chemin_csv,"statut": statut_csv}}. Je pourrai accéder à la valeur par dico_csv[codeIRIS]["fichier"] ou nom_dico[codeIRIS]["statut"]
         :rtype: dict[str, dict[str, str]]
         """
+        # A partir de codes_IRIS, je dois :
+        # créer un dico dico_ouvrir_ou_traiter{formation: sessions} (liste toutes les sessions où je dois soit ouvrir soit traiter)
+        # dico_ouvrir_ou_traiter{formation: sessions} (liste toutes les sessions où je dois soit ouvrir soit traiter)        
+        dico_ouvrir_ou_traiter:dict[Formation, list[Session]] = {}
+
+        # On crée le dictionnaire dico_ouvrir_ou_traiter
+        if formation is not None:
+            # On vérifie que les sessions sont créées dans formation sinon on les crée
+            codes_a_traiter = [code_IRIS for code_IRIS in codes_IRIS if code_IRIS not in formation.tuple_codesIRIS_de_sessions]
+            formation.ajout_sessions(codes_a_traiter)
+            
+            # On crée le dico                
+            dico_ouvrir_ou_traiter[formation] = [session for session in formation.sessions]
+            
+        elif formation is None:  # Si formation n'est pas donné
+            # On cherche les trigrammes dans IRIS sessions
+            dico_trigrammes_codesIRIS = dico_trigrammes_codes_IRIS_a_partir_de_codes_IRIS(codes_IRIS=codes_IRIS)
+
+            # On crée les formations et on initialise le dico avec
+            for trigramme_formation, tcodes_IRIS in dico_trigrammes_codesIRIS.items():
+                # On crée l'objet formation et ses sessions
+                formation = Formation.avec_ajout_sessions(trigramme_formation=trigramme_formation, codes_IRIS=tcodes_IRIS)
+
+                # On crée le dico                
+                dico_ouvrir_ou_traiter[formation] = [session for session in formation.sessions]
+
+                    
+
+
+
+        # On boucle sur les formations
+        for formation, sessions in dico_ouvrir_ou_traiter.items():
+            print(f"\n\n{Style.BRIGHT}{Fore.RED}Gestion des formations {formation.trigramme_formation}")
+            # Création de l'instance formation → Déjà fait en traitant EvalStat session
+            #formation.ouvrir_ou_creer_evalStat() # = Formation.avec_ouverture_ou_creation_evalStat(trigramme_formation)
+            
+            # On crée les EvalStat pour chaque code IRIS de la formation
+            for session in sessions:
+                session.eval = EvalStat_session.avec_ouverture_ou_traitement(
+                    session=session,
+                    ecrire_eval_formation=False,  # On sauvegardera après la boucle de traitement
+                    ouvrirDossier=ouvrirDossier
+                )
+
+                # On met à jour le statut CSV de sortie
+                #statuts_csv[code_IRIS] = {
+                #        "fichier": chemin_csv.name,
+                #        "statut": session.eval.statut
+                #        }
+
+                #print(f"Fin traitement : {code_IRIS}\t{chemin_csv.name}\t{session.eval.statut_csv}")
+            
+            # On sauvegarde l'évaluation de la formation
+            formation.eval.ecrit_et_sauve_df_siModif()
+
+
+
+        # On vérifie que les sessions sont créées dans formation
+        # Sinon on les crée
+        
+        # On crée le dico avec le bon ordre formation:sessions
+        
+        # On vérifie que les éval
+
+
         # Dictionnaire des csv sous une forme qui nous arrange pour le traitement à venir ; on fait une première exclusion des EvalStat déjà dans eval formation
-        dico_csv = EvalStat_session.construire_dictionnaire_trigrammeFormation_codeIRIS_cheminsCSV_depuis_iterableCodesIRIS(codes_IRIS=codes_IRIS, formation=formation)
+        #dico_csv_a_traiter = EvalStat_session.construire_dictionnaire_trigrammeFormation_codeIRIS_cheminsCSV_depuis_iterableCodesIRIS(codes_IRIS=codes_IRIS, formation=formation)
 
         # Dictionnaire des retours du traitement
-        statuts_csv = EvalStat_services.traiter_evalStat_depuis_dico_csv(dico_csv=dico_csv, ouvrirDossier=ouvrirDossier)
+        #statuts_csv = EvalStat_services.ouvrir_ou_traiter_evalStat_depuis_dico_csv(dico_csv=dico_csv_a_traiter, ouvrirDossier=ouvrirDossier)
 
-        return statuts_csv
+        #return statuts_csv

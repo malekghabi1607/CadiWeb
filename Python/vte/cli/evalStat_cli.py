@@ -39,7 +39,7 @@ def verifications():
 
     set_iris_chemin_specifique(typeExport="Sessions", chemin=tel_csv_existant["chemin_IRIS_sessions"])  # On redéfinit le chemin d'IRIS Sessions
     
-    formation = Formation.avec_ouverture_evalStat("TEL")
+    formation = Formation.avec_ouverture_ou_creation_evalStat("TEL")
     formation.ajout_sessions(codes_IRIS=16411)
     formation.sessions[16411].eval = EvalStat_session.avec_ouverture_ou_traitement(
             session=formation.sessions[16411],
@@ -65,7 +65,7 @@ def traite_tous_evalStats_depuis_tuple_csv():
 
     tuple_csv_stagiaires_employe = tuple_csv_stagiaires
 
-    statuts_csv = EvalStat_services.traiter_evalStat_depuis_iterable_de_csv(
+    statuts_csv = EvalStat_services.ouvrir_ou_traiter_evalStat_depuis_iterable_de_csv(
         tuple_csv_stagiaires= tuple_csv_stagiaires_employe,
         ouvrirDossier=False
     )

@@ -104,9 +104,9 @@ class BilanSession:
 
 
     @classmethod   
-    def depuis_codeIRIS(cls, formation:Formation_protocol, code_IRIS:int, annee:Optional[int]=None) -> BilanSession:
+    def depuis_codesIRIS(cls, formation:Formation_protocol, codes_IRIS:Iterable[int], annee:Optional[int]=None, periode:str="Année") -> BilanSession:
         """
-        Génère un bilan de session à partir d'un code IRIS (un bilan pour une session)
+        Génère un bilan de session à partir d'un ou plusieurs codes IRIS (un bilan pour une session ou pour plusieurs sessions (période))
 
         :param code_IRIS: Code IRIS de la session pour laquelle on souhaite faire le bilan
         :type code_IRIS: int
@@ -119,18 +119,27 @@ class BilanSession:
         """
         # On initialise l'instance 
         instance = cls(formation=formation, annee=-1)
-        instance.code_IRIS = code_IRIS
-        instance._annee = annee if annee is not None else int(instance.df_sessions_filtre_codeIRIS["Année début ses."].iloc[0])
+        instance.codes_IRIS = codes_IRIS
+        instance._periode = periode
 
-        # === ON FAIT LES AUTRES VERIFICATIONS QUI ANNULERAIENT LE TRAITEMENT ===
-        continuer, statut = instance.verifier_traitement_bilan()
+        # Si l'année n'est pas donnée, je la récupère d'IRIS sessions
+        instance._annee = annee if annee is not None else int(instance.df_sessions_filtre_codesIRIS["Année début ses."].iloc[0])
+
+
+
+
+
+
+        # === ON FAIT LES VERIFICATIONS QUI ANNULERAIENT LE TRAITEMENT ===
+        continuer = instance.verifier_traitement_bilan()
         if not continuer:
             return
         
+
+
         # === TRAITEMENT DU BILAN DE SESSION ===
         # On affecte les autres données de base à la main
-        # instance.code_IRIS = code_IRIS  # Déjà affecté plus haut
-        #instance._periode = instance.periode_session  # Déjà mis par défaut à "Année"    
+        
         #instance._iris_sessions = get_iris(typeExport="Sessions")
 
         # On met à jour l'Excel evalstat de la formation si la session demandée par l'utilisateur ne s'y trouve pas
@@ -167,7 +176,7 @@ class BilanSession:
     (foramtion, codes_iris, période, année...) → Peut-être mettre dans __init__ ?
     """
     @classmethod   
-    def depuis_codesIRIS(cls, formation:Formation_protocol, codes_IRIS:Iterable[int]) -> BilanSession:
+    def depuis_codesIRIS_BAK(cls, formation:Formation_protocol, codes_IRIS:Iterable[int]) -> BilanSession:
         """
         Génère un bilan de session à partir d'un code IRIS (un bilan pour une session)
 
@@ -252,11 +261,27 @@ class BilanSession:
         (on regarde les CSV qui ne sont pas dans le fichier Excel global à partir de la liste df_sessions_filtre['Code IRIS'])
         """
 
-        # On traite le ou les EvalStats non déjà créés
-        # TODO : avec des codes IRIS et sans autrs sauvegardes des chemins des CSV traités par ailleurs, l'utilisateur est potentiellement obligé de sélectionner des CSV déjà traités (i.e. non pertinents) à la main → A améliorer
-        # fe_evaluations_formation, statuts_csv = EvalStat.depuis_liste_codes_IRIS(self._codes_IRIS, fe_IRIS_sessions=self._fe_IRIS_sessions)
-        statuts_csv = EvalStat_services.traiter_evalStat_depuis_liste_codes_IRIS(codes_IRIS=self._codes_IRIS, formation=self._formation)
-        # OK
+        # TODO : ici je dois me démerder pour créer l'objet session.eval
+        """    
+        session = formation.sessions[tel["code_IRIS"]]  # Alias
+
+        session.eval = EvalStat_session.avec_ouverture_ou_traitement(
+            session=session,
+            chemin_csv=tel["chemin_csv_session"],
+            ecrire_eval_formation=True, # Bilan unique ici, donc True
+            ouvrirDossier=True,
+            ouvrir_fe=False
+        )
+
+        """
+
+
+        # On ouvre ou on traite les EvalStats non déjà créés
+        #statuts_csv = EvalStat_services.ouvrir_ou_traiter_evalStat_depuis_liste_codes_IRIS(codes_IRIS=self._codes_IRIS, formation=self._formation)
+        #print(self._formation)
+        EvalStat_services.ouvrir_ou_traiter_evalStat_depuis_liste_codes_IRIS(codes_IRIS=self._codes_IRIS, formation=self._formation)
+        print(self._formation)
+        # OK - Eval a bien qq chose maintenant
 
 
         # A ce stade, toutes les valeurs de _codes_IRIS sont sensées être a minima présents dans IRIS avec données pour stats générales
@@ -555,18 +580,18 @@ class BilanSession:
     # === METHODES EXTERNES ===
     # =========================
 
-    def verifier_traitement_bilan(self) -> Tuple[bool, str]:
+    def verifier_traitement_bilan(self) -> bool:
         """
         Vérifie si l'on doit traiter un bilan de sessions à partir :
-            - du code IRIS (bien à 5 caractères + bien présent dans IRIS sessions) ;
-            - le bilan Word n'existe pas déjà.
+            - le bilan Word n'existe pas déjà ;
+            - des codes IRIS (bien à 5 caractères + bien présent dans IRIS sessions).
 
-        :return:
-        - Un bool pour dire si le traitement doit continuer 
-            - True il faut traiter l'EvalStat (code IRIS ou CSV non détectés dans EvalStat + code IRIS présent dans IRIS sessions) ; 
-            - False il ne faut pas traiter l'EvalStat.
-        - un string avec le statut pour connaitre l'exclusion de traitement le cas échéant (pertinent ssi False ; si True on renvoie chaine vide).
-        :rtype: Tuple[bool, str]
+        Pour l'instant on coupe le programme en cas d'échec d'une vérification (la sortie bool=False ne sert à rien car non employée)
+
+        :return: Un bool pour dire si le traitement doit continuer :
+            - True on peut traiter l'EvalStat (aucun souci détecté) ; 
+            - False il ne faut pas traiter l'EvalStat (code IRIS ou CSV non détectés dans EvalStat + code IRIS présent dans IRIS sessions).
+        :rtype: bool
         """
         # Vérification 1 : on vérifie la pré-existance du bilan Word ; si il existe déjà, alors on arrête le traitement
         continuer = verifier_existance_fichier(self.chemin_word_bilan_output)
@@ -576,24 +601,26 @@ class BilanSession:
         
         
         # Vérifications 2 : liés à code_IRIS
-        if self.code_IRIS is not None:
-            # 2.1 : On vérifie que code_iris est bien un entier à 5 chiffres
-            est_code_IRIS_valide, _ = IRIS.verifier_code_IRIS(self.code_IRIS, int)
-            if not est_code_IRIS_valide:
-                vlog.log_erreur(f"❌  Code IRIS renseigné non valide : {self.code_IRIS} non traité")
-                #statut = "Exclu - Code IRIS renseigné non valide"
-                #return False, statut
+        for code_IRIS in self._codes_IRIS:
+            if code_IRIS is not None:
+                # 2.1 : On vérifie que code_iris est bien un entier à 5 chiffres
+                est_code_IRIS_valide, _ = IRIS.verifier_code_IRIS(code_IRIS, int)
+                if not est_code_IRIS_valide:
+                    vlog.log_erreur(f"❌  Code IRIS renseigné non valide : {code_IRIS}")
+                    #statut = "Exclu - Code IRIS renseigné non valide"
+                    #return False, statut
 
 
-            # 2.2 : On vérifie si le code_IRIS est bien existant dans l'extract IRIS sessions
-            if self.code_IRIS not in self.df_sessions_filtre["Code IRIS"].values:
-                print(f"⚠️  Code IRIS {self.code_IRIS} non trouvé dans l’extract IRIS.")
-                statut = "Exclu - Code IRIS pas dans Extract IRIS sessions"
-                return False, statut
+                # 2.2 : On vérifie si le code_IRIS est bien existant dans l'extract IRIS sessions
+                if code_IRIS not in self.df_sessions_filtre["Code IRIS"].values:
+                    vlog.log_erreur(f"❌  Code IRIS {code_IRIS} non trouvé dans l’extract IRIS.")
+                    #print(f"⚠️  Code IRIS {code_IRIS} non trouvé dans l’extract IRIS.")
+                    #statut = "Exclu - Code IRIS pas dans Extract IRIS sessions"
+                    #return False, statut
  
 
-        # Si aucun Test n'est vérifié
-        return True, ""
+        # Si rien n'a arrêté les vérifications, alors tout est OK
+        return True
 
 
 
@@ -632,22 +659,38 @@ class BilanSession:
         return self._periodeSessionsEvaluees
 
     @property
+    def codes_IRIS(self) -> Iterable[int]:
+        return self._codes_IRIS
+    
+    @codes_IRIS.setter
+    def codes_IRIS(self, valeur:int|Iterable[int]) -> None:
+        if isinstance(valeur, int):
+            self._codes_IRIS.append(valeur)
+        elif isinstance(valeur, Iterable[int]):
+            self._codes_IRIS = valeur
+        else:
+            vlog.log_erreur("La valeur n'est ni un int ni un Iterable de int (codes_IRIS.setter)")
+
+
+    @property
     def code_IRIS(self) -> int:
         """
         Le 1er code IRIS (code_IRIS au singulier donc on considère qu'on est sur un bilan contenant un seul code IRIS unique)
         """
         return self._codes_IRIS[0]
 
+    """
+    # Ca va me créer de la confusion
     @code_IRIS.setter
     def code_IRIS(self, valeur:int):
-        """
+        "
         Renseigne un code IRIS (code_IRIS au singulier donc on considère qu'on est sur un bilan contenant un seul code IRIS unique)
-        """
+        "
         if not self._codes_IRIS: # Cas d'une liste vide
             self._codes_IRIS.append(valeur)
         else:
             self._codes_IRIS[0] = valeur
-
+    """
     # Liens avec Formation
     @property
     def trigramme_formation(self) -> str:
@@ -692,10 +735,10 @@ class BilanSession:
         return self.df_sessions_filtre["Session"].iloc[-1]
 
     @property
-    def df_sessions_filtre_codeIRIS(self) -> DataFrame:
+    def df_sessions_filtre_codesIRIS(self) -> DataFrame:
         """
         Renvoie le dataframe de l'extract IRIS filtré VTE selon plusieurs critères :
-            - Code IRIS == self.code_IRIS
+            - Code IRIS in self._codes_IRIS
             - Statut Session != "Annulée" (toujours) ;
             - Nb. Nommés != 0 (toujours) ;
             - l'année de la session (année n du bilan de formation) ;
@@ -703,15 +746,9 @@ class BilanSession:
         
         :return: extract IRIS VTE filtré
         :rtype: DataFrame
-        """
-        df_sessions_filtre_codeIRIS = self.df_sessions_filtre[self.df_sessions_filtre['Code IRIS'] == self.code_IRIS]
-        #print(self.df_sessions_filtre)
+        """     
 
-        #if len(df_sessions_filtre_codeIRIS) < 1:
-        #    print(df_sessions_filtre_codeIRIS)
-        #    vlog.log_erreur(f"Le fichier IRIS Sessions ne contient pas ce code IRIS : {self.code_IRIS}")        
-
-        return df_sessions_filtre_codeIRIS
+        return self.df_sessions_filtre[self.df_sessions_filtre['Code IRIS'].isin(self._codes_IRIS)]
 
     @property
     def df_sessions_filtre_stats_generales(self) -> DataFrame: #_df_stagiaires_final → df_sessions_filtre_stats_generales
@@ -721,7 +758,7 @@ class BilanSession:
         :return: df_stagiaires filtré sur les codes IRIS exploités pour le bilan
         :rtype: DataFrame
         """
-        return self.df_sessions_filtre_codeIRIS[self.df_sessions_filtre_codeIRIS['Code IRIS'].isin(self._exploitationBilan["Exploités pour les stats générales"])]
+        return self.df_sessions_filtre_codesIRIS[self.df_sessions_filtre_codesIRIS['Code IRIS'].isin(self._exploitationBilan["Exploités pour les stats générales"])]
 
     @property
     def df_sessions_filtre_stats_generales_code_IRIS_unique(self) -> DataFrame: # _df_stagiaires_final_1ligne_session → df_sessions_filtre_stats_generales_code_IRIS_unique
@@ -738,14 +775,14 @@ class BilanSession:
         """
         Mois de la session dans le cadre d'une session unique (len(codes_IRIS)=1)
         """
-        return mois_fr_depuis_date(self.df_sessions_filtre_codeIRIS["Date début ses."].iloc[0])
+        return mois_fr_depuis_date(self.df_sessions_filtre_codesIRIS["Date début ses."].iloc[0])
 
     @property
     def numero_session(self) -> str:
         """
         Numéro de la session dans le cadre d'une session unique (len(codes_IRIS)=1)
         """
-        return self.df_sessions_filtre_codeIRIS["N° Session"].iloc[0]
+        return self.df_sessions_filtre_codesIRIS["N° Session"].iloc[0]
 
 
     

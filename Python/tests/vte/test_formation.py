@@ -32,7 +32,7 @@ def test_avec_ouverture_evalStat(mock, tel):
 
     mock.return_value = Mock(spec=EvalStat_formation)
 
-    formation = Formation.avec_ouverture_evalStat(tel["trigramme_formation"])
+    formation = Formation.avec_ouverture_ou_creation_evalStat(tel["trigramme_formation"])
 
     assert formation.eval is mock.return_value
 
@@ -40,7 +40,7 @@ def test_avec_ouverture_evalStat(mock, tel):
 # python -m pytest -s -v tests/vte/test_formation.py::test_avec_creation_session
 @patch("vte.domain.formation.EvalStat_formation.avec_ouverture")
 def test_avec_creation_session(mock, tel):
-    formation = Formation.avec_creation_sessions(
+    formation = Formation.avec_ajout_sessions(
         trigramme_formation=tel["trigramme_formation"],
         codes_IRIS=tel["code_IRIS"]
         )
@@ -55,7 +55,7 @@ def test_avec_creation_session(mock, tel):
 # python -m pytest -s -v tests/vte/test_formation.py::test_avec_creation_sessions
 @patch("vte.domain.formation.EvalStat_formation.avec_ouverture")
 def test_avec_creation_sessions(mock, tel):
-    formation = Formation.avec_creation_sessions(
+    formation = Formation.avec_ajout_sessions(
         trigramme_formation=tel["trigramme_formation"],
         codes_IRIS=tel["codes_IRIS"]
         )
@@ -105,7 +105,7 @@ def test_traiter_eval_sessions(mock, tel):
     for session in formation.sessions.values():
         session.eval.traiter_eval.assert_called_once()
 
-    formation.eval.ecritdf_et_sauve_siModif.assert_called_once()
+    formation.eval.ecrit_et_sauve_df_siModif.assert_called_once()
 
 
 #TODO terster _ajout_FdC_avec_ouverture
