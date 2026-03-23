@@ -138,7 +138,7 @@ class Formation:
     # =========================
     # === METHODES EXTERNES ===
     # =========================
-    def session(self, code_IRIS:int) -> Optional[Session]:
+    def get_session_par_codeIRIS(self, code_IRIS:int) -> Optional[Session]:
         """
         Renvoie la session de la liste self._sessions avec le code_IRIS.
 

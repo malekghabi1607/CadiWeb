@@ -250,7 +250,7 @@ class EvalStat_session(EvalStat):
 
         self._session:Session_protocol = session  # C'est un protocol pour éviter les références circulaires
         self._chemin_csv: Optional[Path] = None
-        self._statut: Optional[str] = None  # ex: "A traiter", "Traité", "Traité - Code IRIS déjà dans l'évaluation de la formation", "Traité - CSV déjà dans l'évaluation de la formation", "Exclu - Aucun CSV fourni", "Exclu - Code IRIS pas dans Extract IRIS sessions", "Exclu - Problème lecture CSV", "Exclu - CSV vide / Aucun retour"
+        self._statut: Optional[str] = None  # ex: "A traiter", "Traité", "Exclu - Aucun CSV fourni", "Exclu - Code IRIS pas dans Extract IRIS sessions", "Exclu - Problème lecture CSV", "Exclu - CSV vide / Aucun retour"
 
     @classmethod
     def avec_ouverture_ou_traitement(cls, session:Session_protocol, chemin_csv:Optional[Path|str]=None, ecrire_eval_formation:bool=True, ouvrirDossier:bool=False, ouvrir_fe:bool=False) -> EvalStat_session:
@@ -544,7 +544,6 @@ class EvalStat_session(EvalStat):
         """        
         return self.eval_formation.verifier_traitement_evalStat_session(code_IRIS=self.code_IRIS, chemin_csv=self._chemin_csv)
 
-
     def ouvrir_eval(self, session:Session_protocol, ouvrir_fe:bool=False) -> None:
         """
         Ouvre un EvalStat session déjà traité (i.e. déjà existant dans EvalStat formation).
@@ -565,7 +564,7 @@ class EvalStat_session(EvalStat):
         self._chemin_csv = self.eval_formation.chemin_csv_depuis_code_IRIS(self.code_IRIS)
         
         # On défini le statut
-        self._statut = "Traité - Code IRIS déjà dans l'évaluation de la formation"
+        self._statut = "Traité"  #"Traité - Code IRIS déjà dans l'évaluation de la formation" (je ne peux pas mettre plusieurs statuts traités car après dans bilanSession, dans la matrice "statut evalStat" "statut pour bilan" il me fait une correspondance 1 pour 1)
         
         # On ouvre le fichier si demandé
         if ouvrir_fe:
@@ -1048,7 +1047,7 @@ class EvalStat_formation(EvalStat):
             if str(chemin_csv) in self.df_stagiaires["Chemin fichier CSV"].drop_duplicates().tolist():  
                 print(f"✅  CSV déjà présent dans fichier eval de la formation : EvalStat {chemin_csv} exclu du traitement.")
                 #pprint(self._df_evaluations_formation["Chemin fichier CSV"])
-                statut = "Traité - CSV déjà dans l'évaluation de la formation"
+                statut = "Traité"  # "Traité - CSV déjà dans l'évaluation de la formation" (je ne peux pas mettre plusieurs statuts traités car après dans bilanSession, dans la matrice "statut evalStat" "statut pour bilan" il me fait une correspondance 1 pour 1)
                 return False, statut
 
 
@@ -1064,7 +1063,7 @@ class EvalStat_formation(EvalStat):
             # 2.2 : On vérifie que le code IRIS n'est pas déjà dans le fichier global de la session sinon on n'a pas besoin de traiter (déjà fait)
             if self.verifier_presence_code_IRIS_dans_eval(code_IRIS):  
                 print(f"✅  Code IRIS {code_IRIS} déjà présent dans fichier eval de la formation : EvalStat {code_IRIS} exclu du traitement.")
-                statut = "Traité - Code IRIS déjà dans l'évaluation de la formation"
+                statut = "Traité"  # "Traité - Code IRIS déjà dans l'évaluation de la formation" (je ne peux pas mettre plusieurs statuts traités car après dans bilanSession, dans la matrice "statut evalStat" "statut pour bilan" il me fait une correspondance 1 pour 1)
                 return False, statut
 
             # 2.3 : On vérifie si le code_IRIS est bien existant dans l'extract IRIS
