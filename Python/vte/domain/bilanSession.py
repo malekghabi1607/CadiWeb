@@ -1,13 +1,15 @@
 from __future__ import annotations
+from abc import ABC, abstractmethod
 from pathlib import Path
 from pprint import pprint
 from typing import Optional, Protocol
+from functools import cached_property  # Décorateur générique pour mettre en cache des données lourdes que je recalculais pleinde fois en @property
 
 from pandas import DataFrame
 from mailmerge import MailMerge
 
 from vte.core.iris_referentiel import get_iris
-from vte.domain.evalStat import EvalStat, EvalStat_formation
+from vte.domain.evalStat import EvalStat_formation
 from vte.services.evalStat_services import EvalStat_services
 from vte.domain.session import Session
 from vte.domain.iris import IRIS, IRIS_traite
@@ -15,7 +17,7 @@ from vte.core import config
 from vte.utils.office import FichierExcel, FichierWord, Mail
 from vte.utils.utils import *
 
-# TODO : Pour l'instant c'est une classe de traitement. Le jour où j'ai besoin d'ouvrir un EvalStat pour le lire uniquement, prendre modèle sur IRIS avec des classes de lecture et de traitement
+# TODO : Pour l'instant c'est une classe de traitement. Le jour où j'ai besoin d'ouvrir un BilanSession pour le lire uniquement, prendre modèle sur IRIS avec des classes de lecture et de traitement
 
 # Test à faire sur TEL période : 2024
 
@@ -85,12 +87,11 @@ class BilanSession:
         self._formation = formation
         self._annee: int = annee
         self._periode: str = periode  # ["Année", "1er semestre", "2nd semestre"]
+        self._periodeSessionsEvaluees:str = ""  # f"Session {numSession} uniquement ({moisSession} {instance._annee})", f"{self._periode} {self._annee}"
         self._codes_IRIS:list[int] = []
 
         # --- Variables de traitement ---
         self._statuts:dict[str, list] = {clef: [] for clef in self._mapping_statuts.values()}  # Dictionnaire qui liste les codes IRIS selon chaque statut
-
-
         self._stats_stagiaires: dict[str, dict[str, int|float|str|None]] = {}  # Dictionnaire des stats des CSV
         """
         dictionnaire de la forme :
@@ -104,11 +105,12 @@ class BilanSession:
         }
         """
 
+
         # --- Liste des champs de fusion du Word [V3] (pour la fonction .mergefields, il faut des str)
-        # TODO : voir si je n'ai pas intérêt à faire un dictionnaire d'un part pour tous les str puis les vrais typages pour les valeurs avant str.
-        self._titreFormation:str = ""
-        self._codeFormation:str = self.trigramme_formation  # Déjà déclaré pour fonctionnement de la classe avec formation
-        self._periodeSessionsEvaluees:str = ""  # f"Session {numSession} uniquement ({moisSession} {instance._annee})", f"{self._periode} {self._annee}"
+        #self._titreFormation:str = self.intitule_formation
+        #self._codeFormation:str = self.trigramme_formation  # Déjà déclaré pour fonctionnement de la classe avec formation
+        
+        """
         self._nbSessionsEvaluees:str = ""
         self._numerosSessions:str = ""
         self._nbApprenants:str = ""
@@ -124,16 +126,16 @@ class BilanSession:
         self._evalInf3_val:str = ""
         self._evalInf3_com:str = ""
         self._tauxRetours_val:str = ""
-
+        """
 
 
     @classmethod   
-    def depuis_codesIRIS(cls, formation:Formation_protocol, codes_IRIS:Iterable[int], annee:Optional[int]=None, periode:str="Année") -> BilanSession:
+    def depuis_codesIRIS(cls, formation:Formation_protocol, codes_IRIS:int|Iterable[int], annee:Optional[int]=None, periode:str="Année") -> BilanSession:
         """
         Génère un bilan de session à partir d'un ou plusieurs codes IRIS (un bilan pour une session ou pour plusieurs sessions (période))
 
-        :param code_IRIS: Code IRIS de la session pour laquelle on souhaite faire le bilan
-        :type code_IRIS: int
+        :param codes_IRIS: Codes IRIS des sessions pour lesquels on souhaite faire le bilan
+        :type codes_IRIS: int|Iterable[int],
         :param formation: Objet formation associé à ce bilan
         :type formation: Formation_protocol
         :param annee: Année du bilan (s'il n'est pas donné on l'obtiendra d'IRIS sessions)
@@ -149,40 +151,13 @@ class BilanSession:
         # Si l'année n'est pas donnée, je la récupère d'IRIS sessions
         instance._annee = annee if annee is not None else int(instance.df_sessions_filtre_codesIRIS["Année début ses."].iloc[0])
 
-
-
-
-
-
         # === ON FAIT LES VERIFICATIONS QUI ANNULERAIENT LE TRAITEMENT ===
         continuer = instance.verifier_traitement_bilan()
         if not continuer:
             return
-        
-
 
         # === TRAITEMENT DU BILAN DE SESSION ===
-        # On affecte les autres données de base à la main
-        
-        #instance._iris_sessions = get_iris(typeExport="Sessions")
-
-        # On met à jour l'Excel evalstat de la formation si la session demandée par l'utilisateur ne s'y trouve pas
-        instance._maj_evalstat()
-
-        # On calcule les stats
-        instance._calculer_stats_criteres()
-        #pprint(instance._stats_stagiaires)
-
-        # On construit le bilan de session (bilan de session V3)
-        instance._bilanSessionV3()
-
-        # On ouvre le word
-        FichierWord.depuisFichier(chemin_fichier=instance.chemin_word_bilan_output, charger_contentControl=False, afficherWord=True)
-
-        # On envoie un mail au chef d'unité pour la signature du pdf
-        instance._envoyer_mail_chef_unite()
-
-
+        instance._traiter()
 
         return instance
 
@@ -253,6 +228,8 @@ class BilanSession:
     # =========================
     # === METHODES INTERNES === 
     # =========================
+
+    # === Méthodes get ===
     def _get_codesIRIS_par_statut_evalStat(self, statut_evalStat: str) -> list[int]:
         """
         Retourne une liste des codes IRIS pour un statut donné.
@@ -285,13 +262,56 @@ class BilanSession:
             return []
         return self._get_codesIRIS_par_statut_evalStat(statut_evalStat)
 
+    def _get_generateur_word(self, version: str) -> BilanSession_generateur_word:
+        """
+        Récupère la bonne version du générateur Word (si jamais on a plusieurs versions)
+
+        :param version: Version du bilan de sessions à employer
+        :type version: str
+        :raises ValueError: Si problème
+        :return: le générateur du bilan de sessions
+        :rtype: BilanSession_generateur_word
+        """
+        if version == "V3":
+            return Bilan_V3(self)
+        else:
+            raise ValueError(f"Version inconnue : {version}")
+
+
+    # === Pipeline métier ===
+    def _traiter(self) -> None:
+        """
+        Traite le bilan de sessions :
+            - mise à jour des evalStat ;
+            - calcul des stats des csv (moyennes, concaténation commentaires...) ;
+            - création du word (calcul et fusion des champs de fusion) ;
+            - ouverture word (pour adaptations par utilisateur) ;
+            - préparation mail au n+1.
+        """
+        # On met à jour l'Excel evalstat de la formation si la session demandée par l'utilisateur ne s'y trouve pas
+        self._maj_evalstat()
+
+        # On calcule les stats
+        self._calculer_stats_criteres()
+        #pprint(instance._stats_stagiaires)
+
+        # On construit le bilan de session (bilan de session V3)
+        self._construire_word(version="V3")
+
+        # On ouvre le word
+        FichierWord.depuisFichier(chemin_fichier=self.chemin_word_bilan_output, charger_contentControl=False, afficherWord=True)
+
+        # On envoie un mail au chef d'unité pour la signature du pdf
+        self._envoyer_mail_chef_unite()
+
+
+    # === Détail pipeline ===
     def _maj_evalstat(self) -> None:
         """
         Crée ou ouvre les EvalStat de la/les sessions demandées et met à jour le fichier EvalStat de la formation
         Ne s'applique que si des sessions demandées par l'utilisateur ne s'y trouvent pas.
         (on regarde les CSV qui ne sont pas dans le fichier Excel global à partir de la liste df_sessions_filtre['Code IRIS'])
         """
-
         # On ouvre ou on traite les EvalStats non déjà créés
         EvalStat_services.ouvrir_ou_traiter_evalStat_depuis_liste_codes_IRIS(codes_IRIS=self._codes_IRIS, formation=self._formation)
 
@@ -350,7 +370,17 @@ class BilanSession:
 
         #return self._stats_stagiaires
 
-    def _envoyer_mail_chef_unite(self, pj:Optional[list[str]] = None):
+    def _construire_word(self, version: str = "V3") -> None:
+        """
+        Construit le Word (construit/calcule les champs puis les fusionne dans le Word)
+
+        :param version: Version du bilan de sessions. Défaut = "V3"
+        :type version: str, optional
+        """
+        builder = self._get_generateur_word(version)
+        builder.construire()
+
+    def _envoyer_mail_chef_unite(self, pj:Optional[list[str]] = None) -> None:
         """
         Envoie un mail au chef d'unité avec en lien le PDF à signer
         """       
@@ -361,277 +391,23 @@ class BilanSession:
         #self._CORPS_MAIL_CHEF_UNITE.replace()
         corps_html = remplacer_champs(config.CORPS_MAIL_CHEF_UNITE, [
             ["lien_pdf_bilan", chemin_pdf_bilan_output],
-            ["formation", f"{self._titreFormation} ({self.trigramme_formation})"],
+            ["formation", f"{self.intitule_formation} ({self.trigramme_formation})"],
             ["periode", minuscule_premiere_lettre(self._periodeSessionsEvaluees)],
         ])
 
         Mail.creer_mail(
             destinataires=config.ADRESSE_MAIL_CHEF_UNITE,
-            sujet=f"Signature bilan de session {self._titreFormation} ({self.trigramme_formation}) : {chemin_pdf_bilan_output.name}",
+            sujet=f"Signature bilan de session {self.intitule_formation} ({self.trigramme_formation}) : {chemin_pdf_bilan_output.name}",
             corps_html=corps_html,
             pieces_jointes=pj,
             envoyer_mail=False  # envoie directement sans afficher
         ) 
 
 
-    # ===============================================
-    # === MÉTHODES POUR LA V3 DU BILAN DE SESSION === 
-    # ===============================================
-    def _bilanSessionV3(self) -> None:
-        # On construit champs de fusion
-        self.__construit_champsFusionV3()
-
-        # On merge les champs de fusion
-        self.__mergeBilanV3()
-
-    def __construit_champsFusionV3(self) -> None:
-        """
-        Calcule puis définit les str des champs de fusion
-        """
-        #####
-        # Affectation des valeurs pour les champs de fusion (ce sont des str)
-        #####
-
-        # ===================================
-        # === Calculs données transverses ===
-        # ===================================
-        # Nombre de stagiaires qui ont formulé des retours (provient de eval formation)
-        nb_stagiaires_retours = self.df_stagiaires_filtre_statsCSV['NOM Prénom'].nunique()
-        # Nombre d'apprenants sur les sessions dont on peut faire les stats CSV (peut provenir de IRIS session ou de eval formation, on prend de df_stagiaire)
-        nb_apprenants = int(self.df_stagiaires_filtre_statsCSV_1ligne_par_session['Nb présents'].sum())
-
-
-        # ======================
-        # === Partie en-tête ===
-        # ======================
-        # On met ici toutes les sessions de la période non excclues par l'utilisateur et qui est dans IRIS sessions
-
-        # Les éléments entre parenthèses (employés lors des stats CSV) sont gérés dans la partie stats
-        self._titreFormation = self.intitule_formation
-        # self._codeFormation = codeFormation  # (donné en argument)
-        #self._periodeSessionsEvaluees = self.periodeSessionsEvaluees  # Evalué plus haut
-        self._nbSessionsEvaluees = f"{len(self.df_sessions_filtre_enTete)} session" + ("s" if len(self.df_sessions_filtre_enTete) > 1 else "")  # Valeur toutes les données  
-        self._numerosSessions = "\n".join(self.df_sessions_filtre_enTete["N° Session"].dropna().astype(str).unique())
-        self._nbApprenants = f"{self.df_sessions_filtre_enTete['Nb. Nommés'].sum()} apprenant" + ("s" if self.df_sessions_filtre_enTete['Nb. Nommés'].sum() > 1 else "")  # Valeur toutes les données
-        #self._rp = ", ".join(self.df_sessions_filtre["Trigramme RP"].dropna().astype(str).unique())  # Valeur toutes les données
-        self._rp = ", ".join(self.df_sessions_filtre_enTete["Nom responsable pédag."].dropna().astype(str).unique() + " " + self.df_sessions_filtre_enTete["Prénom responsable pédag."].dropna().astype(str).unique())  # Valeur toutes les données
-        #self._af = ", ".join(self.df_sessions_filtre["Trigramme AF"].dropna().astype(str).unique())  # Valeur toutes les données
-        self._af = ", ".join(self.df_sessions_filtre_enTete["Créée par"].dropna().astype(str).unique())  # Valeur toutes les données
-
-
-
-        
-        # ===========================
-        # === Partie commentaires ===
-        # ===========================
-        # Cas avec aucun CSV dispo pour les stats
-        if len(self.liste_codesIRIS_pour_statsCSV) == 0 :
-            vlog.print("Info", f"⚠️  Aucun CSV disponible pour ce bilan : les statistiques des stagiaires ne seront pas évaluées.")
-            self._commentairesBilan = f"\n⚠️  Aucun CSV disponible pour ce bilan : les statistiques des stagiaires ne seront pas évaluées.\n"
-        
-        # Cas avec certains CSV non dispo pour les stats mais pas tous
-        elif len(self.liste_codesIRIS_pour_enTete) != len(self. liste_codesIRIS_pour_statsCSV) :
-
-            self._commentairesBilan = "\n⚠️  Certaines sessions n'ont pas de CSV exploitables pour les statistiques (cf. liste ci-dessous)."
-            self._commentairesBilan += "\nDonnées employées pour les statistiques :"
-            self._commentairesBilan += "\n   • Sessions évaluées : ".join(self.df_stagiaires_filtre_statsCSV_1ligne_par_session["N° Session"])
-            self._commentairesBilan += "\n   • Nombre d'apprenants sur ces sessions : " + f" ({nb_apprenants:.0f})"
-            self._commentairesBilan += "\n   • Nombre de stagiaires ayant formulé des retours : " + f" ({nb_stagiaires_retours:.0f})"
-
-            #self._nbSessionsEvaluees += f" ({len(self.liste_codesIRIS_pour_statsCSV_uniquement)})"  # Valeur si on ne prend que les données CSV
-            #self._numerosSessions += "\n".join("(" + self._df_stagiaires_final_1ligne_session["N° Session"].dropna().astype(str).unique() + ")")  # Valeur si on ne prend que les données CSV
-            #self._nbApprenants += f" ({nb_apprenants:.0f})"  # Valeur si on ne prend que les données CSV
-            #self._rp += " (" + ", ".join(self._df_stagiaires_final_1ligne_session["Trigramme RP"].dropna().astype(str).unique()) + ")"  # Valeur si on ne prend que les données CSV
-            #self._af += " (" + ", ".join(self._df_stagiaires_final_1ligne_session["Trigramme AF"].dropna().astype(str).unique()) + ")"  # Valeur si on ne prend que les données CSV
-        
-        
-        # Affichage sessions avec pb CSV
-        if len(self.liste_codesIRIS_avec_pb_CSV) > 0:
-            self._commentairesBilan += "\n\nListe des sessions dont les statistiques n'ont pas pu être évaluées :"
-            l_codes_IRIS = self.liste_codesIRIS_avec_pb_CSV
-
-            for statut_evalStat, statut_pourBilan in self._mapping_statuts.items():
-                if statut_evalStat not in ["Traité", "Exclu - Code IRIS pas dans Extract IRIS sessions"]:
-                    l_sessions = (
-                        self.df_stagiaires[self.df_stagiaires['Code IRIS'].isin(l_codes_IRIS)]
-                        .dropna()
-                        .drop_duplicates(subset=['Code IRIS'])
-                        ["N° Session"]
-                        .tolist()
-                        )
-                    if len(l_sessions) > 0:
-                        self._commentairesBilan += f"\n\n   • {statut_pourBilan} :" + "".join(f"\n       - {isession}" for isession in l_sessions)
-
-        # Affichage sessions exclues
-        if len(self.liste_codesIRIS_exclus_totalement) > 0:
-            self._commentairesBilan += "\n\nListe des sessions de la période entièrement exclues du bilan :"
-            l_codes_IRIS = self.liste_codesIRIS_exclus_totalement
-            l_sessions = (
-                self.df_stagiaires[self.df_stagiaires['Code IRIS'].isin(l_codes_IRIS)]
-                .dropna()
-                .drop_duplicates(subset=['Code IRIS'])
-                ["N° Session"]
-                .tolist()
-                )
-            if len(l_sessions) > 0:
-                self._commentairesBilan += "".join(f"\n       - {isession}" for isession in l_sessions)
-
-
-
-
-        """
-        self._commentairesBilan += "\n\nListe des sessions exclues :"
-        for statut_evalStat, statut_pourBilan in self._mapping_statuts.items():
-            #if statut_evalStat[:5] == "Exclu":
-            # TODO : le bilan sort mais j'ai des pb
-            l_codes_IRIS = self._get_codesIRIS_par_statut_evalStat(statut_evalStat=statut_evalStat)
-            l_sessions = (
-                self.df_stagiaires[self.df_stagiaires['Code IRIS'].isin(l_codes_IRIS)]
-                .dropna()
-                .drop_duplicates(subset=['Code IRIS'])
-                ["N° Session"]
-                .tolist()
-                )
-            self._commentairesBilan += f"\n\n   • {statut_pourBilan} :" + "".join(f"\n       - {isession}" for isession in l_sessions)
-        """
-        vlog.print("Info", f"\n{self._commentairesBilan}")     
-
-
-
-        """
-        #pprint(self._exploitationBilan)
-        self._commentairesBilan += "\n\nListe des sessions avec problèmes:"
-        for critere, lsessions in self._exploitationBilan.items():
-            if lsessions:
-                self._commentairesBilan += f"\n\n   • {critere} :" + "".join(f"\n       - {isession}" for isession in lsessions)
-        vlog.print("Info", f"\n{self._commentairesBilan}")      
-        """
-
-
-
-        # ========================
-        # === Partie stats CSV ===
-        # ========================
-        # On n'affecte les champs suivants que si des CSV sont disponibles pour les stats
-        if len(self.liste_codesIRIS_pour_statsCSV) > 0 :
-
-            
-
-
-            stats_sous_3 = { # Dictionnaire pour les critères dont la moyenne est inférieure à 3 et non exclus (critères dans la liste self._CRITERES_A_ENLEVER)
-                critere: valeurs
-                for critere, valeurs in self._stats_stagiaires.items()
-                if (
-                    critere not in self._CRITERES_A_ENLEVER
-                    and valeurs["Moyenne"] is not None
-                    and valeurs["Moyenne"] < 3
-                )
-            }
-
-
-            
-            # Si des champs ne sont pas dans le CSV, alors on garde "" qui est déjà définit dans le constructeur
-            # Satisfaction globale
-            try:
-                self._satisfactionGlobale_moy = f'{self._stats_stagiaires["Satisfaction globale"]["Moyenne"]:.1f}/5'
-            except:
-                self._satisfactionGlobale_moy = "Pas de donnée"      
-            try:
-                self._satisfactionGlobale_com = self._stats_stagiaires["Satisfaction globale"]["Commentaires"].replace("_x000D_", "\n")
-            except:
-                pass
-            
-            # Recommanderiez-vous + commentaires remarques suggestions
-            try:
-                self._recommandation_moy = f'{self._stats_stagiaires["Recommanderiez-vous cette formation ?"]["Moyenne"]/5*100:.0f}%'  # (on divise par 5 car on a un booléen stcké sous forme de note sur 5 : 0 = False, 5 = True)
-            except:
-                self._recommandation_moy = "Pas de donnée"        
-            try:
-                self._commentairesRemarquesSuggestions_com = self._stats_stagiaires["Commentaires, remarques, suggestions"]["Commentaires"].replace("_x000D_", "\n")
-            except:
-                pass
-            
-            # Notes inférieures à 3
-            try:
-                self._evalInf3_val = f"{len(stats_sous_3)}"
-            except:
-                self._evalInf3_val = "Pas de donnée"
-            try:
-                self._evalInf3_com = "\n".join(f"• {clef} ({valeurs['Moyenne']:.1f}) :{valeurs['Commentaires'].replace('•', '\n   -').replace('\n\n', '\n')}"
-                    for clef, valeurs in stats_sous_3.items()
-                )
-
-                #self._evalInf3_com = "\n".join(
-                #    valeurs["Commentaires"]
-                #    for valeurs in stats_sous_3.values()
-                #    if valeurs["Commentaires"]
-                #).replace("_x000D_", "\n")
-            except:
-                pass
-            
-            # Taux de retour
-            try:
-                self._tauxRetours_val = f"{(nb_stagiaires_retours/nb_apprenants)*100:.0f}%"
-            except:
-                self._tauxRetours_val = "Pas de donnée"
-
-    def __mergeBilanV3(self) -> None:
-        """
-        A partir d'un chemin de fichier word avec des champs de fusion, on crée le bilan de formation final en incluant les données à l'intérieur.
-        Le fichier output est défini par l'utilisateur
-
-        :param s_word_bilan_input: Chemin du fichier Word contenant les champs de fusion et a employer
-        :type s_word_bilan_input: string
-        :param s_word_bilan_output: Chemin du fichier Word apres fusion des donnees
-        :type s_word_bilan_output: string
-        :return: pas de donnee en retour
-        :rtype: none
-
-        :Example:
-
-        >>> self.mergeBilan("C:\\Users\\wordIn.docx", "C:\\Users\\wordOut.docx")
-
-
-        .. seealso:: Rien du tout.
-        .. warning:: Rien du tout.
-        .. note:: Rien du tout.
-        .. todo:: Rien du tout.
-        """
-
-        #print(f"BilanFormation lancé avec : trigramme={self.trigramme_formation}, année={self._annee}")
-        document = MailMerge(config.CHEMIN_MODELE_WORD_BILAN_SESSION)
-        #print(document.get_merge_fields())
-
-        document.merge(
-            titreFormation = self._titreFormation,
-            codeFormation = self.trigramme_formation,
-            periodeSessionsEvaluees = self._periodeSessionsEvaluees,
-            nbSessionsEvaluees = self._nbSessionsEvaluees,
-            numerosSessions = self._numerosSessions,
-            nbApprenants = self._nbApprenants,
-            rp = self._rp,
-            af = self._af,
-            commentairesBilan = self._commentairesBilan,
-            satisfactionGlobale_moy = self._satisfactionGlobale_moy,
-            satisfactionGlobale_com = self._satisfactionGlobale_com,
-            recommandation_moy = self._recommandation_moy,
-            commentairesRemarquesSuggestions_com = self._commentairesRemarquesSuggestions_com,
-            evalInf3_val = self._evalInf3_val,
-            evalInf3_com = self._evalInf3_com,
-            tauxRetours_val = self._tauxRetours_val
-            )
-        
-        # On crée le répertoire pour les bilans de session de cette année s'il n'existe pas
-        self.chemin_word_bilan_output.parent.mkdir(parents=True, exist_ok=True)
-
-        # On écrit le fichier
-        document.write(self.chemin_word_bilan_output)
-
 
     # =========================
     # === METHODES EXTERNES ===
     # =========================
-
     def verifier_traitement_bilan(self) -> bool:
         """
         Vérifie si l'on doit traiter un bilan de sessions à partir :
@@ -730,20 +506,7 @@ class BilanSession:
         """
         return self._codes_IRIS[0]
 
-    """
-    # Ca va me créer de la confusion
-    @code_IRIS.setter
-    def code_IRIS(self, valeur:int):
-        "
-        Renseigne un code IRIS (code_IRIS au singulier donc on considère qu'on est sur un bilan contenant un seul code IRIS unique)
-        "
-        if not self._codes_IRIS: # Cas d'une liste vide
-            self._codes_IRIS.append(valeur)
-        else:
-            self._codes_IRIS[0] = valeur
-    """
-
-    @property
+    @cached_property
     def liste_codesIRIS_exclus_totalement(self) -> list[int]:
         """
         Retourne la liste des codes IRIS qui seront complètement exclus du bilan de sessions (en-tête et CSV).
@@ -758,7 +521,7 @@ class BilanSession:
             if self._formation.get_session_par_codeIRIS(code_IRIS).eval.statut in self._statut_exclus_entierement
         ]
 
-    @property
+    @cached_property
     def liste_codesIRIS_pour_enTete(self) -> list[int]:
         """
         Retourne la liste des codes IRIS qui seront dans l'en-tête du bilan de sessions.
@@ -773,7 +536,7 @@ class BilanSession:
             if code_IRIS not in self.liste_codesIRIS_exclus_totalement
         ]
     
-    @property
+    @cached_property
     def liste_codesIRIS_pour_statsCSV(self) -> list[int]:
         """
         Retourne la liste des codes IRIS pour lesquels on peut calculer les stats à partir des CSV.
@@ -785,7 +548,7 @@ class BilanSession:
         """
         return self._get_codesIRIS_par_statut_pourBilan("Exploités pour les évaluations (CSV présents et non vides)")
 
-    @property
+    @cached_property
     def liste_codesIRIS_avec_pb_CSV(self) -> list[int]:
         """
         Retourne la liste des codes IRIS pour lesquels il y a un problème de CSV.
@@ -815,11 +578,11 @@ class BilanSession:
     def eval_fe(self) -> Optional[FichierExcel]:
         return self._formation.eval.fe
      
-    @property
+    @cached_property
     def df_stagiaires(self) -> Optional[DataFrame]:
         return self.eval_formation.fe.get_df_tableau("Stagiaires")
     
-    @property
+    @cached_property
     def df_stagiaires_filtre_statsCSV(self) -> DataFrame:
         """
         df_stagiaires (eval formation) filtré sur les codes IRIS pour lesquels on peut calculer les stats à partir des CSV.
@@ -831,33 +594,32 @@ class BilanSession:
         """
         return self.df_stagiaires[self.df_stagiaires['Code IRIS'].isin(self.liste_codesIRIS_pour_statsCSV)]
     
-    @property
+    @cached_property
     def df_stagiaires_filtre_statsCSV_1ligne_par_session(self) -> DataFrame:
         return self.df_stagiaires_filtre_statsCSV.drop_duplicates(subset=['N° Session'])
 
 
 
     # Liens avec IRIS 
-    @property
+    @cached_property
     def iris_sessions(self) -> IRIS_traite:
         return get_iris(typeExport="Sessions")
   
-  
-    @property
+    @cached_property
     def intitule_formation(self) -> str:
         """
         Intitulé de la formation (prend le nom de la dernière ligne pour avoir la dernière mise à jour)
         """
         return self.df_sessions_filtre_periode["Session"].iloc[-1]
 
-    @property
+    @cached_property
     def mois_session(self) -> str:
         """
         Mois de la session dans le cadre d'une session unique (len(codes_IRIS)=1)
         """
         return mois_fr_depuis_date(self.df_sessions_filtre_codesIRIS["Date début ses."].iloc[0])
 
-    @property
+    @cached_property
     def numero_session(self) -> str:
         """
         Numéro de la session dans le cadre d'une session unique (len(codes_IRIS)=1)
@@ -865,7 +627,7 @@ class BilanSession:
         return self.df_sessions_filtre_codesIRIS["N° Session"].iloc[0]
 
 
-    @property
+    @cached_property
     def df_sessions_filtre_periode(self) -> DataFrame:
         """
         Renvoie le dataframe de l'extract IRIS filtré VTE selon plusieurs critères :
@@ -879,7 +641,7 @@ class BilanSession:
         """
         return self.iris_sessions.df_filtre_periode(trigramme_formation=self.trigramme_formation, annee=self._annee, periode=self._periode)
 
-    @property
+    @cached_property
     def df_sessions_filtre_codesIRIS(self) -> DataFrame:
         """
         Renvoie le dataframe de l'extract IRIS filtré VTE selon plusieurs critères :
@@ -894,7 +656,7 @@ class BilanSession:
         """     
         return self.df_sessions_filtre_periode[self.df_sessions_filtre_periode['Code IRIS'].isin(self._codes_IRIS)]
 
-    @property
+    @cached_property
     def df_sessions_filtre_exclus_totalement(self) -> DataFrame: #_df_stagiaires_final → df_sessions_filtre_stats_generales
         """
         Renvoie le dataframe de l'extract IRIS filtré sur les codes IRIS qui seront complètement exclus du bilan de sessions (en-tête et CSV).
@@ -906,7 +668,7 @@ class BilanSession:
         """
         return self.df_sessions_filtre_codesIRIS[self.df_sessions_filtre_codesIRIS['Code IRIS'].isin(self.liste_codesIRIS_pour_enTete)]
 
-    @property
+    @cached_property
     def df_sessions_filtre_enTete(self) -> DataFrame: #_df_stagiaires_final → df_sessions_filtre_stats_generales
         """
         Renvoie le dataframe de l'extract IRIS filtré sur les codes IRIS exploités pour le bilan (en-tête)
@@ -918,7 +680,7 @@ class BilanSession:
         """
         return self.df_sessions_filtre_codesIRIS[self.df_sessions_filtre_codesIRIS['Code IRIS'].isin(self.liste_codesIRIS_pour_enTete)]
 
-    @property
+    @cached_property
     def df_sessions_filtre_statsCSV(self) -> DataFrame:
         """
         dataframe de l'extract IRIS filtré sur les codes IRIS pour lesquels on peut calculer les stats à partir des CSV.
@@ -930,7 +692,7 @@ class BilanSession:
         """
         return self.df_sessions_filtre_codesIRIS[self.df_sessions_filtre_codesIRIS['Code IRIS'].isin(self.liste_codesIRIS_pour_statsCSV)]
 
-    @property
+    @cached_property
     def df_sessions_filtre_avec_pb_CSV(self) -> DataFrame:
         """
         dataframe de l'extract IRIS filtré sur les codes IRIS pour lesquels il y a un problème de CSV.
@@ -942,5 +704,372 @@ class BilanSession:
         """
         return self.df_sessions_filtre_codesIRIS[self.df_sessions_filtre_codesIRIS['Code IRIS'].isin(self.liste_codesIRIS_avec_pb_CSV)]
 
-    
-class BilanSession
+
+
+
+
+
+# ======================================================================================
+# CLASSE BilanSession_generateur_word
+# ======================================================================================
+class BilanSession_generateur_word(ABC):
+    """
+    Classe abstraite pour construire un bilan (toutes versions confondues)
+
+    NE S'APPELLE PAS DIRECTEMENT : UNIQUEMENT VIA SES FILLES
+    """
+
+    CHEMIN_MODELE: Path = None  # à surcharger
+
+    # =====================
+    # === CONSTRUCTEUR ===
+    # =====================
+    def __init__(self, bilanSession:BilanSession):
+        self._bilanSession:BilanSession = bilanSession
+        self._champs: dict[str, str] = {}
+
+    # =========================
+    # === METHODES EXTERNES ===
+    # =========================
+    def construire(self):
+        """
+        Méthode principale appelée par BilanSession.
+
+        Calcule/construit les champs puis le fusionne dans le Word
+        """
+        self._construire_champs()
+        self._fusionner_word()
+        #self._post_traitement() # → Dans BilanSession
+
+    # =========================
+    # === METHODES INTERNES === 
+    # =========================
+    @abstractmethod
+    def _construire_champs(self) -> None:
+        """
+        Remplit self._champs
+        Doit être surchargée dans les classes filles héritées
+        """
+        pass
+
+    def _fusionner_word(self) -> None:
+        """
+        Tout le process pour écrire les champs de fusion dans le bilan de session Word :
+            - ouvrir le word à partir du modèle ;
+            - fusionne les champs de fusion ;
+            - crée le répertoire pour le bilan si besoin ;
+            - sauvegarde le word.
+        """
+        # Ouvre le document Word à partir du modèle
+        document = MailMerge(self.CHEMIN_MODELE)
+        #print(document.get_merge_fields())
+
+        # Fusionne les champs de fusion
+        document.merge(**self._champs)
+
+        # Chemin de sauvegarde
+        chemin = self._bilanSession.chemin_word_bilan_output
+
+        # On crée le répertoire pour les bilans de session de cette année s'il n'existe pas
+        chemin.parent.mkdir(parents=True, exist_ok=True)
+
+        # On écrit le fichier
+        document.write(chemin)
+
+    """
+    def _post_traitement(self) -> None:
+        "
+        Peut être surchargé (ouvrir word, mail…)
+        "
+        # Afficher le word
+        FichierWord.depuisFichier(
+            chemin_fichier=self._bilanSession.chemin_word_bilan_output,
+            charger_contentControl=False,
+            afficherWord=True
+        )
+
+        # Préparer le mail pour le chef d'unité
+        self._bilanSession._envoyer_mail_chef_unite()
+    """
+
+
+
+
+# ======================================================================================
+# PROTOCOLES
+# ======================================================================================
+class Bilan_V3(BilanSession_generateur_word):
+
+    CHEMIN_MODELE = config.CHEMIN_MODELE_WORD_BILAN_SESSION
+
+    # =======================
+    # === PIPELINE METIER === 
+    # =======================
+    def _construire_champs(self) -> None:
+        """
+        Pipeline pour calculer et construire les champs de fusion du Word
+        """
+        # === Données transverses ===
+        # Nombre de stagiaires qui ont formulé des retours (provient de eval formation)
+        self._nb_stagiaires_retours = self._bilanSession.df_stagiaires_filtre_statsCSV['NOM Prénom'].nunique()
+        # Nombre d'apprenants sur les sessions dont on peut faire les stats CSV (peut provenir de IRIS session ou de eval formation, on prend de df_stagiaire)
+        self._nb_apprenants = int(self._bilanSession.df_stagiaires_filtre_statsCSV_1ligne_par_session['Nb présents'].sum())
+
+        # === On génère le word ===
+        self._construire_entete()
+        self._construire_commentaires()
+        self._construire_stats()
+
+
+    # =============================
+    # === SOUS-PARTIES DU BILAN === 
+    # =============================
+    def _construire_entete(self):
+        """
+        Construit la partie en-tête du bilan de session
+        """
+        # On met ici toutes les sessions de la période non excclues par l'utilisateur et qui est dans IRIS sessions
+
+        self._champs["titreFormation"] = self._bilanSession.intitule_formation
+        self._champs["codeFormation"] = self._bilanSession.trigramme_formation
+        self._champs["periodeSessionsEvaluees"] = self._bilanSession.periodeSessionsEvaluees
+        self._champs["nbSessionsEvaluees"] = f"{len(self._bilanSession.df_sessions_filtre_enTete)} session" + ("s" if len(self._bilanSession.df_sessions_filtre_enTete) > 1 else "")  # Valeur toutes les données  
+        self._champs["numerosSessions"] = "\n".join(self._bilanSession.df_sessions_filtre_enTete["N° Session"].dropna().astype(str).unique())
+        self._champs["nbApprenants"] = f"{self._bilanSession.df_sessions_filtre_enTete['Nb. Nommés'].sum()} apprenant" + ("s" if self._bilanSession.df_sessions_filtre_enTete['Nb. Nommés'].sum() > 1 else "")  # Valeur toutes les données
+        self._champs["rp"] = ", ".join(self._bilanSession.df_sessions_filtre_enTete["Nom responsable pédag."].dropna().astype(str).unique() + " " + self._bilanSession.df_sessions_filtre_enTete["Prénom responsable pédag."].dropna().astype(str).unique())  # Valeur toutes les données
+        self._champs["af"] = ", ".join(self._bilanSession.df_sessions_filtre_enTete["Créée par"].dropna().astype(str).unique())  # Valeur toutes les données
+
+    def _construire_commentaires(self):
+        """
+        Construit la partie commentaires du bilan de session
+        """
+        commentaires = ""
+
+        # Cas avec aucun CSV dispo pour les stats
+        if len(self._bilanSession.liste_codesIRIS_pour_statsCSV) == 0 :
+            vlog.print("Info", f"⚠️  Aucun CSV disponible pour ce bilan : les statistiques des stagiaires ne seront pas évaluées.")
+            commentaires = f"\n⚠️  Aucun CSV disponible pour ce bilan : les statistiques des stagiaires ne seront pas évaluées.\n"
+        
+        # Cas avec certains CSV non dispo pour les stats mais pas tous
+        elif len(self._bilanSession.liste_codesIRIS_pour_enTete) != len(self._bilanSession.liste_codesIRIS_pour_statsCSV) :
+            commentaires = "\n⚠️  Certaines sessions n'ont pas de CSV exploitables pour les statistiques (cf. liste ci-dessous)."
+            commentaires += "\nDonnées employées pour les statistiques :"
+            commentaires += "\n   • Sessions évaluées : ".join(self._bilanSession.df_stagiaires_filtre_statsCSV_1ligne_par_session["N° Session"])
+            commentaires += "\n   • Nombre d'apprenants sur ces sessions : " + f" ({self._nb_apprenants:.0f})"
+            commentaires += "\n   • Nombre de stagiaires ayant formulé des retours : " + f" ({self._nb_stagiaires_retours:.0f})"
+
+        # Affichage sessions avec pb CSV
+        if len(self._bilanSession.liste_codesIRIS_avec_pb_CSV) > 0:
+            commentaires += "\n\nListe des sessions dont les statistiques n'ont pas pu être évaluées :"
+            l_codes_IRIS = self._bilanSession.liste_codesIRIS_avec_pb_CSV
+
+            for statut_evalStat, statut_pourBilan in self._bilanSession._mapping_statuts.items():
+                if statut_evalStat not in ["Traité", "Exclu - Code IRIS pas dans Extract IRIS sessions"]:
+                    l_sessions = (
+                        self._bilanSession.df_stagiaires[self._bilanSession.df_stagiaires['Code IRIS'].isin(l_codes_IRIS)]
+                        .dropna()
+                        .drop_duplicates(subset=['Code IRIS'])
+                        ["N° Session"]
+                        .tolist()
+                        )
+                    if len(l_sessions) > 0:
+                        commentaires += f"\n\n   • {statut_pourBilan} :" + "".join(f"\n       - {isession}" for isession in l_sessions)
+
+        # Affichage sessions exclues
+        if len(self._bilanSession.liste_codesIRIS_exclus_totalement) > 0:
+            commentaires += "\n\nListe des sessions de la période entièrement exclues du bilan :"
+            l_codes_IRIS = self._bilanSession.liste_codesIRIS_exclus_totalement
+            l_sessions = (
+                self._bilanSession.df_stagiaires[self._bilanSession.df_stagiaires['Code IRIS'].isin(l_codes_IRIS)]
+                .dropna()
+                .drop_duplicates(subset=['Code IRIS'])
+                ["N° Session"]
+                .tolist()
+                )
+            if len(l_sessions) > 0:
+                commentaires += "".join(f"\n       - {isession}" for isession in l_sessions)
+
+        vlog.print("Info", f"\n{commentaires}")     
+
+        self._champs["commentairesBilan"] = commentaires
+
+    def _construire_stats(self):
+        """
+        Construit la partie statistiques du bilan de session
+        """
+        # On n'affecte les champs suivants que si des CSV sont disponibles pour les stats
+        if len(self._bilanSession.liste_codesIRIS_pour_statsCSV) > 0 :
+            # Satisfaction globale
+            self._champs["satisfactionGlobale_moy"] = self._get_stat_avec_format(
+                "Satisfaction globale",
+                "Moyenne",
+                lambda v: f"{v:.1f}/5"
+            )
+            self._champs["satisfactionGlobale_com"] = self._get_stat_avec_format(
+                "Satisfaction globale",
+                "Commentaires",
+                lambda v: v.replace("_x000D_", "\n"),
+                default=""
+            )
+            """
+            try:
+                self._satisfactionGlobale_moy = f'{self._bilanSession._stats_stagiaires["Satisfaction globale"]["Moyenne"]:.1f}/5'
+            except:
+                self._satisfactionGlobale_moy = "Pas de donnée"      
+            try:
+                self._satisfactionGlobale_com = self._bilanSession._stats_stagiaires["Satisfaction globale"]["Commentaires"].replace("_x000D_", "\n")
+            except:
+                pass
+            """
+
+            # Recommanderiez-vous + commentaires remarques suggestions
+            self._champs["recommandation_moy"] = self._get_stat_avec_format(
+                "Recommanderiez-vous cette formation ?",
+                "Moyenne",
+                lambda v: f"{v/5*100:.0f}%"  # (on divise par 5 car on a un booléen stcké sous forme de note sur 5 : 0 = False, 5 = True)
+            )
+            self._champs["commentairesRemarquesSuggestions_com"] = self._get_stat_avec_format(
+                "Commentaires, remarques, suggestions",
+                "Commentaires",
+                lambda v: v.replace("_x000D_", "\n"),
+                default=""
+            )
+            """
+            try:
+                self._recommandation_moy = f'{self._bilanSession._stats_stagiaires["Recommanderiez-vous cette formation ?"]["Moyenne"]/5*100:.0f}%'  # (on divise par 5 car on a un booléen stcké sous forme de note sur 5 : 0 = False, 5 = True)
+            except:
+                self._recommandation_moy = "Pas de donnée"        
+            try:
+                self._commentairesRemarquesSuggestions_com = self._bilanSession._stats_stagiaires["Commentaires, remarques, suggestions"]["Commentaires"].replace("_x000D_", "\n")
+            except:
+                pass
+            """
+
+            # Notes inférieures à 3
+            stats_sous_3 = {  # Dictionnaire pour les critères dont la moyenne est inférieure à 3 et non exclus (critères dans la liste self._CRITERES_A_ENLEVER)
+                critere: valeurs
+                for critere, valeurs in self._bilanSession._stats_stagiaires.items()
+                if (
+                    critere not in self._bilanSession._CRITERES_A_ENLEVER
+                    and valeurs["Moyenne"] is not None
+                    and valeurs["Moyenne"] < 3
+                )
+            }
+            self._champs["evalInf3_val"] = f"{len(stats_sous_3)}"
+            self._champs["evalInf3_com"] = "\n".join(
+                f"• {clef} ({valeurs['Moyenne']:.1f}) :{valeurs['Commentaires'].replace('•', '\n   -').replace('\n\n', '\n')}"
+                for clef, valeurs in stats_sous_3.items()
+                )
+            """
+            try:
+                self._evalInf3_val = f"{len(stats_sous_3)}"
+            except:
+                self._evalInf3_val = "Pas de donnée"
+            try:
+                self._evalInf3_com = "\n".join(f"• {clef} ({valeurs['Moyenne']:.1f}) :{valeurs['Commentaires'].replace('•', '\n   -').replace('\n\n', '\n')}"
+                    for clef, valeurs in stats_sous_3.items()
+                )
+
+                #self._evalInf3_com = "\n".join(
+                #    valeurs["Commentaires"]
+                #    for valeurs in stats_sous_3.values()
+                #    if valeurs["Commentaires"]
+                #).replace("_x000D_", "\n")
+            except:
+                pass
+            """
+
+            # Taux de retour
+            self._champs["tauxRetours_val"] = f"{(self._nb_stagiaires_retours/self._nb_apprenants)*100:.0f}%"
+            """
+            try:
+                self._tauxRetours_val = f"{(self._nb_stagiaires_retours/self._nb_apprenants)*100:.0f}%"
+            except:
+                self._tauxRetours_val = "Pas de donnée"
+            """
+
+
+    # ====================
+    # === MÉTHODES GET === 
+    # ====================
+    def _get_stat(self, critere: str, champ: str, default=None) -> int|float|str|None:
+        """
+        Récupère une stat depuis le dictionnaire _stats_stagiaires
+
+        :param critere: Critère de la stat à récupérer
+        :type critere: str
+        :param champ: Champ de ce critère à récupérer (["Nombre", "Moyenne", "Commentaires"])
+        :type champ: str
+        :param default: Valeur retournée si ce critère n'existe pas. Défaut = None
+        :type default: _type_, optional
+        :return: la valeur du champ de ce critère (ex. _stats_stagiaires["Satisfaction globale"]["Moyenne"])
+        :rtype: int|float|str|None
+        """
+        stats = self._bilanSession._stats_stagiaires.get(critere)
+        if not stats:
+            return default
+
+        valeur = stats.get(champ)
+        return valeur if valeur is not None else default
+
+    def _get_stat_avec_format(self, critere: str, champ: str, format:Callable[[Any], str], default:str="Pas de donnée") -> str:
+        """
+        Récupère et formatte une stat depuis le dictionnaire _stats_stagiaires
+
+        :param critere: Critère de la stat à récupérer
+        :type critere: str
+        :param champ: _descChamp de ce critère à récupérer (["Nombre", "Moyenne", "Commentaires"])ription_
+        :type champ: str
+        :param format: format à appliquer (ex. lambda v: f"{v:.1f}/5" ou lambda v: f"{v/5*100:.0f}%" ou lambda v: v.replace("_x000D_", "\n"))
+        :type format: Callable[[Any], str]
+        :param default: Valeur renvoyée si aucune donnée. Défaut = "Pas de donnée"
+        :type default: str, optional
+        :return: une statistique formatée en str
+        :rtype: str
+        """
+        valeur = self._get_stat(critere, champ)
+
+        if valeur is None:
+            return default
+
+        try:
+            return format(valeur)
+        except Exception:
+            return default
+
+
+
+
+
+
+
+
+
+# Compréhension décorateur générique pour mettre en cache des données lourdes que je recalculais pleinde fois en @property
+"""
+# from functools import cached_property fait déjà ça nativement, mais sinon :
+
+def cached_property(func):
+    attr_name = f"_cache_{func.__name__}"
+
+    @property
+    def wrapper(self):
+        if not hasattr(self, attr_name):
+            setattr(self, attr_name, func(self))
+        return getattr(self, attr_name)
+
+    return wrapper
+
+
+Permet de mettre en cache une valeur plutôt que de la réévaluer plein de fois.
+
+Ex. avant je faisais ceci :
+@property
+def df_sessions_filtre_periode(self) -> DataFrame:
+    return self.iris_sessions.df_filtre_periode(trigramme_formation=self.trigramme_formation, annee=self._annee, periode=self._periode)
+
+Maintenant je peux faire :
+@cached_property
+def df_sessions_filtre_periode(self) -> DataFrame:
+    return self.iris_sessions.df_filtre_periode(trigramme_formation=self.trigramme_formation, annee=self._annee, periode=self._periode)
+"""
