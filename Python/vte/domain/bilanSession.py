@@ -718,7 +718,7 @@ class BilanSession:
     def codes_IRIS(self, valeur:int|Iterable[int]) -> None:
         if isinstance(valeur, int):
             self._codes_IRIS.append(valeur)
-        elif isinstance(valeur, Iterable[int]):
+        elif isinstance(valeur, Iterable) and not isinstance(valeur, str):  # Iterable[int] n’est pas valide dans isinstance
             self._codes_IRIS = valeur
         else:
             vlog.log_erreur("La valeur n'est ni un int ni un Iterable de int (codes_IRIS.setter)")
@@ -943,3 +943,4 @@ class BilanSession:
         return self.df_sessions_filtre_codesIRIS[self.df_sessions_filtre_codesIRIS['Code IRIS'].isin(self.liste_codesIRIS_avec_pb_CSV)]
 
     
+class BilanSession
