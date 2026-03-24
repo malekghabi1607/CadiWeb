@@ -587,15 +587,24 @@ class EvalStat_session(EvalStat):
         :param ouvrirDossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
         :type ouvrirDossier: bool
         """
-        # Si le chemin est avec un raccourci réseau alors on récupère le chemin en entier + on convertit en Path 
-        self._chemin_csv = chemin_vers_unc(Path(chemin_csv)) 
-
+        
         # On vérifie s'il est perinent de faire le traitement de l'EvalStat (on vérifie notemment sa déjà présence dans l'EvalStat formation)
         continuer, self._statut = self.verification_traitement_eval()
         if not continuer:
             return
 
-
+        # Si l'argument est à None, on récupère la valeur existante dans l'objet (i.e. priorité à l'argument devant self)
+        if chemin_csv is None :
+            self._chemin_csv = EvalStat_session.filedialog_csv(
+                    trigramme_formation=self.trigramme_formation, 
+                    code_IRIS=self.code_IRIS)
+            
+            #vlog.log_erreur("Aucun chemin CSV fourni pour le traitement.", continuer=True)
+            print(f"⚠️  Aucun chemin CSV fourni pour le traitement.")
+            self._statut = "Exclu - Aucun CSV fourni"
+            return 
+        else:
+            self._chemin_csv = chemin_vers_unc(chemin_csv)
 
 
         print("\n")
@@ -694,6 +703,7 @@ class EvalStat_session(EvalStat):
 
         return dictionnaire
 
+    # TODO : ce n'est plus employé
     @staticmethod
     def construire_dictionnaire_trigrammeFormation_codeIRIS_cheminsCSV_depuis_iterableCodesIRIS(codes_IRIS: Iterable[int], formation:Optional[Formation_protocol]=None) -> Dict[str, Dict[int, Path]]:
         """
@@ -768,7 +778,7 @@ class EvalStat_session(EvalStat):
         return self.filedialog_csv(self.trigramme_formation, self.code_IRIS)
 
     @staticmethod
-    def filedialog_csv(trigramme_formation:Optional[str]=None, code_IRIS:Optional[int]=None) -> Path | None:
+    def filedialog_csv(trigramme_formation:Optional[str]=None, code_IRIS:Optional[int]=None, unc:bool=True) -> Path | None:
         """
         Ouvre un filedialog pour demander à l'utilisateur de sélectionner un CSV.
 
@@ -782,6 +792,8 @@ class EvalStat_session(EvalStat):
         :type trigramme_formation: Optional[str]
         :param code_IRIS: Code IRIS de la session. Permet d'être spécifié dans l'en-tête du filedialog (non obligatoire).
         :type code_IRIS: Optional[int]
+        :param unc: Si True, le chemin renvoyé sera avec le chemin réseau complet et pas le raccourci utilisateur lecteur réseau
+        :type unc: bool, optional
         :return: Description
         :rtype: Path | None
         """
@@ -803,9 +815,10 @@ class EvalStat_session(EvalStat):
                         dossier_initial=chemin_repertoire_csv,
                         obligatoire=False,
                         texte_bouton_choisir="Choisir CSV à nouveau",
-                        texte_bouton_aucun="Pas de CSV pour cette session"
+                        texte_bouton_aucun="Pas de CSV pour cette session",
+                        unc=unc
                         )
-
+        
 
 
     # =========================
@@ -1027,31 +1040,7 @@ class EvalStat_formation(EvalStat):
         if self._fe is None:
             self._ouvrir_ou_creer_eval_formation()
 
-        # Vérifications 1 : liés au chemin du CSV
-        if chemin_csv is not None:
-            # Soit on a déjà un chemin, soit on va pointer le csv manuellement – Partie obsolète car il n'y a aucun cas où on peut rentrer ici
-            """
-            if chemin_csv is None:
-                chemin_csv = EvalStat_session.filedialog_csv(trigramme_formation=self.trigramme_formation, code_IRIS=code_IRIS)
-                if chemin_csv is None:
-                    #vlog.log_erreur("Aucun chemin CSV fourni pour le traitement.", continuer=True)
-                    print(f"⚠️  Aucun chemin CSV fourni pour le traitement.")
-                    statut = "Exclu - Aucun CSV fourni"
-                    return False, statut
-            """
-            
-            # Si le chemin est avec un raccourci réseau alors on récupère le chemin en entier + on convertit en Path 
-            chemin_csv = chemin_vers_unc(Path(chemin_csv))
-
-            # on vérifie que chemin_csv_session n'est pas déjà dans le fichier évaluations des formations
-            if str(chemin_csv) in self.df_stagiaires["Chemin fichier CSV"].drop_duplicates().tolist():  
-                print(f"✅  CSV déjà présent dans fichier eval de la formation : EvalStat {chemin_csv} exclu du traitement.")
-                #pprint(self._df_evaluations_formation["Chemin fichier CSV"])
-                statut = "Traité"  # "Traité - CSV déjà dans l'évaluation de la formation" (je ne peux pas mettre plusieurs statuts traités car après dans bilanSession, dans la matrice "statut evalStat" "statut pour bilan" il me fait une correspondance 1 pour 1)
-                return False, statut
-
-
-        # Vérifications 2 : liés à code_IRIS
+        # Vérifications 1 : liés à code_IRIS
         if code_IRIS is not None:
             # 2.1 : On vérifie que code_iris est bien un entier à 5 chiffres
             est_code_IRIS_valide, code_IRIS = IRIS.verifier_code_IRIS(code_IRIS, int)
@@ -1076,7 +1065,17 @@ class EvalStat_formation(EvalStat):
 
 
 
+        # Vérifications 2 : liés au chemin du CSV
+        if chemin_csv is not None and code_IRIS is not None:  # Ca ne sert à rien de faire une double vérification de la présence dans eval formation
+            # Si le chemin est avec un raccourci réseau alors on récupère le chemin en entier + on convertit en Path 
+            chemin_csv = chemin_vers_unc(Path(chemin_csv))
 
+            # on vérifie que chemin_csv_session n'est pas déjà dans le fichier évaluations des formations
+            if str(chemin_csv) in self.df_stagiaires["Chemin fichier CSV"].drop_duplicates().tolist():  
+                print(f"✅  CSV déjà présent dans fichier eval de la formation : EvalStat {chemin_csv} exclu du traitement.")
+                #pprint(self._df_evaluations_formation["Chemin fichier CSV"])
+                statut = "Traité"  # "Traité - CSV déjà dans l'évaluation de la formation" (je ne peux pas mettre plusieurs statuts traités car après dans bilanSession, dans la matrice "statut evalStat" "statut pour bilan" il me fait une correspondance 1 pour 1)
+                return False, statut
 
         # Si aucun Test n'est vérifié
         return True, "A traiter"

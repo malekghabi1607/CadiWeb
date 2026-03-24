@@ -25,6 +25,7 @@ tuple_csv_stagiaires_TEL = (
     r"P:\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-13414-rapports-session-evaluations\S-13414-FC22-TEL-JVI-LRA-Stagiaires.csv",
     r"P:\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\2024 csv\S-15942-FC24-TEL-JVI-ACD-Stagiaires.csv",
     r"P:\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\2024 csv\S-16161-FC24-TEL-VTE-ACD-Stagiaires.csv",
+    # 17343 - Pas de csv stagiaires
     r"P:\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-16411-rapports-session-evaluations\S-16411-FC25-TEL-VTE-CAR-Stagiaires.csv",
 )
 

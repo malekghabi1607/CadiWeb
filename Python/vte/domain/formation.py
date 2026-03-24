@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Optional
 from collections.abc import Iterable
 
+from vte.domain.bilanSessions import BilanSessions
 from vte.domain.evalStat import EvalStat_formation
 from vte.domain.fdc import FdC
 from vte.domain.session import Session
@@ -31,7 +32,7 @@ class Formation:
         #self.bilans_formation:Optional[dict[int, BilanFormation]] = {}  # bilans_formation[2025] : Index = année du bilan
 
         # Une formation a un ou plusieurs bilans de session par année (soit 1 par semestre, soit annuel s'il n'y a qu'une session annuellement)
-        #self.bilans_session:Optional[dict[int, dict[int, BilanSession]]] = {}  #bilans_session[2025][0] : Index1 = année du bilan ; Index2 = période du bilan (1 = 1er semestre ; 2 = 2nd semestre ; 0 = annuel)
+        self.bilans_sessions:Optional[dict[int, dict[int, BilanSessions]]] = {}  #bilans_session[2025][0] : Index1 = année du bilan ; Index2 = période du bilan (1 = 1er semestre ; 2 = 2nd semestre ; 0 = annuel)
 
         # Une formation a une ou plusieurs sessions
         self._sessions:list[Session] = []

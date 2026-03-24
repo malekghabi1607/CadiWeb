@@ -1551,6 +1551,7 @@ def choisir_fichier(
     texte_bouton_choisir: str = "Choisir à nouveau",
     texte_bouton_aucun: str = "Pas de fichier à sélectionner",
     texte_bouton_quitter: str = "Quitter l'application",
+    unc: bool = True
 ) -> Optional[Union[Path, List[Path]]]:
     """
     Ouvre une boîte de dialogue pour sélectionner un ou plusieurs fichiers, avec gestion
@@ -1576,6 +1577,9 @@ def choisir_fichier(
         Libellé du bouton "aucun fichier", affiché seulement si `obligatoire=False`.
     texte_bouton_quitter : str, optional
         Libellé du bouton pour quitter le programme.
+    unc : bool, optional
+        Si True, le chemin renvoyé sera avec le chemin réseau complet et pas le raccourci utilisateur lecteur réseau
+        
 
     Returns
     -------
@@ -1747,9 +1751,11 @@ def choisir_fichier(
         if chemins:
             root.destroy()
             if multi_fichiers:
-                return [Path(c) for c in chemins]
+                return [
+                    (chemin_vers_unc(Path(chemin)) if unc else Path(chemin)) for chemin in chemins
+                    ]
             else:
-                return Path(chemins)
+                return chemin_vers_unc(Path(chemins)) if unc else Path(chemins)
 
         # --- Aucun fichier sélectionné → boîte modale
         reponse = popup_aucun_fichier()
