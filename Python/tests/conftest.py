@@ -86,62 +86,6 @@ def tel():
 def tel():
     return tel_data()
 
-
-@pytest.fixture
-def evalstat_csv_datasets(tel):
-    """
-    Liste de datasets CSV à tester.
-    Chaque dataset représente un cas réel rencontré.
-    """
-
-    return [
-
-        {
-            "nom": "code_iris_deja_dans_eval_formation",
-            "code_IRIS": 13414,
-            "csv": Path(r"\\instnt\PARTAGE\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-13414-rapports-session-evaluations\S-13414-FC22-TEL-JVI-LRA-Stagiaires.csv"),
-            "statut": "Exclu - Code IRIS déjà dans fichier global",
-            "nbLignes_evalFormation": tel["resultat_sansTraitement_evalFormation_nbLignes"],
-        },
-
-        {
-            "nom": "code_IRIS_absent_IRISsessions",
-            "code_IRIS": 11111,
-            "csv": tel["chemin_csv_session"],  # Ce n'est pas le csv qu'il faudrait au sens du test, mais pas grave le traitement sera exclu de toute façon
-            "statut": "Exclu - Code IRIS pas dans Extract IRIS sessions",
-            "nbLignes_evalFormation": tel["resultat_sansTraitement_evalFormation_nbLignes"],
-        },
-
-        {
-            "nom": "csv_vide",
-            "code_IRIS": 11090,
-            "csv": Path(r"\\instnt\PARTAGE\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-11090-rapports-sessions-evaluations\S-11090-FC21-TEL-JVI-MLR-Stagiaires.csv"),
-            "statut": "Exclu - CSV vide / Aucun retour",
-            "nbLignes_evalFormation": tel["resultat_sansTraitement_evalFormation_nbLignes"],
-        },
-
-        {
-            "nom": "csv_probleme_lecture",
-            "code_IRIS": 11090,
-            "csv": Path(r"\\instnt\PARTAGE\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-11090-rapports-sessions-evaluations\S-11090-FC21-TEL-JVI-MLR-Stagiaires-ErreurCSV.csv"),
-            "statut": "Exclu - Problème lecture CSV",
-            "nbLignes_evalFormation": tel["resultat_sansTraitement_evalFormation_nbLignes"],
-        },
-
-        {
-            "nom": "csv_ancien_format",
-            "code_IRIS": 12766,
-            "csv": Path(r"\\instnt\PARTAGE\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-12766-rapports-session-evaluations\S-12766-FC22-TEL-JVI-LRA-Stagiaires.csv"),
-            "iris": tel["chemin_IRIS_sessions"],
-            "statut": "Traité",
-            "nbLignes_evalFormation": 157, # 102 (nb initial) + 55 (nb de lignes liés au traitement de 12766)
-        },
-
-    ]
-
-
-
-
 @pytest.fixture
 def formation(tel):
     """Formation réelle avec juste trigramme formation"""
@@ -151,7 +95,7 @@ def formation(tel):
 def session(formation, tel):
     """Session réelle attachée à la formation"""
     formation.ajout_sessions(codes_IRIS=(tel["code_IRIS"],))
-    return formation.sessions[tel["code_IRIS"]]
+    return formation.get_session_par_codeIRIS(tel["code_IRIS"])
 
 """
 @pytest.fixture

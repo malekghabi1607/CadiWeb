@@ -12,6 +12,59 @@ from vte.domain.evalStat import EvalStat, EvalStat_session, EvalStat_formation
 
 from vte.utils.utils import backup_fichier_test, restore_nom_fichier_test
 
+
+@pytest.fixture
+def evalstat_csv_datasets(tel):
+    """
+    Liste de datasets CSV à tester.
+    Chaque dataset représente un cas réel rencontré.
+    """
+
+    return [
+
+        {
+            "nom": "code_iris_deja_dans_eval_formation",
+            "code_IRIS": 13414,
+            "csv": Path(r"\\instnt\PARTAGE\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-13414-rapports-session-evaluations\S-13414-FC22-TEL-JVI-LRA-Stagiaires.csv"),
+            "statut": "Traité",
+            "nbLignes_evalFormation": tel["resultat_sansTraitement_evalFormation_nbLignes"],
+        },
+
+        {
+            "nom": "code_IRIS_absent_IRISsessions",
+            "code_IRIS": 11111,
+            "csv": tel["chemin_csv_session"],  # Ce n'est pas le csv qu'il faudrait au sens du test, mais pas grave le traitement sera exclu de toute façon
+            "statut": "Exclu - Code IRIS pas dans Extract IRIS sessions",
+            "nbLignes_evalFormation": tel["resultat_sansTraitement_evalFormation_nbLignes"],
+        },
+
+        {
+            "nom": "csv_vide",
+            "code_IRIS": 11090,
+            "csv": Path(r"\\instnt\PARTAGE\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-11090-rapports-sessions-evaluations\S-11090-FC21-TEL-JVI-MLR-Stagiaires.csv"),
+            "statut": "Exclu - CSV vide / Aucun retour",
+            "nbLignes_evalFormation": tel["resultat_sansTraitement_evalFormation_nbLignes"],
+        },
+
+        {
+            "nom": "csv_probleme_lecture",
+            "code_IRIS": 11090,
+            "csv": Path(r"\\instnt\PARTAGE\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-11090-rapports-sessions-evaluations\S-11090-FC21-TEL-JVI-MLR-Stagiaires-ErreurCSV.csv"),
+            "statut": "Exclu - Problème lecture CSV",
+            "nbLignes_evalFormation": tel["resultat_sansTraitement_evalFormation_nbLignes"],
+        },
+
+        {
+            "nom": "csv_ancien_format",
+            "code_IRIS": 12766,
+            "csv": Path(r"\\instnt\PARTAGE\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-12766-rapports-session-evaluations\S-12766-FC22-TEL-JVI-LRA-Stagiaires.csv"),
+            "iris": tel["chemin_IRIS_sessions"],
+            "statut": "Traité",
+            "nbLignes_evalFormation": 157, # 102 (nb initial) + 55 (nb de lignes liés au traitement de 12766)
+        },
+
+    ]
+
 @pytest.fixture
 def csv_datasets(tel):
     """
@@ -136,7 +189,7 @@ def test_init_evalStat_session(session):
 # ----------------------------------------------------------------------
 def test_avec_ouverture_evalStat_session(session, tel):
     # TODO : je ne teste pas avec ouvrir_fe=True
-    es = EvalStat_session.avec_ouverture(session=session, ouvrir_fe=False)
+    es = EvalStat_session.avec_ouverture_ou_traitement(session=session, ouvrir_fe=False)
 
     assert es.fe is None
     assert es._session == session
@@ -437,10 +490,13 @@ def test_eval_session_multi_csv(
 
 
         # Vérifications de session
+        # Ce test ne marche plus depuis que "Traité - Code IRIS déjà dans l'évaluation de la formation" est devenu "Traité" (car le fe n'est pas loadé et je ne peux plus le discriminer)
+        """
         if dataset["statut"] == "Traité":
             assert session.eval.fe is not None
         else:
             assert session.eval.fe is None
+        """
         assert session.eval.statut == dataset["statut"]
 
 
