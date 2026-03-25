@@ -4,6 +4,7 @@ from pathlib import Path
 from pprint import *
 
 from vte.core.iris_referentiel import set_iris_chemin_specifique
+from vte.domain.evalStat import EvalStat_session
 from vte.domain.formation import Formation
 from vte.domain.bilanSessions import BilanSessions
 from vte.utils.utils import backup_fichier_test, chemin_vers_unc, restore_nom_fichier_test
@@ -23,7 +24,14 @@ DATASETS_CODES_IRIS = {
             "chemin_IRIS_sessions": tel["chemin_IRIS_sessions"],
             "trigramme_formation": tel["trigramme_formation"],
             "codes_IRIS": tel["code_IRIS"],
-            "chemin_bilanSessions": tel["chemin_bilanSessions"]
+            "chemin_bilanSessions": tel["chemin_bilanSessions"],
+
+            # mocks
+            "mock_verifier_existance_fichier": True,  # True = on continue
+            "mock_statut_eval": "Traité",
+
+            # attendu
+            #"expected_statut": "OK",
             },
 
 
@@ -31,7 +39,14 @@ DATASETS_CODES_IRIS = {
             "chemin_IRIS_sessions": tel["chemin_IRIS_sessions"],
             "trigramme_formation": tel["trigramme_formation"],
             "codes_IRIS": 17343,
-            "chemin_bilanSessions": chemin_vers_unc(Path(r"P:\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\2025\P07-Pr05-F05-Bilan session-S-17343-FC25-TEL-VTE-CAR-UEM.docx"))
+            "chemin_bilanSessions": chemin_vers_unc(Path(r"P:\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\2025\P07-Pr05-F05-Bilan session-S-17343-FC25-TEL-VTE-CAR-UEM.docx")),
+
+            # mocks
+            "mock_verifier_existance_fichier": True,  # True = on continue
+            "mock_statut_eval": "Exclu - Aucun CSV fourni",
+
+            # attendu
+            #"expected_statut": "Exclu - Aucun CSV fourni",
             },
 
     }
@@ -66,6 +81,38 @@ def datasets_periode(tel):
 
     }
 
+
+
+def apply_mocks(monkeypatch, dataset):
+    # --- mock fichier ---
+    monkeypatch.setattr(
+        "vte.domain.bilanSessions.verifier_existance_fichier",  # Fonction à remplacer
+        lambda path: dataset["mock_verifier_existance_fichier"]  # Fonction de remplacemen,t
+    )
+
+    # --- mock EvalStat ---
+    def fake_evalstat(*args, **kwargs):
+        session = kwargs.get("session") or args[0]
+        return EvalStat_session(
+            session=session,
+            statut=dataset["mock_statut_eval"]
+        )
+
+    monkeypatch.setattr(
+        "vte.domain.evalStat.EvalStat_session.avec_ouverture_ou_traitement",
+        fake_evalstat
+    )
+
+    # --- mock envoyer_mail_chef_unite ---
+    def fake_envoyer_mail_chef_unite(*args, **kwargs):
+        pass
+
+    monkeypatch.setattr(
+        "vte.domain.bilanSessions.BilanSessions._envoyer_mail_chef_unite",
+        fake_envoyer_mail_chef_unite
+    )
+
+
 # Pour choisir mes cas
 """
 @pytest.mark.parametrize("nom_cas", [
@@ -74,21 +121,25 @@ def datasets_periode(tel):
 ])
 """
 # Pour faire tous les cas
-#@pytest.mark.parametrize("nom_cas", DATASETS_CODES_IRIS.keys())
-#def test_bilanSession_depuis_codesIRIS(nom_cas, datasets_codesIRIS):
-def verif_bilanSession_depuis_codesIRIS():
+@pytest.mark.parametrize("nom_cas, dataset", DATASETS_CODES_IRIS.items())
+def test_bilanSession_depuis_codesIRIS(nom_cas, dataset, monkeypatch):
+#def verif_bilanSession_depuis_codesIRIS():
 
     # Sélection du dataset - Mode fonction
-    dataset = DATASETS_CODES_IRIS["Bilan unique par code IRIS. CSV introuvable"]
+    #dataset = DATASETS_CODES_IRIS["Bilan unique par code IRIS. CSV introuvable"]
     
     # Sélection du dataset - Mode pytest
     #dataset = datasets_codesIRIS[nom_cas]
+    apply_mocks(monkeypatch, dataset)  # Appliquer les mocks
+
+
 
     # Backups de mon environnement de travail
     backup_fichier_test(dataset["chemin_bilanSessions"])  # Bilan sessions word
     backup_fichier_test(dataset["chemin_bilanSessions"].with_suffix(".pdf"))  # Bilan sessions pdf
 
     set_iris_chemin_specifique(typeExport="Sessions", chemin=dataset["chemin_IRIS_sessions"])  # On redéfinit le chemin d'IRIS Sessions
+
 
     formation = Formation.avec_ajout_sessions(trigramme_formation=dataset["trigramme_formation"], codes_IRIS=dataset["codes_IRIS"])
     BilanSessions.depuis_codesIRIS(formation=formation, codes_IRIS=dataset["codes_IRIS"])
@@ -97,6 +148,8 @@ def verif_bilanSession_depuis_codesIRIS():
     # Restauration de mon environnement de travail
     restore_nom_fichier_test(dataset["chemin_bilanSessions"])  # Bilan sessions word
     restore_nom_fichier_test(dataset["chemin_bilanSessions"].with_suffix(".pdf"))  # Bilan sessions pdf
+
+    #input(f"Fin du test de {nom_cas}, appuer sur une touche")
 
 
 

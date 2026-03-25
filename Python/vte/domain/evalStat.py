@@ -238,7 +238,7 @@ class EvalStat_session(EvalStat):
     # =====================
     # === CONSTRUCTEURS ===
     # =====================
-    def __init__(self, session:Session_protocol):
+    def __init__(self, session:Session_protocol, statut:Optional[str]=None):
         """
         Crée l'instance EvalStat d'un session a minima.
 
@@ -250,7 +250,7 @@ class EvalStat_session(EvalStat):
 
         self._session:Session_protocol = session  # C'est un protocol pour éviter les références circulaires
         self._chemin_csv: Optional[Path] = None
-        self._statut: Optional[str] = None  # ex: "A traiter", "Traité", "Exclu - Aucun CSV fourni", "Exclu - Code IRIS pas dans Extract IRIS sessions", "Exclu - Problème lecture CSV", "Exclu - CSV vide / Aucun retour"
+        self._statut: Optional[str] = statut  # ex: "A traiter", "Traité", "Exclu - Aucun CSV fourni", "Exclu - Code IRIS pas dans Extract IRIS sessions", "Exclu - Problème lecture CSV", "Exclu - CSV vide / Aucun retour"
 
     @classmethod
     def avec_ouverture_ou_traitement(cls, session:Session_protocol, chemin_csv:Optional[Path|str]=None, ecrire_eval_formation:bool=True, ouvrirDossier:bool=False, ouvrir_fe:bool=False) -> EvalStat_session:

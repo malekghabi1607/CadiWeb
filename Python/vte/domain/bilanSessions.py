@@ -8,11 +8,11 @@ from functools import cached_property  # Décorateur générique pour mettre en 
 from pandas import DataFrame
 from mailmerge import MailMerge
 
+from vte.core import config
 from vte.core.iris_referentiel import get_iris
 from vte.domain.evalStat import EvalStat_formation
 from vte.domain.session import Session
 from vte.domain.iris import IRIS, IRIS_traite
-from vte.core import config
 from vte.services.evalStat_services import EvalStat_services
 from vte.utils.office import FichierExcel, FichierWord, Mail
 from vte.utils.utils import *
