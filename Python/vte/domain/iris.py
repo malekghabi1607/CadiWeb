@@ -13,6 +13,7 @@ from colorama import Fore
 from vte.core import config, config_extractsIRIS
 from vte.utils.office import FichierExcel
 from vte.utils.utils import *
+from vte.utils.utils import periode as utils_periode
 from vte.utils.utils_instn import demander_code
 
 # ======================================================================================
@@ -1120,6 +1121,7 @@ class IRIS_traite(IRIS):
             showindex=False
         ))
 
+    # TODO : ce n'est plus utilisé / A adapter selon modèle demande_sessions_a_retenir si besoin
     def demande_sessions_a_exclure(self, trigramme_formation:str = None, annee:Optional[int] = None, periode:Optional[str] = None) -> Tuple[pd.DataFrame, List[int]]:
         """
         Demande à l'utilisateur les sessions qu'il souhaite exclure de la période choisie :
@@ -1214,11 +1216,8 @@ class IRIS_traite(IRIS):
         :rtype: list[int]
         """
 
-        # Liste des sessions qui seront exclues par l'utilisateur
-        codes_sessions_exclues_par_utilisateur = []
-
         # Renseigne les valeurs par défaut de période et année si None
-        annee, periode = periode(annee, periode)
+        annee, periode = utils_periode(annee, periode)
 
         # On filtre sur le trigramme et la période demandée
         df_filtre = self.df_filtre_periode(trigramme_formation=trigramme_formation, annee=annee, periode=periode)
@@ -1238,13 +1237,11 @@ class IRIS_traite(IRIS):
         ))
         
         # On demande à l'utilisateur les sessions qu'il veut exclure
-        exclusionSessions = self.demander_liste_codes_IRIS()
-        if exclusionSessions:  # si la liste n'est pas vide
-            # On trace l'exclusion des sessions
-            codes_sessions_exclues_par_utilisateur = df_filtre.loc[df_filtre["Code IRIS"].isin(exclusionSessions), "N° Session"].unique().tolist()
+        sessionsRetenues = self.demander_liste_codes_IRIS()
 
+        if sessionsRetenues:  # si la liste n'est pas vide
             # On met à jour _df_sessions_filtre en enlevant les sessions exclues
-            df_filtre = df_filtre[~df_filtre['Code IRIS'].isin(exclusionSessions)]
+            df_filtre = df_filtre[df_filtre['Code IRIS'].isin(sessionsRetenues)]
         else:
             # la liste est vide, on ne filtre rien, on garde tout
             pass
@@ -1258,7 +1255,7 @@ class IRIS_traite(IRIS):
             showindex=False
         ))
 
-        return df_filtre["Code IRIS"].tolist()
+        return sessionsRetenues
 
     # ==============================
     # === Méthodes filtrer le df ===

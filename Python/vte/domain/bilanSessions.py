@@ -37,6 +37,7 @@ class Formation_protocol(Protocol):
     
     def get_session_par_codeIRIS(self, code_IRIS:int) -> Optional[Session]: ...
 
+    def ajout_sessions(self, codes_IRIS:int|Iterable[int]) -> None: ...
 
 # ======================================================================================
 # CLASSE BilanSessions
@@ -167,7 +168,13 @@ class BilanSessions:
             periode=periode
         )
 
+
+
+
         if len(codes_IRIS) > 0:  # Si on a des codes IRIS à traiter
+            # On ajoute les sessions à formation à partir des codes_IRIS
+            formation.ajout_sessions(codes_IRIS=codes_IRIS)
+
             return BilanSessions.depuis_codesIRIS(
                 formation=formation,
                 codes_IRIS=codes_IRIS,
@@ -812,11 +819,16 @@ class Bilan_V3(BilanSessions_generateur_word):
         
         # Cas avec certains CSV non dispo pour les stats mais pas tous
         elif len(self._bilanSessions.liste_codesIRIS_pour_enTete) != len(self._bilanSessions.liste_codesIRIS_pour_statsCSV) :
+
+            print(self._bilanSessions.df_stagiaires_filtre_statsCSV_1ligne_par_session)
+            print()
+            print(self._bilanSessions.df_stagiaires_filtre_statsCSV_1ligne_par_session['N° Session'].tolist())
+
             commentaires = "\n⚠️  Certaines sessions n'ont pas de CSV exploitables pour les statistiques (cf. liste ci-dessous)."
-            commentaires += "\nDonnées employées pour les statistiques :"
-            commentaires += "\n   • Sessions évaluées : ".join(self._bilanSessions.df_stagiaires_filtre_statsCSV_1ligne_par_session["N° Session"])
-            commentaires += "\n   • Nombre d'apprenants sur ces sessions : " + f" ({self._nb_apprenants:.0f})"
-            commentaires += "\n   • Nombre de stagiaires ayant formulé des retours : " + f" ({self._nb_stagiaires_retours:.0f})"
+            commentaires += "\n\nDonnées employées pour les statistiques :"
+            commentaires += "\n   • Sessions évaluées : "+"".join(f"\n       - {session}" for session in self._bilanSessions.df_stagiaires_filtre_statsCSV_1ligne_par_session['N° Session'].tolist())
+            commentaires += "\n   • Nombre d'apprenants sur ces sessions : " + f" {self._nb_apprenants:.0f}"
+            commentaires += "\n   • Nombre de stagiaires ayant formulé des retours : " + f" {self._nb_stagiaires_retours:.0f}"
 
         # Affichage sessions avec pb CSV
         if len(self._bilanSessions.liste_codesIRIS_avec_pb_CSV) > 0:
@@ -839,7 +851,7 @@ class Bilan_V3(BilanSessions_generateur_word):
                         .tolist()
                         )
                     if len(l_sessions) > 0:
-                        commentaires += f"\n\n   • {statut_pourBilan} :" + "".join(f"\n       - {isession}" for isession in l_sessions)
+                        commentaires += f"\n   • {statut_pourBilan} :" + "".join(f"\n       - {isession}" for isession in l_sessions)
 
         # Affichage sessions exclues
         if len(self._bilanSessions.liste_codesIRIS_exclus_totalement) > 0:

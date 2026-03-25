@@ -154,7 +154,9 @@ class Formation:
 
     def ajout_sessions(self, codes_IRIS:int|Iterable[int]) -> None:
         """
-        Ajouter une ou plusieurs sessions au dictionnaire de la formation
+        Ajouter une ou plusieurs sessions au dictionnaire de la formation.
+
+        On vérifie qu'aucune session avec ce code IRIS n'appartient à cette liste au préalable.
 
         :param codes_IRIS: Codes IRIS à ajouter
         :type codes_IRIS: int | Iterable[int]
@@ -162,7 +164,8 @@ class Formation:
         codes = convertir_collection(codes_IRIS)
 
         for code_IRIS in codes:
-            self._sessions.append(Session(formation=self, code_IRIS=code_IRIS))
+            if code_IRIS not in [session.code_IRIS for session in self._sessions]:
+                self._sessions.append(Session(formation=self, code_IRIS=code_IRIS))
 
     def ouvrir_ou_creer_evalStat(self) -> None:
         """
