@@ -1,7 +1,8 @@
 import pytest
 from pathlib import Path
 
-from vte.domain.iris import *
+from vte.domain.iris import IRIS_natif, IRIS_traite
+from vte.utils.office import *
 
 DATA_DIR = Path(__file__).parent / "data"
 
