@@ -1,5 +1,6 @@
 from vte.utils.utils import *
 from vte.domain.formation import Formation
+from vte.domain.bilanSessions import *
 #test = BilanFormation_V3("TEL", 2024) # Complet (sessions UEM + UECC)
 #test = BilanFormation_V3("948", 2024) # Bon test car 2023 n'a rien
 
@@ -9,7 +10,16 @@ from vte.domain.formation import Formation
 
 trigramme_formation = "TEL"
 
-formation = Formation(trigramme_formation=trigramme_formation)
-formation.ajout_sessions(15697)
+#formation = Formation(trigramme_formation=trigramme_formation)
+#formation.ajout_sessions(15697)
 
-print(formation.sessions)
+#print(formation.sessions)
+
+print(
+    BilanSessions.construire_chemin_word_bilan_sessions_output(
+        trigramme_formation="TEL",
+        annee=2025,
+        periode_pour_titre="Année 2025",
+        unite="UEM"
+    )
+)

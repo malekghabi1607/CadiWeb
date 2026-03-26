@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from vte.core import config
 from vte.utils.utils import *
 
 from pathlib import Path
@@ -161,7 +162,64 @@ def demander_code(typeCode:str, info:Optional[Path] = None) -> int|str:
     code = int(code) if code.isdigit() else str(code)
     return code
 
+def construire_chemin_config(
+    chemin_a_completer: Path,
+    *,
+    optimiser_chemin: bool = True,
+    convertir_unc: bool = True,
+    #fallback_path: Optional[Path] = config.REPERTOIRE_FORMATION.parent,
+    **kwargs: Any
+) -> Path:
+    """
+    Construit un chemin à partir d'un template de configuration (config.format_path) :
+        - les paramètres à compléter du chemin peuvent être rentrés de manière générique ;
+        - le chemin est transformé en unc (s'il y a un raccourci lecteur réseau sur le poste de l'utilisateur on transforme en chemin réseau complet) ;
+        - l'utilisateur peut optimiser le chemin (chemin le plus long entre l'attendu et ce qui existe).
 
+
+    Fonction générique utilisée pour tous les chemins métiers (CSV, Word, Excel, etc.) qui sont dans la conf.
+
+    :param chemin_a_completer: Template de chemin provenant de la config avec éléments à compléter (ex. config.REPERTOIRE_FORMATION)
+    :type chemin_a_completer: Path
+
+    :param optimiser_chemin: Si True, applique optimiseCheminRepertoire pour trouver le chemin le plus long entre l'attendu et ce qui existe. Défaut = True
+    :type optimiser_chemin: bool
+
+    :param convertir_unc: Si True, convertit le chemin en UNC. Défaut = True
+    :type convertir_unc: bool
+
+    :param kwargs: Paramètres à injecter dans config.format_path (trigramme_formation, annee, etc.)
+    :type kwargs: dict
+
+    :return: Chemin construit et prêt à l'emploi
+    :rtype: Path
+    """
+    """
+    :param fallback_path: Chemin utilisé si les paramètres nécessaires ne sont pas fournis
+    :type fallback_path: Optional[Path]
+
+    if kwargs:
+        chemin = config.format_path(chemin_a_completer, **kwargs)
+    else:
+        if fallback_path is None:
+            raise ValueError("Aucun paramètre fourni et aucun fallback_path défini")
+        chemin = fallback_path
+    """
+    # --- Filtrer les kwargs None ---
+    kwargs = {k: v for k, v in kwargs.items() if v is not None}
+    
+    # --- Construction du chemin ---
+    chemin = config.format_path(chemin_a_completer, **kwargs)
+
+    # --- Conversion UNC ---
+    if convertir_unc:
+        chemin = chemin_vers_unc(chemin)
+
+    # --- Optimisation chemin ssi le chemin est un répertoire ---
+    if chemin.is_dir() and optimiser_chemin:
+        chemin = optimiseCheminRepertoire(chemin)
+
+    return chemin
 
 
 # Versions avec "pointeur"

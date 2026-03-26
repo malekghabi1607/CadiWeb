@@ -507,20 +507,16 @@ def optimiseCheminRepertoire(path_in:str|Path) -> str|Path:
     """
     
 
-    path_out = path_in
+    path_out = Path(path_in)
+    # On remonte jusqu'à trouver un chemin existant
+    while not path_out.exists():
+        parent = path_out.parent
 
-    # On boucle de manière incrémentale vers la racine du répertoire donné en paramètre d'entrée jusqu'à ce qu'un répertoire soit ok
-    while not(os.path.exists(path_out)):
-        path_out = path_out[:-len(path_out.split("\\")[-1])-1]
-        if len(path_out)==0 :
-            path_out = "."
-        #print(path_out)
+        # Si on ne peut plus remonter (racine atteinte)
+        if parent == path_out:
+            return Path(".")
 
-    # Ancienne manière de typer la sortie comme à l'entrée
-    # if isinstance(path_in, str) :
-    #     return(str(path_out))
-    # elif isinstance(path_in, Path) :
-    #     return(Path(path_out))
+        path_out = parent
 
     # Nouvelle manière de typer la sortie comme à l'entrée
     return type(path_in)(path_out)

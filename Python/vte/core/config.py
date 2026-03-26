@@ -189,10 +189,10 @@ CHEMIN_EXCEL_EVALUATIONS_FORMATION:Path = REPERTOIRE_CSV_EVALUATIONS / "Evaluati
 
 
 ###
-# === Bilan de session ===
+# === Bilan de sessions ===
 ###
-CHEMIN_MODELE_WORD_BILAN_SESSION:Path = REPERTOIRES_MODELES / "P07-Pr05-F05-Bilan-session-V3.docx"
-CHEMIN_WORD_BILAN_SESSION_OUTPUT:Path = REPERTOIRE_BILANS_SESSIONS / "P07-Pr05-F05-Bilan session-{periode}-{unite}.docx"
+CHEMIN_MODELE_WORD_BILAN_SESSIONS:Path = REPERTOIRES_MODELES / "P07-Pr05-F05-Bilan-session-V3.docx"
+CHEMIN_WORD_BILAN_SESSIONS_OUTPUT:Path = REPERTOIRE_BILANS_SESSIONS / "P07-Pr05-F05-Bilan session-{periode}-{unite}.docx"
 
 
 ADRESSE_MAIL_CHEF_UNITE:str = "florent.lemont@cea.fr"

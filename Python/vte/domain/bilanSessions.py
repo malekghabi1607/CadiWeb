@@ -16,6 +16,7 @@ from vte.domain.iris import IRIS, IRIS_traite
 from vte.services.evalStat_services import EvalStat_services
 from vte.utils.office import FichierExcel, FichierWord, Mail
 from vte.utils.utils import *
+from vte.utils.utils_instn import construire_chemin_config
 
 # TODO : Pour l'instant c'est une classe de traitement. Le jour où j'ai besoin d'ouvrir un BilanSession pour le lire uniquement, prendre modèle sur IRIS avec des classes de lecture et de traitement
 
@@ -264,7 +265,7 @@ class BilanSessions:
         self._construire_word(version="V3")
 
         # On ouvre le word
-        FichierWord.depuisFichier(chemin_fichier=self.chemin_word_bilan_output, charger_contentControl=False, afficherWord=True)
+        FichierWord.depuisFichier(chemin_fichier=self.chemin_word_bilan_sessions_output, charger_contentControl=False, afficherWord=True)
 
         # On envoie un mail au chef d'unité pour la signature du pdf
         self._envoyer_mail_chef_unite()
@@ -352,7 +353,7 @@ class BilanSessions:
         
 
 
-        chemin_pdf_bilan_output = self.chemin_word_bilan_output.with_suffix(".pdf")
+        chemin_pdf_bilan_output = self.chemin_word_bilan_sessions_output.with_suffix(".pdf")
         corps_html = remplacer_champs(config.CORPS_MAIL_CHEF_UNITE, [
             ["lien_pdf_bilan", chemin_pdf_bilan_output],
             ["formation", f"{self.intitule_formation} ({self.trigramme_formation})"],
@@ -386,7 +387,7 @@ class BilanSessions:
         :rtype: bool
         """
         # Vérification 1 : on vérifie la pré-existance du bilan Word ; si il existe déjà, alors on arrête le traitement
-        continuer = verifier_existance_fichier(self.chemin_word_bilan_output)
+        continuer = verifier_existance_fichier(self.chemin_word_bilan_sessions_output)
         if not continuer:
             vlog.log_erreur("❌  Bilan de sessions déjà existant → Arrêt du traitement du bilan par l'utilisateur")
             
@@ -414,6 +415,39 @@ class BilanSessions:
         # Si rien n'a arrêté les vérifications, alors tout est OK
         return True
 
+    @staticmethod
+    def construire_chemin_word_bilan_sessions_output(trigramme_formation:Optional[str]=None, annee:Optional[int]=None, periode_pour_titre:Optional[str]=None, unite:Optional[str]=None) -> Path:
+        """
+        Construit le chemin de sortie du bilan de sessions (à partir des données de la config CHEMIN_WORD_BILAN_FORMATION_OUTPUT) :
+            - le chemin est transformé en unc (s'il y a un raccourci lecteur réseau sur le poste de l'utilisateur on transforme en chemin réseau complet) ;
+            - l'utilisateur peut optimiser le chemin (chemin le plus long entre l'attendu et ce qui existe).
+
+        :param trigramme_formation: Trigramme de la formation. Défaut = None
+        :type trigramme_formation: Optional[str], optional
+
+        :param annee: Année du bilan de formation. Défaut = None.
+        :type annee: Optional[int], optional
+
+        :param periode_pour_titre: Période à considérer ("Année", "1er semestre", "2nd semestre"), renommé pour le titre.
+            - si bilan unique, f"{numero_session} ({mois_session} {annee}) ;
+            - si bilan plusieurs sessioins, f"{periode} {annee}"
+        :type periode_pour_titre: Optional[str], optional
+
+        :param unite: Code de l'unité (ex. UEM)
+        :type unite: Optional[str], optional
+
+        :return: Le chemin de sortie du bilan de sessions.
+        :rtype: Path
+        """
+        return construire_chemin_config(
+            chemin_a_completer = config.CHEMIN_WORD_BILAN_SESSIONS_OUTPUT,
+            trigramme_formation = trigramme_formation, 
+            annee = annee, 
+            periode=periode_pour_titre, 
+            unite=unite
+        )
+
+
 
 
     # =========================
@@ -428,8 +462,8 @@ class BilanSessions:
     def periode(self) -> int:
         return self._periode
     
-    @property
-    def chemin_word_bilan_output(self) -> Path:
+    @cached_property
+    def chemin_word_bilan_sessions_output(self) -> Path:
         """
         Renvoie le chemin de sortie du bilan de formation.
         Cette donnée est stockée dans le fichier de config (valeur par défaut).
@@ -437,9 +471,14 @@ class BilanSessions:
         :return: Chemin de sortie du bilan de formation.
         :rtype: Path
         """
-        return config.format_path(config.CHEMIN_WORD_BILAN_SESSION_OUTPUT, trigramme_formation=self.trigramme_formation, annee=self._annee, periode=self.periode_pour_titre, unite=config.UNITE)
+        return BilanSessions.construire_chemin_word_bilan_sessions_output( 
+            trigramme_formation=self.trigramme_formation, 
+            annee=self._annee, 
+            periode_pour_titre=self.periode_pour_titre, 
+            unite=config.UNITE
+            )
 
-    @property
+    @cached_property
     def periode_pour_titre(self) -> str:
         """
         Période de la session dans le cadre d'une session unique (len(codes_IRIS)=1).
@@ -740,7 +779,7 @@ class BilanSessions_generateur_word(ABC):
         document.merge(**self._champs)
 
         # Chemin de sauvegarde
-        chemin = self._bilanSessions.chemin_word_bilan_output
+        chemin = self._bilanSessions.chemin_word_bilan_sessions_output
 
         # On crée le répertoire pour les bilans de session de cette année s'il n'existe pas
         chemin.parent.mkdir(parents=True, exist_ok=True)
@@ -772,7 +811,7 @@ class BilanSessions_generateur_word(ABC):
 # ======================================================================================
 class Bilan_V3(BilanSessions_generateur_word):
 
-    CHEMIN_MODELE = config.CHEMIN_MODELE_WORD_BILAN_SESSION
+    CHEMIN_MODELE = config.CHEMIN_MODELE_WORD_BILAN_SESSIONS
 
     # =======================
     # === PIPELINE METIER === 
