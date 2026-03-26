@@ -1112,32 +1112,103 @@ class IRIS_traite(IRIS):
     # ====================
     # === METHODES GET ===
     # ====================
-    def get_trigramme_formation_depuis_codeIRIS(self, code_IRIS:int) -> str:
+    def get_champ_depuis_codesIRIS(self, champ:str, codes_IRIS:int|Iterable[int], valeurUnique:bool=False) -> str|tuple[str]|int|tuple[int]|date|tuple[date]:
         """
-        Récupère le trigramme d'une formation à partir d'un code IRIS.
+        Méthode générique quel que soit le champ.
 
-        :param code_IRIS: Code IRIS de la formation dont on souhaite récupérer le trigramme.
-        :type code_IRIS: int
-        :return: Trigramme de formation correspondant à code_IRIS
-        :rtype: str
+        Récupère la ou les valeurs d'un champ d'un IRIS traité (sessions...) à partir d'un ou plusieurs codes IRIS (on ne conserve pas les doublons).
+
+        Si valeurUnique est True on vérifie qu'on n'a qu'un seul retour sinon on lance une erreur (et type retour = str sinon type retour = tuple[str]).
+
+        Si le champ est de type date (datetime64 pandas), il est converti en `datetime.date`
+
+        :param champ: Nom de la colonne de IRIS session dont il faut récupérer la valeur ("Trigramme formation", "Session" (intitulé foramtion), "Date début ses.", "Année début ses.", "Lieu principal"...)
+        :type champ: str
+        :param code_IRIS: Code IRIS de la formation dont on souhaite récupérer les valeur du champ.
+        :type code_IRIS: int|Iterable[int]
+        :param valeurUnique: Si valeurUnique est True on vérifie qu'on n'a qu'un seul retour sinon on lance une erreur. Défaut = False
+        :type valeurUnique: bool, optional
+        :return: La ou les valeurs d'un champ d'un IRIS traité (sessions...) correspondant à code_IRIS. Si valeurUnique=True, type retour = str|int|date ; sinon un tuple.
+        :rtype: str|tuple[str]|int|tuple[int]|date|tuple[date]
         """
-        # TODO : A un moment je pourrai mettre un switch avec le typeExport → Pour l'instant je n'en ai pas besoin
-        return self.df_filtre_codes_IRIS(codes_IRIS=code_IRIS)["Trigramme formation"].iloc[0]
+        # TODO : à un moment je pourrai mettre un switch avec le typeExport → Pour l'instant je n'en ai pas besoin
+        
+        # On évalue notre sortie
+        df = self.df_filtre_codes_IRIS(codes_IRIS=codes_IRIS)
+        
+        if pd.api.types.is_datetime64_any_dtype(df[champ]):  # Si champ de type date  # Si Excel mal typé, alors on pourra faire df[champ] = pd.to_datetime(df[champ], errors="coerce")
+            resultat = tuple(df[champ].dropna().dt.date.unique())
+        else:  # Sinon
+            resultat = tuple(df[champ].dropna().unique())
 
-    def get_intitulé_formation_depuis_codeIRIS(self, code_IRIS:int) -> str:
+        # On gère le return en fonction du nombre de résultat et de valeurUnique
+        if len(resultat) == 1:  # Si resultat unique
+            if valeurUnique:
+                return resultat[0]  # str|int|date
+            else:
+                return resultat  # tuple[str]|tuple[int]|tuple[date]
+        else:  # Si plusieurs résultats
+            if valeurUnique:
+                return vlog.log_erreur(f"{champ} unique attendu, or resultat = {resultat}")  # Erreur car valeur unique attendue
+            else:
+                return resultat  # tuple[str]|tuple[int]|tuple[date]
+
+    def get_periode_depuis_codes_IRIS(self, codes_IRIS: int | Iterable[int]) -> tuple[int, str]:
         """
-        Récupère l'intitulé d'une formation à partir d'un code IRIS.
+        Récupère l'année et la période ("1er semestre", "2nd semestre", "Année")
+        correspondant à un ou plusieurs codes IRIS, à partir des dates de début de session.
 
-        :param code_IRIS: Code IRIS de la formation dont on souhaite récupérer l'intitulé.
-        :type code_IRIS: int
-        :return: Intitulé de la formation correspondant à code_IRIS
-        :rtype: str
+        Les dates sont récupérées via get_champ_depuis_codesIRIS, qui renvoie des objets `datetime.date`.
+
+        Hypothèses :
+        - Toutes les sessions doivent appartenir à la même année (sinon on lève une erreur).
+        - La période est déterminée en fonction de la date minimale et maximale.
+
+        :param codes_IRIS: Code(s) IRIS des sessions à analyser
+        :type codes_IRIS: int | Iterable[int]
+
+        :return: Tuple (année, période)
+                - année : int
+                - période : str ("1er semestre", "2nd semestre", "Année")
+        :rtype: tuple[int, str]
         """
-        # TODO : A un moment je pourrai mettre un switch avec le typeExport → Pour l'instant je n'en ai pas besoin
-        return self.df_filtre_codes_IRIS(codes_IRIS=code_IRIS)["Session"].iloc[0]
 
+        # On récupère les dates de début (déjà en datetime.date)
+        dates_debuts = self.get_champ_depuis_codesIRIS(
+            champ="Date début ses.",
+            codes_IRIS=codes_IRIS
+        )
 
+        date_min = min(dates_debuts)
+        date_max = max(dates_debuts)
 
+        # Vérification même année
+        meme_annee = all(date_debut.year == date_min.year for date_debut in dates_debuts)
+
+        if meme_annee:
+            annee = date_min.year
+        else:
+            vlog.log_erreur(f"Tous les codes IRIS sont censés être sur la même année, or date min = {date_min} et date max = {date_max}")
+
+        # Bornes en datetime.date (pas pandas)
+        debut_annee = date(annee, 1, 1)
+        fin_semestre_1 = date(annee, 6, 30)
+        debut_semestre_2 = date(annee, 7, 1)
+        fin_annee = date(annee, 12, 31)
+
+        # Détermination de la période
+        if date_min >= debut_annee and date_max <= fin_semestre_1:
+            periode = "1er semestre"
+        elif date_min >= debut_semestre_2 and date_max <= fin_annee:
+            periode = "2nd semestre"
+        elif date_min >= debut_annee and date_max <= fin_annee:
+            periode = "Année"
+        else:
+            vlog.log_erreur(
+                f"Période incohérente : date min = {date_min}, date max = {date_max}"
+            )
+
+        return annee, periode
 
 
     # ============================

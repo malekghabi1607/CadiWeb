@@ -162,7 +162,6 @@ def test_bilanSession_depuis_codesIRIS(nom_cas, dataset, monkeypatch):
     #dataset = DATASETS_CODES_IRIS["Bilan unique par code IRIS. CSV introuvable"]
     
     # MODE PYTEST
-    #dataset = datasets_codesIRIS[nom_cas]  # TODO : a virer ?
     apply_mocks(monkeypatch, dataset)  # Appliquer les mocks
 
 
@@ -192,7 +191,6 @@ def test_bilanSession_depuis_periode(nom_cas, dataset, monkeypatch):
     #dataset = DATASETS_PERIODE["Bilan TEL année 2024 (3 sessions, 2 CSV seulement)"]
     
     # MODE PYTEST
-    #dataset = datasets_codesIRIS[nom_cas]  # TODO : a virer ?
     apply_mocks(monkeypatch, dataset)  # Appliquer les mocks
     
     # Backups de mon environnement de travail

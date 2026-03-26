@@ -74,30 +74,6 @@ def set_iris_chemin_specifique(typeExport: str, chemin: Path) -> None:
     _chemins_specifiques[typeExport] = chemin
 
 
-# === FONCTIONS GET ===
-def get_trigramme_formation_depuis_codeIRIS(code_IRIS:int) -> str:
-    """
-    Récupère le trigramme d'une formation à partir d'un code IRIS
-
-    :param code_IRIS: Code IRIS de la formation dont on souhaite récupérer le trigramme.
-    :type code_IRIS: int
-    :return: Trigramme de formation correspondant à code_IRIS
-    :rtype: str
-    """
-    return get_iris(typeExport="Sessions").get_trigramme_formation_depuis_codeIRIS(code_IRIS)
-
-def get_intitulé_formation_depuis_codeIRIS(code_IRIS:int) -> str:
-    """
-    Récupère l'intitulé d'une formation à partir d'un code IRIS
-
-    :param code_IRIS: Code IRIS de la formation dont on souhaite récupérer l'intitulé.
-    :type code_IRIS: int
-    :return: Intitulé de la formation correspondant à code_IRIS
-    :rtype: str
-    """
-    return get_iris(typeExport="Sessions").get_intitulé_formation_depuis_codeIRIS(codes_IRIS=code_IRIS)
-
-
 
 # === FONCTIONS DE BASE ===
 def dico_trigrammes_codes_IRIS_a_partir_de_codes_IRIS(codes_IRIS:int|Iterable[int], chemin:Optional[Path]=None) -> dict[str:tuple(int)]:

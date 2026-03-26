@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Optional
 from collections.abc import Iterable
 
-from vte.core.iris_referentiel import get_trigramme_formation_depuis_codeIRIS
+from vte.core.iris_referentiel import get_iris
 from vte.domain.bilanSessions import BilanSessions
 from vte.domain.evalStat import EvalStat_formation
 from vte.domain.fdc import FdC
@@ -38,7 +38,7 @@ class Formation:
         # Une formation a un ou plusieurs bilans de formation (annuel)
         #self.bilans_formation:Optional[dict[int, BilanFormation]] = {}  # bilans_formation[2025] : Index = année du bilan
 
-
+    # TODO : voir si ce n'est pas un constructeur de traitement finalement (déplacer plus bas et renommer)
     @classmethod
     def avec_ouverture_ou_creation_evalStat(cls, trigramme_formation: str) -> Formation:
         """
@@ -80,13 +80,15 @@ class Formation:
     # ======================================
     # === CONSTRUCTEURS POUR TRAITEMENTS ===
     # ======================================
-    # TODO faire des vérifs pour calculer comme il faut année et période depuis IRIS sessions et ne pas avoir à mettre ces données en argument
+    
+    # Méthodes de traitement : on fera toutes les étapes intemédiaires si besoin (créer formation, ajouter sessions, ajouter FdC...)
+
     @classmethod
     def pour_traitement_bilanSessions_depuis_codesIRIS(cls, codes_IRIS:int|Iterable[int], annee:Optional[int]=None, periode:str="Année") -> Formation:
         """
         Génère un bilan de sessions à partir d'un ou plusieurs codes IRIS (un bilan pour une session ou pour plusieurs sessions (période)).
 
-        La période est renseignée par l'utilisateur mais n'est pas contrôlée.
+        Si annee est donnée, alors on ne fait pas de contrôle. Sinon on la détermine avec la période grâce aux codes IRIS et à IRIS sessions.
 
         :param codes_IRIS: Codes IRIS des sessions pour lesquels on souhaite faire le bilan
         :type codes_IRIS: int | Iterable[int]
@@ -97,11 +99,8 @@ class Formation:
         :return: le bilan de sessions est traité et l'objet formation est bien créé avec les sessions correspondantes.
         :rtype: Formation
         """
-        # On convetit codes_IRIS en Iterable
-        codes_IRIS = convertir_collection(codes_IRIS)
-
-        # Le trigramme de la formation peut être déduit
-        trigramme_formation = get_trigramme_formation_depuis_codeIRIS(code_IRIS=codes_IRIS[0])
+        # On évalue le trigramme de la formation
+        trigramme_formation = get_iris(typeExport="Sessions").get_champ_depuis_codesIRIS(champ="Trigramme formation", codes_IRIS=codes_IRIS, valeurUnique=True)
 
         # On définit la formation et on ajoute les sessions
         instance = cls.avec_ajout_sessions(trigramme_formation=trigramme_formation, codes_IRIS=codes_IRIS)
@@ -147,7 +146,7 @@ class Formation:
         return instance
 
     
-    # TODO a vérifier
+    # TODO : non employé, vérifier besoin et adapter si besoin
     @classmethod
     def avec_creation_session_et_ouverture_ou_traitement_EvalStat(
         cls, 
@@ -273,7 +272,7 @@ class Formation:
 
         On traite ce bilan de sessions (création du word et envoi du mail pour signature).
 
-        Si codes_IRIS fourni, alors on traite avec BilanSessions.depuis_codesIRIS.
+        Si codes_IRIS fourni, alors on traite avec BilanSessions.depuis_codesIRIS (et dans ce cas, si annee est donnée alors on ne fait pas de contrôle ; sinon on la détermine avec la période grâce aux codes IRIS et à IRIS sessions).
         Sinin il faut fournir annee et on traite avec BilanSessions.depuis_periode.
 
         :param codes_IRIS: Codes IRIS des sessions pour lesquels on souhaite faire le bilan. Optionnel si annee fourni.
@@ -290,7 +289,7 @@ class Formation:
         # On traite le bilan
         if codes_IRIS is not None:
             # Alors on traite à partir des codes IRIS
-            bilan = BilanSessions.depuis_codesIRIS(formation=self, codes_IRIS=codes_IRIS)
+            bilan = BilanSessions.depuis_codesIRIS(formation=self, codes_IRIS=codes_IRIS, annee=annee, periode=periode)
         else:
             # Alors on traite à partir de la période
             bilan = BilanSessions.depuis_periode(formation=self, annee=annee, periode=periode)

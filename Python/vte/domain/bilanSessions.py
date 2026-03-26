@@ -71,7 +71,7 @@ class BilanSessions:
     # =====================
     # === CONSTRUCTEURS ===
     # =====================
-    def __init__(self, formation:Formation_protocol, annee:int, periode:str="Année") -> None:
+    def __init__(self, formation:Formation_protocol, annee:int, periode:str="Année", codes_IRIS:Optional[int|Iterable[int]]=[]) -> None:
         """
         Initialise un bilan de sessions a minima
         
@@ -83,13 +83,16 @@ class BilanSessions:
         :type annee: int
         :param periode: période du bilan (appartient à ["Année", "1er semestre", "2nd semestre"]), defaut = "Année"
         :type periode: str, optional
+        :param codes_IRIS: Codes IRIS des sessions pour lesquels on souhaite faire le bilan. Défaut = []
+        :type codes_IRIS: Optional[int|Iterable[int]], optional
         """
         # --- Variables qui caractérisent le bilan de sessions
         self._formation = formation
         self._annee: int = annee
         self._periode: str = periode  # ["Année", "1er semestre", "2nd semestre"]
-        self._periodeSessionsEvaluees:str = ""  # f"Session {numSession} uniquement ({moisSession} {instance._annee})", f"{self._periode} {self._annee}"
+        self._periode_pour_titre:str = ""  # f"Session {numSession} uniquement ({moisSession} {instance._annee})", f"{self._periode} {self._annee}"
         self._codes_IRIS:list[int] = []
+        self.codes_IRIS = codes_IRIS
 
         # --- Variables de traitement ---
         self._statuts:dict[str, list] = {clef: [] for clef in self._mapping_statuts.values()}  # Dictionnaire qui liste les codes IRIS selon chaque statut
@@ -106,13 +109,12 @@ class BilanSessions:
         }
         """
 
-
     @classmethod   
     def depuis_codesIRIS(cls, formation:Formation_protocol, codes_IRIS:int|Iterable[int], annee:Optional[int]=None, periode:str="Année") -> BilanSessions:
         """
         Génère un bilan de sessions à partir d'un ou plusieurs codes IRIS (un bilan pour une session ou pour plusieurs sessions (période)).
 
-        La période est renseignée par l'utilisateur mais n'est pas contrôlée.
+        Si annee est donnée, alors on ne fait pas de contrôle. Sinon on la détermine avec la période grâce aux codes IRIS et à IRIS sessions.
 
         :param formation: Objet formation associé à ce bilan
         :type formation: Formation_protocol
@@ -125,13 +127,16 @@ class BilanSessions:
         :return: Un objet bilan de sessions de ce ou ces code(s) IRIS
         :rtype: BilanSessions
         """
+        # On évalue l'année et la période à partir des codes IRIS si besoin (sinon aucune vérification : on fait confiance à l'utilisateur)
+        if annee is None:
+            annee, periode = get_iris(typeExport="Sessions").get_periode_depuis_codes_IRIS(codes_IRIS=codes_IRIS)
+        
         # On initialise l'instance 
-        instance = cls(formation=formation, annee=-1)
-        instance.codes_IRIS = codes_IRIS
-        instance._periode = periode
+        instance = cls(formation=formation, annee=annee, periode=periode, codes_IRIS=codes_IRIS)
+        #instance.codes_IRIS = codes_IRIS
 
         # Si l'année n'est pas donnée, je la récupère d'IRIS sessions
-        instance._annee = annee if annee is not None else int(instance.df_sessions_filtre_codesIRIS["Année début ses."].iloc[0])
+        #instance._annee = annee if annee is not None else int(instance.df_sessions_filtre_codesIRIS["Année début ses."].iloc[0])
 
         # === ON FAIT LES VERIFICATIONS QUI ANNULERAIENT LE TRAITEMENT ===
         continuer = instance.verifier_traitement_bilan()
@@ -166,18 +171,15 @@ class BilanSessions:
             periode=periode
         )
 
-
-
-
-        if len(codes_IRIS) > 0:  # Si on a des codes IRIS à traiter
+        # On traite le bilan de session
+        if len(codes_IRIS) > 0:  # Si on a des codes IRIS à traiter, on traite le bilan de sessions
             return BilanSessions.depuis_codesIRIS(
                 formation=formation,
                 codes_IRIS=codes_IRIS,
                 annee=annee,
                 periode=periode
             )
-
-        else:  # Si aucun code IRIS n'a été sélectionné
+        else:  # Si aucun code IRIS n'a été sélectionné, on print un warning
             vlog.print("Info", f"⚠️  Toutes les sessions sont exclues : il n'y a plus de raison de faire le bilan de sessions.")
             return None
 
@@ -354,7 +356,7 @@ class BilanSessions:
         corps_html = remplacer_champs(config.CORPS_MAIL_CHEF_UNITE, [
             ["lien_pdf_bilan", chemin_pdf_bilan_output],
             ["formation", f"{self.intitule_formation} ({self.trigramme_formation})"],
-            ["periode", self._periodeSessionsEvaluees],
+            ["periode", self._periode_pour_titre],
         ])
 
         Mail.creer_mail(
@@ -435,10 +437,10 @@ class BilanSessions:
         :return: Chemin de sortie du bilan de formation.
         :rtype: Path
         """
-        return config.format_path(config.CHEMIN_WORD_BILAN_SESSION_OUTPUT, trigramme_formation=self.trigramme_formation, annee=self._annee, periode=self.periodeSessionsEvaluees, unite=config.UNITE)
+        return config.format_path(config.CHEMIN_WORD_BILAN_SESSION_OUTPUT, trigramme_formation=self.trigramme_formation, annee=self._annee, periode=self.periode_pour_titre, unite=config.UNITE)
 
     @property
-    def periodeSessionsEvaluees(self) -> str:
+    def periode_pour_titre(self) -> str:
         """
         Période de la session dans le cadre d'une session unique (len(codes_IRIS)=1).
 
@@ -446,15 +448,15 @@ class BilanSessions:
             - si un seul code IRIS : f"Session {self.numero_session} uniquement ({self.mois_session} {self._annee})"
             - si plusieurs codes IRIS : f"{self._periode} {self._annee}"
         """
-        if self._periodeSessionsEvaluees == "":
+        if self._periode_pour_titre == "":
             if len(self._codes_IRIS) == 1:  # Cas code IRIS unique
-                self._periodeSessionsEvaluees = f"{self.numero_session} ({self.mois_session} {self._annee})"
+                self._periode_pour_titre = f"{self.numero_session} ({self.mois_session} {self._annee})"
             elif len(self._codes_IRIS) > 1:
-                self._periodeSessionsEvaluees = f"{self._periode} {self._annee}"
+                self._periode_pour_titre = f"{self._periode} {self._annee}"
             else:
                 vlog.log_erreur("J'appelle periodeSessionsEvaluees alors que len(self.codes_IRIS)<=0")
         
-        return self._periodeSessionsEvaluees
+        return self._periode_pour_titre
 
     @property
     def codes_IRIS(self) -> Iterable[int]:
@@ -463,7 +465,7 @@ class BilanSessions:
     @codes_IRIS.setter
     def codes_IRIS(self, valeur:int|Iterable[int]) -> None:
         if isinstance(valeur, int):
-            self._codes_IRIS.append(valeur)
+            self._codes_IRIS = [valeur]
         elif isinstance(valeur, Iterable) and not isinstance(valeur, str):  # Iterable[int] n’est pas valide dans isinstance
             self._codes_IRIS = valeur
         else:
@@ -802,7 +804,7 @@ class Bilan_V3(BilanSessions_generateur_word):
 
         self._champs["titreFormation"] = self._bilanSessions.intitule_formation
         self._champs["codeFormation"] = self._bilanSessions.trigramme_formation
-        self._champs["periodeSessionsEvaluees"] = self._bilanSessions.periodeSessionsEvaluees
+        self._champs["periodeSessionsEvaluees"] = self._bilanSessions.periode_pour_titre
         self._champs["nbSessionsEvaluees"] = f"{len(self._bilanSessions.df_sessions_filtre_enTete)} session" + ("s" if len(self._bilanSessions.df_sessions_filtre_enTete) > 1 else "")  # Valeur toutes les données  
         self._champs["numerosSessions"] = "\n".join(self._bilanSessions.df_sessions_filtre_enTete["N° Session"].dropna().astype(str).unique())
         self._champs["nbApprenants"] = f"{self._bilanSessions.df_sessions_filtre_enTete['Nb. Nommés'].sum()} apprenant" + ("s" if self._bilanSessions.df_sessions_filtre_enTete['Nb. Nommés'].sum() > 1 else "")  # Valeur toutes les données
@@ -830,8 +832,8 @@ class Bilan_V3(BilanSessions_generateur_word):
             commentaires = "\n⚠️  Certaines sessions n'ont pas de CSV exploitables pour les statistiques (cf. liste ci-dessous)."
             commentaires += "\n\nDonnées employées pour les statistiques :"
             commentaires += "\n   • Sessions évaluées : "+"".join(f"\n       - {session}" for session in self._bilanSessions.df_stagiaires_filtre_statsCSV_1ligne_par_session['N° Session'].tolist())
-            commentaires += "\n   • Nombre d'apprenants sur ces sessions : " + f" {self._nb_apprenants:.0f}"
-            commentaires += "\n   • Nombre de stagiaires ayant formulé des retours : " + f" {self._nb_stagiaires_retours:.0f}"
+            commentaires += "\n   • Nombre d'apprenants sur ces sessions : " + f"{self._nb_apprenants:.0f}"
+            commentaires += "\n   • Nombre de stagiaires ayant formulé des retours : " + f"{self._nb_stagiaires_retours:.0f}"
 
         # Affichage sessions avec pb CSV
         if len(self._bilanSessions.liste_codesIRIS_avec_pb_CSV) > 0:
