@@ -1,7 +1,7 @@
 from __future__ import annotations
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional
 
 from vte.domain.iris import IRIS, IRIS_traite
 
@@ -25,6 +25,7 @@ _chemins_specifiques: Dict[str, Optional[Path]] = {}
 # API PUBLIQUE
 # ======================================================================================
 
+# === FONCTIONS DE BASE ===
 def get_iris(typeExport: str, chemin:Optional[Path]=None) -> IRIS_traite:
     """
     Retourne une instance IRIS chargée pour un type donné.
@@ -72,6 +73,33 @@ def set_iris_chemin_specifique(typeExport: str, chemin: Path) -> None:
     """
     _chemins_specifiques[typeExport] = chemin
 
+
+# === FONCTIONS GET ===
+def get_trigramme_formation_depuis_codeIRIS(code_IRIS:int) -> str:
+    """
+    Récupère le trigramme d'une formation à partir d'un code IRIS
+
+    :param code_IRIS: Code IRIS de la formation dont on souhaite récupérer le trigramme.
+    :type code_IRIS: int
+    :return: Trigramme de formation correspondant à code_IRIS
+    :rtype: str
+    """
+    return get_iris(typeExport="Sessions").get_trigramme_formation_depuis_codeIRIS(code_IRIS)
+
+def get_intitulé_formation_depuis_codeIRIS(code_IRIS:int) -> str:
+    """
+    Récupère l'intitulé d'une formation à partir d'un code IRIS
+
+    :param code_IRIS: Code IRIS de la formation dont on souhaite récupérer l'intitulé.
+    :type code_IRIS: int
+    :return: Intitulé de la formation correspondant à code_IRIS
+    :rtype: str
+    """
+    return get_iris(typeExport="Sessions").get_intitulé_formation_depuis_codeIRIS(codes_IRIS=code_IRIS)
+
+
+
+# === FONCTIONS DE BASE ===
 def dico_trigrammes_codes_IRIS_a_partir_de_codes_IRIS(codes_IRIS:int|Iterable[int], chemin:Optional[Path]=None) -> dict[str:tuple(int)]:
     """
     A partir d'un itérable de codes IRIS, je crée un dictionnaire {trigrammes: tuple(codes_IRIS)}
@@ -91,6 +119,9 @@ def dico_trigrammes_codes_IRIS_a_partir_de_codes_IRIS(codes_IRIS:int|Iterable[in
     # Possible avant .tolist() : .unique() pour valeurs uniques ; .dropna() pour gérer valeurs manquantes
     #return df[df["Code IRIS"].isin(codes_IRIS)]["Trigramme formation"].unique().tolist()
     return df.groupby("Trigramme formation")["Code IRIS"].apply(tuple).to_dict()
+
+
+
 
 # Emploi :
 #iris_sessions = get_iris("Sessions")

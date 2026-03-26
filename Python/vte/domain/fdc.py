@@ -9,8 +9,6 @@ from vte.utils.utils import *
 from vte.utils.office import FichierExcel
 from vte.utils.utils_instn import recupere_trig_formation_depuis_chemin
 
-# TODO : Pour l'instant c'est une classe de traitemnt. Le jour où j'ai besoin d'ouvrir un EvalStat pour le lire uniquement, prendre modèle sur IRIS avec des classes de lecture et de traitement
-
 # ======================================================================================
 # PROTOCOLES
 # (pour faire passer les informations des objets parents sans ref circulaires)
@@ -62,10 +60,12 @@ class FdC:
         """
         Initialise une instance FdC à partir du chemin de la FdC.
 
+        Si aucun chemin n'est donné, on ouvrira un filedialog.
+
         :param formation: l'instance de Formation pour la fiche de coûts (nécessaire uniquement pour facilite la sélection du fichier de FdC (pré-sélection répertoire))
         :type formation: Optional[Formation_protocol], optional
-        :param chemin_fdc: Objet FichierExcel de la fiche de coûts (contient le chemin de la FdC).
-        :type fe: Optional[Path|str], optional
+        :param chemin_fdc: chemin de la fiche de coûts. Défaut = None
+        :type chemin_fdc: Optional[Path|str], optional
         """
 
         fe = FichierExcel(chemin_fichier=convertir_chemin_en_path(chemin_fdc))

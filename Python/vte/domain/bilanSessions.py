@@ -37,7 +37,7 @@ class Formation_protocol(Protocol):
     
     def get_session_par_codeIRIS(self, code_IRIS:int) -> Optional[Session]: ...
 
-    def ajout_sessions(self, codes_IRIS:int|Iterable[int]) -> None: ...
+    #def ajout_sessions(self, codes_IRIS:int|Iterable[int]) -> None: ...
 
 # ======================================================================================
 # CLASSE BilanSessions
@@ -110,12 +110,14 @@ class BilanSessions:
     @classmethod   
     def depuis_codesIRIS(cls, formation:Formation_protocol, codes_IRIS:int|Iterable[int], annee:Optional[int]=None, periode:str="Année") -> BilanSessions:
         """
-        Génère un bilan de sessions à partir d'un ou plusieurs codes IRIS (un bilan pour une session ou pour plusieurs sessions (période))
+        Génère un bilan de sessions à partir d'un ou plusieurs codes IRIS (un bilan pour une session ou pour plusieurs sessions (période)).
 
-        :param codes_IRIS: Codes IRIS des sessions pour lesquels on souhaite faire le bilan
-        :type codes_IRIS: int|Iterable[int],
+        La période est renseignée par l'utilisateur mais n'est pas contrôlée.
+
         :param formation: Objet formation associé à ce bilan
         :type formation: Formation_protocol
+        :param codes_IRIS: Codes IRIS des sessions pour lesquels on souhaite faire le bilan
+        :type codes_IRIS: int|Iterable[int]
         :param annee: Année du bilan (s'il n'est pas donné on l'obtiendra d'IRIS sessions)
         :type annee: Optional[int], optional
         :param periode: période du bilan (appartient à ["Année", "1er semestre", "2nd semestre"]), defaut = "Année"
@@ -141,22 +143,18 @@ class BilanSessions:
 
         return instance
 
-
-
-
-    # TODO : j'ai fait en sorte que les méthodes soient pas en warning, d'abord finaliser depuis_codesIRIS puis adapter pour que par période marche
-    # TODO : A faire ; refactoriser ce qui est mutualisable
     @classmethod   
     def depuis_periode(cls, formation:Formation_protocol, annee:int, periode:str="Année") -> Optional[BilanSessions]:
         """
-        Permet de générer un bilan de sessions selon une période qui est l'un de ces éléments : ["1er semestre", "2nd semestre", "Année"]
+        Permet de générer un bilan de sessions selon une année et une période qui est l'un de ces éléments : ["1er semestre", "2nd semestre", "Année"]
+
         Ex : BilanSessions.bilanUnique_parPeriode("948", 2024, "Année")
 
         :param formation: Objet formation associé à ce bilan
         :type formation: Formation_protocol
         :param annee: Année du bilan
         :type annee: int
-        :param periode: période du bilan (appartient à ["Année", "1er semestre", "2nd semestre"]), defaut = "Année"
+        :param periode: Période du bilan (appartient à ["Année", "1er semestre", "2nd semestre"]), defaut = "Année"
         :type periode: str, optional
         :return: Un objet bilan de sessions des codes IRIS sélectionnés par l'utilisateur
         :rtype: Optional[BilanSessions]
@@ -172,9 +170,6 @@ class BilanSessions:
 
 
         if len(codes_IRIS) > 0:  # Si on a des codes IRIS à traiter
-            # On ajoute les sessions à formation à partir des codes_IRIS
-            formation.ajout_sessions(codes_IRIS=codes_IRIS)
-
             return BilanSessions.depuis_codesIRIS(
                 formation=formation,
                 codes_IRIS=codes_IRIS,
@@ -423,6 +418,14 @@ class BilanSessions:
     # === GETTERS / SETTERS === 
     # =========================
     # Getters / setters liés à BilanSessions
+    @property
+    def annee(self) -> int:
+        return self._annee
+    
+    @property
+    def periode(self) -> int:
+        return self._periode
+    
     @property
     def chemin_word_bilan_output(self) -> Path:
         """

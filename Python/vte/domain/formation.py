@@ -3,11 +3,12 @@ from pathlib import Path
 from typing import Optional
 from collections.abc import Iterable
 
+from vte.core.iris_referentiel import get_trigramme_formation_depuis_codeIRIS
 from vte.domain.bilanSessions import BilanSessions
 from vte.domain.evalStat import EvalStat_formation
 from vte.domain.fdc import FdC
 from vte.domain.session import Session
-from vte.utils.utils import convertir_collection
+from vte.utils.utils import convertir_collection, vlog
 
 # ======================================================================================
 # CLASSE FORMATION
@@ -22,20 +23,21 @@ class Formation:
         """
         self._trigramme_formation:str = trigramme_formation
 
+        # Une formation a une évaluation stagiaire de la formation (regroupement de toutes les évaluations stagiaires de toutes les sessions)
+        self._eval:Optional[EvalStat_formation] = None
+
         # Une formation a une fiche de coûts
         self._fdc:Optional[FdC] = None
         
-        # Une formation a une évaluation stagiaire de la formation (regroupement de toutes les évaluations stagiaires de toutes les sessions)
-        self._eval:Optional[EvalStat_formation] = None
+        # Une formation a une ou plusieurs sessions
+        self._sessions:list[Session] = []
+
+        # Une formation a un ou plusieurs bilans de session par année (soit 1 par semestre, soit annuel s'il n'y a qu'une session annuellement)
+        self._bilans_sessions:dict[int, dict[str, BilanSessions]] = {}  #bilans_session[2025]["Année"] : Index1 = année du bilan ; Index2 = période du bilan (1er semestre ; 2nd semestre ; Annuel)
 
         # Une formation a un ou plusieurs bilans de formation (annuel)
         #self.bilans_formation:Optional[dict[int, BilanFormation]] = {}  # bilans_formation[2025] : Index = année du bilan
 
-        # Une formation a un ou plusieurs bilans de session par année (soit 1 par semestre, soit annuel s'il n'y a qu'une session annuellement)
-        self.bilans_sessions:Optional[dict[int, dict[int, BilanSessions]]] = {}  #bilans_session[2025][0] : Index1 = année du bilan ; Index2 = période du bilan (1 = 1er semestre ; 2 = 2nd semestre ; 0 = annuel)
-
-        # Une formation a une ou plusieurs sessions
-        self._sessions:list[Session] = []
 
     @classmethod
     def avec_ouverture_ou_creation_evalStat(cls, trigramme_formation: str) -> Formation:
@@ -48,7 +50,7 @@ class Formation:
         :rtype: Formation
         """
         instance = cls(trigramme_formation=trigramme_formation)
-        instance.ouvrir_ou_creer_evalStat()
+        instance.ouvrir_ou_creer_eval_formation()
         return instance
 
     @classmethod
@@ -75,7 +77,77 @@ class Formation:
 
 
 
+    # ======================================
+    # === CONSTRUCTEURS POUR TRAITEMENTS ===
+    # ======================================
+    # TODO faire des vérifs pour calculer comme il faut année et période depuis IRIS sessions et ne pas avoir à mettre ces données en argument
+    @classmethod
+    def pour_traitement_bilanSessions_depuis_codesIRIS(cls, codes_IRIS:int|Iterable[int], annee:Optional[int]=None, periode:str="Année") -> Formation:
+        """
+        Génère un bilan de sessions à partir d'un ou plusieurs codes IRIS (un bilan pour une session ou pour plusieurs sessions (période)).
 
+        La période est renseignée par l'utilisateur mais n'est pas contrôlée.
+
+        :param codes_IRIS: Codes IRIS des sessions pour lesquels on souhaite faire le bilan
+        :type codes_IRIS: int | Iterable[int]
+        :param annee: Année du bilan (s'il n'est pas donné on l'obtiendra d'IRIS sessions)
+        :type annee: Optional[int], optional
+        :param periode: période du bilan (appartient à ["Année", "1er semestre", "2nd semestre"]), defaut = "Année"
+        :type periode: str, optional
+        :return: le bilan de sessions est traité et l'objet formation est bien créé avec les sessions correspondantes.
+        :rtype: Formation
+        """
+        # On convetit codes_IRIS en Iterable
+        codes_IRIS = convertir_collection(codes_IRIS)
+
+        # Le trigramme de la formation peut être déduit
+        trigramme_formation = get_trigramme_formation_depuis_codeIRIS(code_IRIS=codes_IRIS[0])
+
+        # On définit la formation et on ajoute les sessions
+        instance = cls.avec_ajout_sessions(trigramme_formation=trigramme_formation, codes_IRIS=codes_IRIS)
+
+        # On ajoute le bilan de sessions au dictionnaire et on le traite
+        instance.ajout_bilan_sessions_avec_traitement(
+            codes_IRIS=codes_IRIS,
+            annee=annee,
+            periode=periode
+        )
+        
+        return instance 
+
+    @classmethod
+    def pour_traitement_bilanSessions_depuis_periode(cls, trigramme_formation:str, annee:int, periode:str="Année") -> Formation:
+        """
+        Permet de générer un bilan de sessions selon une année et une période qui est l'un de ces éléments : ["1er semestre", "2nd semestre", "Année"]
+
+        Ex : BilanSessions.bilanUnique_parPeriode("948", 2024, "Année")
+
+        :param annee: Année du bilan
+        :type annee: int
+        :param periode: Période du bilan (appartient à ["Année", "1er semestre", "2nd semestre"]), defaut = "Année"
+        :type periode: str, optional
+        :return: le bilan de sessions est traité et l'objet formation est bien créé avec les sessions correspondantes.
+        :rtype: Formation
+        """
+        # On définit la formation 
+        instance = cls(trigramme_formation=trigramme_formation)
+
+        # On ajoute le bilan de sessions au dictionnaire et on le traite
+        instance.ajout_bilan_sessions_avec_traitement(
+            annee=annee,
+            periode=periode
+        )
+        
+        # On ajoute les sessions à formation à partir des codes_IRIS ssi on a des codes IRIS qui ont été traités
+        if annee in instance._bilans_sessions.keys():
+            if periode in instance._bilans_sessions[annee].keys():
+                if len(instance._bilans_sessions[annee][periode].codes_IRIS) > 0:
+                    instance.ajout_sessions(codes_IRIS=instance._bilans_sessions[annee][periode].codes_IRIS)
+
+        return instance
+
+    
+    # TODO a vérifier
     @classmethod
     def avec_creation_session_et_ouverture_ou_traitement_EvalStat(
         cls, 
@@ -113,7 +185,7 @@ class Formation:
         # On ajoute la session 
         instance.ajout_sessions(codes_IRIS=code_IRIS)
 
-        instance.traiter_eval_sessions(
+        instance.ouvrir_ou_traiter_eval_sessions(
             chemin_csv=chemin_csv,
             ecrire_eval_formation=ecrire_eval_formation,
             ouvrirDossier=ouvrirDossier
@@ -126,31 +198,30 @@ class Formation:
     # =========================
     # === METHODES INTERNES ===
     # =========================
-    def _ajout_FdC_avec_ouverture(self, chemin_fdc:Optional[Path|str] = None) -> None:
-        """
-        Ajoute la fiche de coûts de la formation à l'instance de Formation (i.e. renseigne self._fdc)
-
-        La fiche de coût est ouverte si elle existe.
-        """
-        self._fdc = FdC.depuis_chemin(formation=self, chemin_fdc=chemin_fdc)
-
 
 
     # =========================
     # === METHODES EXTERNES ===
     # =========================
-    def get_session_par_codeIRIS(self, code_IRIS:int) -> Optional[Session]:
+    def ouvrir_ou_creer_eval_formation(self) -> None:
         """
-        Renvoie la session de la liste self._sessions avec le code_IRIS.
+        Définit self._eval en créant ou ouvrant l'évaluation de la formation à l'instance de Formation.
 
-        Renvoie None si non trouvé.
-
-        :param code_IRIS: Code IRIS de la session à retourner
-        :type code_IRIS: int
-        :return: L'objet Session de self._sessions avec ce code IRIS. None si non trouvé.
-        :rtype: Optional[Session]
+        L'évaluation est créée si elle n'existe pas ou est ouverte si elle existe.
         """
-        return next((session for session in self.sessions if session.code_IRIS == code_IRIS), None)
+        if self._eval is None:
+            self._eval = EvalStat_formation.avec_ouverture_ou_creation(formation=self)
+
+    def ouvrir_fdc(self, chemin_fdc:Optional[Path|str] = None) -> None:
+        """
+        Ouvre la fiche de coûts de la formation (i.e. définit self._fdc).
+
+        Si le chemin n'est pas donné, alors on ouvre un filedialog.
+
+        :param chemin_fdc: Chemin de la fiche de coûts. Défaut = None
+        :type chemin_fdc: Optional[Path | str], optional
+        """
+        self._fdc = FdC.depuis_chemin(formation=self, chemin_fdc=chemin_fdc)
 
     def ajout_sessions(self, codes_IRIS:int|Iterable[int]) -> None:
         """
@@ -167,31 +238,18 @@ class Formation:
             if code_IRIS not in [session.code_IRIS for session in self._sessions]:
                 self._sessions.append(Session(formation=self, code_IRIS=code_IRIS))
 
-    def ouvrir_ou_creer_evalStat(self) -> None:
-        """
-        Définit self._eval en créant ou ouvrant l'évaluation de la formation à l'instance de Formation.
-
-        L'évaluation est créée si elle n'existe pas ou est ouverte si elle existe.
-        """
-        if self._eval is None:
-            self._eval = EvalStat_formation.avec_ouverture_ou_creation(formation=self)
-
-
-    def traiter_eval_sessions(
+    def ouvrir_ou_traiter_eval_sessions(
         self,
-        chemin_csv: Optional[Path|str],
         ecrire_eval_formation: Optional[bool] = False, 
         ouvrirDossier: Optional[bool] = False
         ) -> None:
         """
-        Traite les EvalStat de plusieurs sessions. Pour chacune d'elle :
+        Ouvre ou traite les EvalStat de toutes les sessions. Pour chacune d'elle :
 
-        Crée l'Excel EvalStat d'une session à partir d'un CSV (s'il n'est pas donné, on ouvre un filedialog)
+        Ouvre ou crée l'Excel EvalStat d'une session à partir d'un filedialog
 
         L'évaluation de la formation est mise à jour avec ces nouvelles données et est sauvée en fin de traitement.
 
-        :param chemin_csv: _description_, defaults to None
-        :type chemin_csv: Optional[Path | str], optional
         :param ecrire_eval_formation: Pour écrire physiquement l'Excel eval formation en fin de traitement. Si False, il devra être écrit ailleurs (à l'endroit où il y a la boucle pour du multi-traitement typiquement). Défaut = False car ic on peut traiter plusiseurs sessions d'une même formation.
         :type ecrire_eval_formation: bool, optional
         :param ouvrirDossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
@@ -200,15 +258,67 @@ class Formation:
 
 
         # On boucle sur Session pour traiter_eval en spécifiant ecrire_eval_formation=False
-        for session in self.sessions.values():
-            session.eval.traiter_eval(
-                chemin_csv=chemin_csv,
+        for session in self.sessions:
+            session.eval.ouvrir_ou_traiter_eval(
                 ecrire_eval_formation=ecrire_eval_formation,  # On sauvegardera en fin de boucle
                 ouvrirDossier=ouvrirDossier
             )
         
         # Sauvegarde de l'eval formation
         self.eval.ecrit_et_sauve_df_siModif()
+
+    def ajout_bilan_sessions_avec_traitement(self, codes_IRIS:Optional[int|Iterable[int]]=None, annee:Optional[int]=None, periode:str="Année") -> None:
+        """
+        On ajoute un nouveau bilan de sessions à self._bilans_sessions[annee][periode].
+
+        On traite ce bilan de sessions (création du word et envoi du mail pour signature).
+
+        Si codes_IRIS fourni, alors on traite avec BilanSessions.depuis_codesIRIS.
+        Sinin il faut fournir annee et on traite avec BilanSessions.depuis_periode.
+
+        :param codes_IRIS: Codes IRIS des sessions pour lesquels on souhaite faire le bilan. Optionnel si annee fourni.
+        :type codes_IRIS: Optional[int|Iterable[int]], optional
+        :param annee: Année du bilan. Ooptionnel si codes_IRIS fourni
+        :type annee: Optional[int], optional
+        :param periode: période du bilan (appartient à ["Année", "1er semestre", "2nd semestre"]), defaut = "Année"
+        :type periode: str, optional
+        """
+        # Vérif qu'on peut employer soit BilanSessions.depuis_codesIRIS soit BilanSessions.depuis_periode
+        if (codes_IRIS is None) and (annee is None) :
+            vlog.log_erreur("code_IRIS et annee sont None tous les deux : on ne peut pas lancer le traitement de BilanSessions")
+        
+        # On traite le bilan
+        if codes_IRIS is not None:
+            # Alors on traite à partir des codes IRIS
+            bilan = BilanSessions.depuis_codesIRIS(formation=self, codes_IRIS=codes_IRIS)
+        else:
+            # Alors on traite à partir de la période
+            bilan = BilanSessions.depuis_periode(formation=self, annee=annee, periode=periode)
+
+        # Les champs année et période peuvent être complétés/définis lors du traitement de BilanSessions, donc je ne peut affcter self._bilans_sessions[bilan.annee][bilan.periode] que maintenant
+        # On initialise le dictionnaire de 2nd niveau si non déjà fait
+        if bilan.annee not in self._bilans_sessions.keys():
+            self._bilans_sessions[bilan.annee] = {}
+        
+        # On ajoute l'élément
+        self._bilans_sessions[bilan.annee][bilan.periode] = bilan
+
+    # ====================
+    # === METHODES GET ===
+    # ====================
+    def get_session_par_codeIRIS(self, code_IRIS:int) -> Optional[Session]:
+        """
+        Renvoie la session de la liste self._sessions avec le code_IRIS.
+
+        Renvoie None si non trouvé.
+
+        :param code_IRIS: Code IRIS de la session à retourner
+        :type code_IRIS: int
+        :return: L'objet Session de self._sessions avec ce code IRIS. None si non trouvé.
+        :rtype: Optional[Session]
+        """
+        return next((session for session in self.sessions if session.code_IRIS == code_IRIS), None)
+
 
     # =========================
     # === GETTERS / SETTERS ===

@@ -60,7 +60,6 @@ DATASETS_CODES_IRIS = {
 
     }
 
-
 DATASETS_PERIODE = {
         "Bilan TEL annee 2024 (3 sessions, 2 CSV seulement)": {
             "chemin_IRIS_sessions": tel["chemin_IRIS_sessions"],
@@ -174,9 +173,9 @@ def test_bilanSession_depuis_codesIRIS(nom_cas, dataset, monkeypatch):
 
     set_iris_chemin_specifique(typeExport="Sessions", chemin=dataset["chemin_IRIS_sessions"])  # On redéfinit le chemin d'IRIS Sessions
 
-
-    formation = Formation.avec_ajout_sessions(trigramme_formation=dataset["trigramme_formation"], codes_IRIS=dataset["codes_IRIS"])
-    BilanSessions.depuis_codesIRIS(formation=formation, codes_IRIS=dataset["codes_IRIS"])
+    formation = Formation.pour_traitement_bilanSessions_depuis_codesIRIS(codes_IRIS=dataset["codes_IRIS"])
+    #formation = Formation.avec_ajout_sessions(trigramme_formation=dataset["trigramme_formation"], codes_IRIS=dataset["codes_IRIS"])
+    #BilanSessions.depuis_codesIRIS(formation=formation, codes_IRIS=dataset["codes_IRIS"])
 
 
     # Restauration de mon environnement de travail
@@ -202,12 +201,17 @@ def test_bilanSession_depuis_periode(nom_cas, dataset, monkeypatch):
 
     set_iris_chemin_specifique(typeExport="Sessions", chemin=dataset["chemin_IRIS_sessions"])  # On redéfinit le chemin d'IRIS Sessions
 
-    formation = Formation(trigramme_formation=dataset["trigramme_formation"])
-    BilanSessions.depuis_periode(
-        formation=formation,
+    formation = Formation.pour_traitement_bilanSessions_depuis_periode(
+        dataset["trigramme_formation"],
         annee=dataset["annee"],
         periode=dataset["periode"]
         )
+    #formation = Formation(trigramme_formation=dataset["trigramme_formation"])
+    #BilanSessions.depuis_periode(
+    #    formation=formation,
+    #    annee=dataset["annee"],
+    #    periode=dataset["periode"]
+    #    )
 
     
     # Restauration de mon environnement de travail

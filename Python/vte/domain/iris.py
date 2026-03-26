@@ -6,7 +6,8 @@ from pathlib import Path
 from tkinter.ttk import Style
 from typing import Iterable, List, Optional, Tuple, Any, Type
 
-import pandas as pd
+#import pandas as pd
+from pandas import *
 import tqdm
 from colorama import Fore
 
@@ -613,7 +614,7 @@ class IRIS:
         self._fe = valeur
 
     @property
-    def df(self) -> pd.DataFrame:
+    def df(self) -> DataFrame:
         """
         DataFrame de _fe._tableaux[self._typeExport]._df (ex. : _fe._tableaux["Sessions"]._df)
         
@@ -624,12 +625,12 @@ class IRIS:
         return self._fe.get_df_tableau(self._typeExport)
 
     @df.setter
-    def df(self, valeur:pd.DataFrame):
+    def df(self, valeur:DataFrame):
         """
         Remplace le DataFrame de self._fe._tableaux[self._typeExport]._df par un nouveau DataFrame
         
         :param valeur: DataFrame devant écraser l'ancien dans self._fe._tableaux[self._typeExport]._df
-        :type valeur: pd.DataFrame
+        :type valeur: DataFrame
         """
         #self._fe._tableaux[self._typeExport]._df = valeur
         self._fe.set_df_tableau(self._typeExport, df=valeur)
@@ -722,7 +723,7 @@ class IRIS_natif(IRIS):
     # =========================
     # === Méthodes internes ===
     # =========================
-    def _charger_iris_natifs(self, chemins_fichiersInput:Optional[Path|Iterable[Path]]=None) -> tuple[pd.DataFrame, tuple[Path]]:
+    def _charger_iris_natifs(self, chemins_fichiersInput:Optional[Path|Iterable[Path]]=None) -> tuple[DataFrame, tuple[Path]]:
         r"""
         Lit le/les extract(s) IRIS et on génère dans un seul dataframe
         On concatène si besoin
@@ -734,7 +735,7 @@ class IRIS_natif(IRIS):
         :return: 2 variables:
            - un DataFrame contenant les données de chemins_fichiersInput concaténées
            - un tuple des chemins concaténés
-        :rtype: tuple[pd.DataFrame, tuple[Path]]
+        :rtype: tuple[DataFrame, tuple[Path]]
 
         :example:
         >>> self._charger_iris_natifs(Path(r"C:/fichier1.xlsx"))
@@ -826,7 +827,7 @@ class IRIS_natif(IRIS):
 
         return df_concat_iris, chemins_fichiersInput
 
-    def _ecrire_et_sauver_df_dans_excel(self, df:pd.DataFrame, chemins_natifs_iris:tuple[Path], chemin_fichier_sauv:Optional[Path]=None) -> None:
+    def _ecrire_et_sauver_df_dans_excel(self, df:DataFrame, chemins_natifs_iris:tuple[Path], chemin_fichier_sauv:Optional[Path]=None) -> None:
         r"""
         Écrit et sauve un df issu d'extracts IRIS natifs dans un fichier Excel issu d'un modèle.
         Si chemin_fichier_sauv n'est pas donné, alors on emploie la valeur par défaut qui est dans cei.
@@ -837,7 +838,7 @@ class IRIS_natif(IRIS):
         >>> self._ecrire_et_sauver_df_dans_excel(df, chemins_natifs_iris, Path(r"C:/fichier_out.xlsx"))
 
         Args:
-            df (pd.DataFrame): le DataFrame des extracts IRIS natifs concaténés
+            df (DataFrame): le DataFrame des extracts IRIS natifs concaténés
             chemins_natifs_iris (tuple[Path]): tuple des chemins ayant servi à faire df
             chemin_fichier_sauv (Optional[Path]): chemin de sauvegarde du fichier. Si chemin_fichier_sauv n'est pas donné, alors on emploie la valeur par défaut qui est dans cei.
         """
@@ -855,7 +856,7 @@ class IRIS_natif(IRIS):
         self.tableau_donnees_iris.ecrit_dataFrame_dans_tableauStructure(df, supprimeDonneesEtRemplace=True, remplace_df_par_nouveau=True)
 
         # On écrit les références des fichiers copiés dans le tableau structuré "Imports". Nota : openpyxl ne prend pas en charge les Path donc on passe avec des str
-        df_chemins = pd.DataFrame([str(chemin) for chemin in chemins_natifs_iris], columns=['Chemin fichier'])
+        df_chemins = DataFrame([str(chemin) for chemin in chemins_natifs_iris], columns=['Chemin fichier'])
         self.tableau_fichiers_importes.ecrit_dataFrame_dans_tableauStructure(df=df_chemins, supprimeDonneesEtRemplace=True, remplace_df_par_nouveau=True)
 
         #On enregistre et on ferme (par précaution car copieformat xlwings sauvegarde)
@@ -900,7 +901,8 @@ class IRIS_natif(IRIS):
             chemins_natifs_iris=chemins_natifs_iris, 
             chemin_fichier_sauv=chemin_fichier_sauv
             ) 
-        
+
+
 
     # =========================
     # === Méthodes externes ===
@@ -917,6 +919,8 @@ class IRIS_natif(IRIS):
             ConfigExportIRIS: _description_
         """
         return IRIS.DICT_EXPORTS_IRIS["ConfigExportIRIS"][typeExport]
+
+
 
     # ===========
     # === IHM ===
@@ -940,7 +944,6 @@ class IRIS_natif(IRIS):
             texte_bouton_choisir=f"Choisir extract IRIS {str.lower(IRIS_natif.cei(typeExport)._nom_typeExport)} {IRIS_natif.cei(typeExport)._codeExport} à nouveau",
             multi_fichiers=True
         )
-
 
 
 # ======================================================================================
@@ -987,7 +990,7 @@ class IRIS_traite(IRIS):
 
 
     # =========================
-    # === Méthodes internes ===
+    # === METHODES INTERNES ===
     # =========================
     def _charger_excel(self, fe:Optional[FichierExcel]=None, chemin:Optional[Path]=None):
         """
@@ -1104,15 +1107,48 @@ class IRIS_traite(IRIS):
         # Retourner le chemin du fichier le plus récent
         return fichier_iris_plus_recent
 
-    # =========================
-    # === Méthodes externes ===
-    # =========================
-    def affiche_df_moins_de_colonnes(df:pd.DataFrame) -> None:
+
+
+    # ====================
+    # === METHODES GET ===
+    # ====================
+    def get_trigramme_formation_depuis_codeIRIS(self, code_IRIS:int) -> str:
+        """
+        Récupère le trigramme d'une formation à partir d'un code IRIS.
+
+        :param code_IRIS: Code IRIS de la formation dont on souhaite récupérer le trigramme.
+        :type code_IRIS: int
+        :return: Trigramme de formation correspondant à code_IRIS
+        :rtype: str
+        """
+        # TODO : A un moment je pourrai mettre un switch avec le typeExport → Pour l'instant je n'en ai pas besoin
+        return self.df_filtre_codes_IRIS(codes_IRIS=code_IRIS)["Trigramme formation"].iloc[0]
+
+    def get_intitulé_formation_depuis_codeIRIS(self, code_IRIS:int) -> str:
+        """
+        Récupère l'intitulé d'une formation à partir d'un code IRIS.
+
+        :param code_IRIS: Code IRIS de la formation dont on souhaite récupérer l'intitulé.
+        :type code_IRIS: int
+        :return: Intitulé de la formation correspondant à code_IRIS
+        :rtype: str
+        """
+        # TODO : A un moment je pourrai mettre un switch avec le typeExport → Pour l'instant je n'en ai pas besoin
+        return self.df_filtre_codes_IRIS(codes_IRIS=code_IRIS)["Session"].iloc[0]
+
+
+
+
+
+    # ============================
+    # === METHODES LIEES AU DF ===
+    # ============================
+    def affiche_df_moins_de_colonnes(df:DataFrame) -> None:
         """
         print le DataFrame avec filtre des colonnes pour affichage : ['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Présents', 'Statut Session', 'N° Session']
 
         :param df: DataFrame à afficher
-        :type df: pd.DataFrame
+        :type df: DataFrame
         """
         print(tabulate(
             df[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Présents', 'Statut Session', 'N° Session']], 
@@ -1121,146 +1157,19 @@ class IRIS_traite(IRIS):
             showindex=False
         ))
 
-    # TODO : ce n'est plus utilisé / A adapter selon modèle demande_sessions_a_retenir si besoin
-    def demande_sessions_a_exclure(self, trigramme_formation:str = None, annee:Optional[int] = None, periode:Optional[str] = None) -> Tuple[pd.DataFrame, List[int]]:
+
+    def df_filtre_codes_IRIS(self, codes_IRIS:int|Iterable[int])  -> DataFrame:
         """
-        Demande à l'utilisateur les sessions qu'il souhaite exclure de la période choisie :
-           - on applique un filtre sur une période + trigramme au dataframe de l'extract IRIS
-           - on affiche le résultat
-           - l'utilisateur définit les codes IRIS qu'il veut exclure
+        Renvoie le dataframe de l'extract IRIS filtré VTE selon Code IRIS in codes_IRIS.
         
-        On retourne :
-           - un dataframe df_sessions_filtre à jour
-           - #la liste des codes IRIS retenus (plus maintenant : pour l'avoir on peut faire df_filtre["Code IRIS"].tolist())
-           - la liste des codes IRIS exclus
-        
-        :param trigramme_formation: trigramme de la formation à filtrer
-        :type trigramme_formation: str
-        :param annee: année à filtrer
-        :type annee: Optional[int]
-        :param periode: période à filtrer
-        :type periode: Optional[str]
-        :return: un dataframe df_sessions_filtre à jour, la liste des codes IRIS exclus
-        :rtype: Tuple[pd.Dataframe, List[int]]
-        """
+        :param codes_IRIS: Codes IRIS sur lesquels on veut filtrer IRIS sessions
+        :type codes_IRIS: int|Iterable[int]
+        :return: extract IRIS VTE filtré sur codes_IRIS
+        :rtype: DataFrame
+        """     
+        return self.df[self.df['Code IRIS'].isin(convertir_collection(codes_IRIS))]
 
-        # Liste des sessions qui seront exclues par l'utilisateur
-        codes_sessions_exclues_par_utilisateur = []
-
-        # Renseigne les valeurs par défaut de période et année si None
-        annee, periode = periode(annee, periode)
-
-        # On filtre sur le trigramme et la période demandée
-        df_filtre = self.df_filtre_periode(trigramme_formation=trigramme_formation, annee=annee, periode=periode)
-
-        # On affiche à l'utilisateur les sessions et dates et statuts 
-        vlog.print("Info", f"\nListe des sessions {trigramme_formation} dans {self.chemin.name} - {periode} {annee}", style=["jaune"])
-
-        # Adaptation format date
-        df_filtre['Date début ses.'] = pd.to_datetime(df_filtre['Date début ses.']).dt.strftime("%d/%m/%Y")
-        df_filtre['Date fin ses.'] = pd.to_datetime(df_filtre['Date fin ses.']).dt.strftime("%d/%m/%Y")
-
-        print(tabulate(
-            df_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Nommés', 'Statut Session', 'N° Session']], 
-            headers='keys', 
-            tablefmt='pretty', 
-            showindex=False
-        ))
-        
-        # On demande à l'utilisateur les sessions qu'il veut exclure
-        exclusionSessions = self.demander_liste_codes_IRIS()
-        if exclusionSessions:  # si la liste n'est pas vide
-            # On trace l'exclusion des sessions
-            codes_sessions_exclues_par_utilisateur = df_filtre.loc[df_filtre["Code IRIS"].isin(exclusionSessions), "N° Session"].unique().tolist()
-            #for session_exclue in exclusionSessions:
-            #    codes_sessions_exclues_par_utilisateur.append(df_filtre.loc[df_filtre["Code IRIS"] == session_exclue, "N° Session"].iloc[0])
-
-            # On met à jour _df_sessions_filtre en enlevant les sessions exclues
-            df_filtre = df_filtre[~df_filtre['Code IRIS'].isin(exclusionSessions)]
-        else:
-            # la liste est vide, on ne filtre rien, on garde tout
-            pass
-
-        # On affiche à l'utilisateur les sessions finalement retenues
-        vlog.print("Info", "\nSessions retenues pour le bilan :", style=["jaune"])
-        print(tabulate(
-            df_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Nommés', 'Statut Session', 'N° Session']], 
-            headers='keys', 
-            tablefmt='pretty', 
-            showindex=False
-        ))
-
-
-        # pour avoir la liste des codes IRIS retenus : df_filtre["Code IRIS"].tolist()
-
-        # On retourne les codes_IRIS des sessions retenues + exploitationBilan 
-        return df_filtre, codes_sessions_exclues_par_utilisateur
-
-    def demande_sessions_a_retenir(self, trigramme_formation:str = None, annee:Optional[int] = None, periode:Optional[str] = None) -> list[int]:
-        """
-        Demande à l'utilisateur les sessions qu'il souhaite retenir de la période choisie :
-           - on applique un filtre sur une période + trigramme au dataframe de l'extract IRIS
-           - on affiche le résultat
-           - l'utilisateur définit les codes IRIS qu'il veut retenir
-        
-        On retourne :
-           - la liste des codes IRIS retenus
-        
-        :param trigramme_formation: trigramme de la formation à filtrer
-        :type trigramme_formation: str
-        :param annee: année à filtrer
-        :type annee: Optional[int]
-        :param periode: période à filtrer
-        :type periode: Optional[str]
-        :return: la liste des codes IRIS retenus
-        :rtype: list[int]
-        """
-
-        # Renseigne les valeurs par défaut de période et année si None
-        annee, periode = utils_periode(annee, periode)
-
-        # On filtre sur le trigramme et la période demandée
-        df_filtre = self.df_filtre_periode(trigramme_formation=trigramme_formation, annee=annee, periode=periode)
-
-        # On affiche à l'utilisateur les sessions et dates et statuts 
-        vlog.print("Info", f"\nListe des sessions {trigramme_formation} dans {self.chemin.name} - {periode} {annee}", style=["jaune"])
-
-        # Adaptation format date
-        df_filtre['Date début ses.'] = pd.to_datetime(df_filtre['Date début ses.']).dt.strftime("%d/%m/%Y")
-        df_filtre['Date fin ses.'] = pd.to_datetime(df_filtre['Date fin ses.']).dt.strftime("%d/%m/%Y")
-
-        print(tabulate(
-            df_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Nommés', 'Statut Session', 'N° Session']], 
-            headers='keys', 
-            tablefmt='pretty', 
-            showindex=False
-        ))
-        
-        # On demande à l'utilisateur les sessions qu'il veut exclure
-        sessionsRetenues = self.demander_liste_codes_IRIS()
-
-        if sessionsRetenues:  # si la liste n'est pas vide
-            # On met à jour _df_sessions_filtre en enlevant les sessions exclues
-            df_filtre = df_filtre[df_filtre['Code IRIS'].isin(sessionsRetenues)]
-        else:
-            # la liste est vide, on ne filtre rien, on garde tout
-            pass
-
-        # On affiche à l'utilisateur les sessions finalement retenues
-        vlog.print("Info", "\nSessions retenues pour le bilan :", style=["jaune"])
-        print(tabulate(
-            df_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Nommés', 'Statut Session', 'N° Session']], 
-            headers='keys', 
-            tablefmt='pretty', 
-            showindex=False
-        ))
-
-        return sessionsRetenues
-
-    # ==============================
-    # === Méthodes filtrer le df ===
-    # ==============================
-    def df_filtre_periode(self, trigramme_formation:Optional[str] = None, annee:Optional[int] = None, periode:Optional[str] = None) -> pd.DataFrame:
+    def df_filtre_periode(self, trigramme_formation:Optional[str] = None, annee:Optional[int] = None, periode:Optional[str] = None) -> DataFrame:
         """
         Renvoie le dataframe de l'extract IRIS filtré VTE selon plusieurs critères.
          
@@ -1288,7 +1197,7 @@ class IRIS_traite(IRIS):
             case "Sessions":
                 return self.df_filtre_periode_sessions(trigramme_formation=trigramme_formation, annee=annee, periode=periode)
 
-    def df_filtre_periode_sessions(self, trigramme_formation:Optional[str] = None, annee:Optional[int] = None, periode:Optional[str] = None) -> pd.DataFrame:
+    def df_filtre_periode_sessions(self, trigramme_formation:Optional[str] = None, annee:Optional[int] = None, periode:Optional[str] = None) -> DataFrame:
         """
         Renvoie le dataframe de l'extract IRIS filtré VTE selon plusieurs critères :
             - Statut Session != "Annulée" (toujours) ;
@@ -1353,6 +1262,9 @@ class IRIS_traite(IRIS):
 
 
 
+
+
+
     # ===========
     # === IHM ===
     # ===========
@@ -1383,9 +1295,150 @@ class IRIS_traite(IRIS):
                     texte_bouton_choisir=f"Choisir extract IRIS {str.lower(self._typeExport)} {self.cei._codeExport} à nouveau"
                     )
 
+    def demande_sessions_a_retenir(self, trigramme_formation:str = None, annee:Optional[int] = None, periode:Optional[str] = None) -> list[int]:
+        """
+        Demande à l'utilisateur les sessions qu'il souhaite retenir de la période choisie :
+           - on applique un filtre sur une période + trigramme au dataframe de l'extract IRIS
+           - on affiche le résultat
+           - l'utilisateur définit les codes IRIS qu'il veut retenir
+        
+        On retourne :
+           - la liste des codes IRIS retenus
+        
+        :param trigramme_formation: trigramme de la formation à filtrer
+        :type trigramme_formation: str
+        :param annee: année à filtrer
+        :type annee: Optional[int]
+        :param periode: période à filtrer
+        :type periode: Optional[str]
+        :return: la liste des codes IRIS retenus
+        :rtype: list[int]
+        """
+
+        # Renseigne les valeurs par défaut de période et année si None
+        annee, periode = utils_periode(annee, periode)
+
+        # On filtre sur le trigramme et la période demandée
+        df_filtre = self.df_filtre_periode(trigramme_formation=trigramme_formation, annee=annee, periode=periode)
+
+        # On affiche à l'utilisateur les sessions et dates et statuts 
+        vlog.print("Info", f"\nListe des sessions {trigramme_formation} dans {self.chemin.name} - {periode} {annee}", style=["jaune"])
+
+        # Adaptation format date
+        df_filtre['Date début ses.'] = pd.to_datetime(df_filtre['Date début ses.']).dt.strftime("%d/%m/%Y")
+        df_filtre['Date fin ses.'] = pd.to_datetime(df_filtre['Date fin ses.']).dt.strftime("%d/%m/%Y")
+
+        print(tabulate(
+            df_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Nommés', 'Statut Session', 'N° Session']], 
+            headers='keys', 
+            tablefmt='pretty', 
+            showindex=False
+        ))
+        
+        # On demande à l'utilisateur les sessions qu'il veut exclure
+        sessionsRetenues = self.demander_liste_codes_IRIS()
+
+        if sessionsRetenues:  # si la liste n'est pas vide
+            # On met à jour _df_sessions_filtre en enlevant les sessions exclues
+            df_filtre = df_filtre[df_filtre['Code IRIS'].isin(sessionsRetenues)]
+        else:
+            # la liste est vide, on ne filtre rien, on garde tout
+            pass
+
+        # On affiche à l'utilisateur les sessions finalement retenues
+        vlog.print("Info", "\nSessions retenues pour le bilan :", style=["jaune"])
+        print(tabulate(
+            df_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Nommés', 'Statut Session', 'N° Session']], 
+            headers='keys', 
+            tablefmt='pretty', 
+            showindex=False
+        ))
+
+        return sessionsRetenues
+
+    # TODO : ce n'est plus utilisé / A adapter selon modèle demande_sessions_a_retenir si besoin
+    def demande_sessions_a_exclure(self, trigramme_formation:str = None, annee:Optional[int] = None, periode:Optional[str] = None) -> Tuple[DataFrame, List[int]]:
+        """
+        Demande à l'utilisateur les sessions qu'il souhaite exclure de la période choisie :
+           - on applique un filtre sur une période + trigramme au dataframe de l'extract IRIS
+           - on affiche le résultat
+           - l'utilisateur définit les codes IRIS qu'il veut exclure
+        
+        On retourne :
+           - un dataframe df_sessions_filtre à jour
+           - #la liste des codes IRIS retenus (plus maintenant : pour l'avoir on peut faire df_filtre["Code IRIS"].tolist())
+           - la liste des codes IRIS exclus
+        
+        :param trigramme_formation: trigramme de la formation à filtrer
+        :type trigramme_formation: str
+        :param annee: année à filtrer
+        :type annee: Optional[int]
+        :param periode: période à filtrer
+        :type periode: Optional[str]
+        :return: un dataframe df_sessions_filtre à jour, la liste des codes IRIS exclus
+        :rtype: Tuple[DataFrame, List[int]]
+        """
+
+        # Liste des sessions qui seront exclues par l'utilisateur
+        codes_sessions_exclues_par_utilisateur = []
+
+        # Renseigne les valeurs par défaut de période et année si None
+        annee, periode = periode(annee, periode)
+
+        # On filtre sur le trigramme et la période demandée
+        df_filtre = self.df_filtre_periode(trigramme_formation=trigramme_formation, annee=annee, periode=periode)
+
+        # On affiche à l'utilisateur les sessions et dates et statuts 
+        vlog.print("Info", f"\nListe des sessions {trigramme_formation} dans {self.chemin.name} - {periode} {annee}", style=["jaune"])
+
+        # Adaptation format date
+        df_filtre['Date début ses.'] = pd.to_datetime(df_filtre['Date début ses.']).dt.strftime("%d/%m/%Y")
+        df_filtre['Date fin ses.'] = pd.to_datetime(df_filtre['Date fin ses.']).dt.strftime("%d/%m/%Y")
+
+        print(tabulate(
+            df_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Nommés', 'Statut Session', 'N° Session']], 
+            headers='keys', 
+            tablefmt='pretty', 
+            showindex=False
+        ))
+        
+        # On demande à l'utilisateur les sessions qu'il veut exclure
+        exclusionSessions = self.demander_liste_codes_IRIS()
+        if exclusionSessions:  # si la liste n'est pas vide
+            # On trace l'exclusion des sessions
+            codes_sessions_exclues_par_utilisateur = df_filtre.loc[df_filtre["Code IRIS"].isin(exclusionSessions), "N° Session"].unique().tolist()
+            #for session_exclue in exclusionSessions:
+            #    codes_sessions_exclues_par_utilisateur.append(df_filtre.loc[df_filtre["Code IRIS"] == session_exclue, "N° Session"].iloc[0])
+
+            # On met à jour _df_sessions_filtre en enlevant les sessions exclues
+            df_filtre = df_filtre[~df_filtre['Code IRIS'].isin(exclusionSessions)]
+        else:
+            # la liste est vide, on ne filtre rien, on garde tout
+            pass
+
+        # On affiche à l'utilisateur les sessions finalement retenues
+        vlog.print("Info", "\nSessions retenues pour le bilan :", style=["jaune"])
+        print(tabulate(
+            df_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Nommés', 'Statut Session', 'N° Session']], 
+            headers='keys', 
+            tablefmt='pretty', 
+            showindex=False
+        ))
+
+
+        # pour avoir la liste des codes IRIS retenus : df_filtre["Code IRIS"].tolist()
+
+        # On retourne les codes_IRIS des sessions retenues + exploitationBilan 
+        return df_filtre, codes_sessions_exclues_par_utilisateur
+
+
+
+
+
+
 
     # =========================
-    # ===  GETTER / SETTER  === 
+    # === GETTERS / SETTERS === 
     # =========================
 
 
@@ -1434,7 +1487,7 @@ def charger_excel_IRIS_sessions(fe_IRIS_sessions:Optional[FichierExcel]=None, ch
     return fe_IRIS_sessions
 
 @staticmethod
-def convertit_types_colonnes_df_sessions(fe_IRIS_sessions:FichierExcel) -> pd.DataFrame:
+def convertit_types_colonnes_df_sessions(fe_IRIS_sessions:FichierExcel) -> DataFrame:
 
     df_IRIS_sessions = fe_IRIS_sessions._tableaux["Sessions"]._df  # Alias
 

@@ -253,7 +253,7 @@ class EvalStat_session(EvalStat):
         self._statut: Optional[str] = statut  # ex: "A traiter", "Traité", "Exclu - Aucun CSV fourni", "Exclu - Code IRIS pas dans Extract IRIS sessions", "Exclu - Problème lecture CSV", "Exclu - CSV vide / Aucun retour"
 
     @classmethod
-    def avec_ouverture_ou_traitement(cls, session:Session_protocol, chemin_csv:Optional[Path|str]=None, ecrire_eval_formation:bool=True, ouvrirDossier:bool=False, ouvrir_fe:bool=False) -> EvalStat_session:
+    def avec_ouverture_ou_traitement(cls, session:Session_protocol, chemin_csv:Optional[Path|str]=None, ecrire_eval_formation:bool=True, ouvrir_dossier:bool=False, ouvrir_fe:bool=False) -> EvalStat_session:
         """
         Initialisation d'un EvalStat session avec ouverture ou création du fichier Excel EvalStat.
 
@@ -268,34 +268,26 @@ class EvalStat_session(EvalStat):
         :type chemin_csv: Optional[Path|str]
         :param ecrire_eval_formation: Pour écrire physiquement l'Excel eval formation en fin de traitement. Si False, il devra être écrit ailleurs (à l'endroit où il y a la boucle pour du multi-traitement typiquement). Défaut = True.
         :type ecrire_eval_formation: bool
-        :param ouvrirDossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
-        :type ouvrirDossier: bool
+        :param ouvrir_dossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
+        :type ouvrir_dossier: bool
         :param ouvrir_fe: Si True, ouvre et charge l'Objet FichierExcel dans fe (i.e. si les données de eval formation ne suffisent pas)
         :type ouvrir_fe: bool, optional
         :return: l'EvalStat session
         :rtype: EvalStat_session
         """
         instance = cls(session)
-
-        # On vérifie la présence du code_session dans l'éval formation
-        code_IRIS_present_eval_formation = instance.eval_formation.verifier_presence_code_IRIS_dans_eval(instance.code_IRIS)
-        
-        if code_IRIS_present_eval_formation :
-            # === CAS avec code IRIS déjà traité (i.e. qui est dans eval formation) ===
-            instance.ouvrir_eval(session=session, ouvrir_fe=ouvrir_fe)
-        
-        else:
-            # === CAS avec code IRIS non traité (i.e. qui n'est pas dans eval formation) ===
-            instance.traiter_eval(
-                chemin_csv=chemin_csv,
-                ecrire_eval_formation=ecrire_eval_formation,
-                ouvrirDossier=ouvrirDossier
-            )
-
+        instance.ouvrir_ou_traiter_eval(
+            chemin_csv=chemin_csv,
+            ecrire_eval_formation=ecrire_eval_formation,
+            ouvrir_dossier=ouvrir_dossier,
+            ouvrir_fe=ouvrir_fe
+        )
         return instance
 
+
+    # TODO : probablement à virer
     @classmethod
-    def avec_traitement(cls, session:Session_protocol, chemin_csv:Optional[Path|str]=None, ecrire_eval_formation:bool=True, ouvrirDossier:bool=False) -> EvalStat_session:
+    def avec_traitement(cls, session:Session_protocol, chemin_csv:Optional[Path|str]=None, ecrire_eval_formation:bool=True, ouvrir_dossier:bool=False) -> EvalStat_session:
         """
         Crée l'instance EvalStat d'une session et traite cet EvalStat.
 
@@ -309,8 +301,8 @@ class EvalStat_session(EvalStat):
         :type chemin_csv: Optional[Path|str]
         :param ecrire_eval_formation: Pour écrire physiquement l'Excel eval formation en fin de traitement. Si False, il devra être écrit ailleurs (à l'endroit où il y a la boucle pour du multi-traitement typiquement). Défaut = True.
         :type ecrire_eval_formation: bool
-        :param ouvrirDossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
-        :type ouvrirDossier: bool
+        :param ouvrir_dossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
+        :type ouvrir_dossier: bool
         :return: _description_
         :rtype: EvalStat_session
         """
@@ -318,7 +310,7 @@ class EvalStat_session(EvalStat):
         instance.traiter_eval(
             chemin_csv=chemin_csv,
             ecrire_eval_formation=ecrire_eval_formation,
-            ouvrirDossier=ouvrirDossier
+            ouvrir_dossier=ouvrir_dossier
         )
         return instance
 
@@ -574,7 +566,7 @@ class EvalStat_session(EvalStat):
         if session.eval is None:
             session.eval = self   
 
-    def traiter_eval(self, chemin_csv:Optional[Path|str]=None, ecrire_eval_formation:bool=True, ouvrirDossier:bool=False) -> None:
+    def traiter_eval(self, chemin_csv:Optional[Path|str]=None, ecrire_eval_formation:bool=True, ouvrir_dossier:bool=False) -> None:
         """
         Crée l'Excel EvalStat d'une session à partir d'un CSV (s'il n'est pas donné, on ouvre un filedialog).
 
@@ -584,8 +576,8 @@ class EvalStat_session(EvalStat):
         :type chemin_csv: Optional[Path|str]
         :param ecrire_eval_formation: Pour écrire physiquement l'Excel eval formation en fin de traitement. Si False, il devra être écrit ailleurs (à l'endroit où il y a la boucle pour du multi-traitement typiquement). Défaut = True.
         :type ecrire_eval_formation: bool
-        :param ouvrirDossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
-        :type ouvrirDossier: bool
+        :param ouvrir_dossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
+        :type ouvrir_dossier: bool
         """
         
         # On vérifie s'il est perinent de faire le traitement de l'EvalStat (on vérifie notemment sa déjà présence dans l'EvalStat formation)
@@ -644,10 +636,43 @@ class EvalStat_session(EvalStat):
     
     
         # Ouverture du dossier à la fin si demandé
-        if ouvrirDossier:
+        if ouvrir_dossier:
             ouvrir_dossier(self.chemin_fe.parent)
 
         timer.fin()       
+
+    def ouvrir_ou_traiter_eval(self, chemin_csv:Optional[Path|str]=None, ecrire_eval_formation:bool=True, ouvrir_dossier:bool=False, ouvrir_fe:bool=False) -> None:
+        """
+        Ouverture ou création du fichier Excel EvalStat.
+
+        Si création :
+            - crée l'instance EvalStat d'une session et traite cet EvalStat ;
+            - crée l'Excel EvalStat d'une session à partir d'un CSV (s'il n'est pas donné, on ouvre un filedialog) ;
+            - l'évaluation de la formation est mise à jour avec ces nouvelles données et est sauvée en fin de traitement selon le critère ecrire_eval_formation.
+
+        :param chemin_csv: chemin du CSV à traiter. S'il est None, on ouvre un filedialog
+        :type chemin_csv: Optional[Path|str]
+        :param ecrire_eval_formation: Pour écrire physiquement l'Excel eval formation en fin de traitement. Si False, il devra être écrit ailleurs (à l'endroit où il y a la boucle pour du multi-traitement typiquement). Défaut = True.
+        :type ecrire_eval_formation: bool
+        :param ouvrir_dossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
+        :type ouvrir_dossier: bool
+        :param ouvrir_fe: Si True, ouvre et charge l'Objet FichierExcel dans fe (i.e. si les données de eval formation ne suffisent pas)
+        :type ouvrir_fe: bool, optional
+        """
+        # On vérifie la présence du code_session dans l'éval formation
+        code_IRIS_present_eval_formation = self.eval_formation.verifier_presence_code_IRIS_dans_eval(self.code_IRIS)
+        
+        if code_IRIS_present_eval_formation :
+            # === CAS avec code IRIS déjà traité (i.e. qui est dans eval formation) ===
+            self.ouvrir_eval(session=self._session, ouvrir_fe=ouvrir_fe)
+        
+        else:
+            # === CAS avec code IRIS non traité (i.e. qui n'est pas dans eval formation) ===
+            self.traiter_eval(
+                chemin_csv=chemin_csv,
+                ecrire_eval_formation=ecrire_eval_formation,
+                ouvrir_dossier=ouvrir_dossier
+            )
 
 
 

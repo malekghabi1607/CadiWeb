@@ -97,7 +97,7 @@ def test_traiter_eval_sessions(mock, tel):
 
     formation.eval = Mock()
 
-    formation.traiter_eval_sessions(
+    formation.ouvrir_ou_traiter_eval_sessions(
         chemin_csv=None,
         ouvrirDossier=False
     )
