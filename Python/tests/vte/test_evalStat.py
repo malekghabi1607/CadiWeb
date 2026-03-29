@@ -299,7 +299,7 @@ def test_creation_nouvel_eval_formation(tel):
 
     try:
 
-        formation = Formation.avec_ouverture_ou_creation_evalStat(
+        formation = Formation.avec_ouverture_ou_creation_evalStat_formation(
             tel["trigramme_formation"]
         )
         #print("\n")
@@ -336,7 +336,7 @@ def test_creation_ouvrir_eval_formation_existant(tel):
 
     try:
 
-        formation = Formation.avec_ouverture_ou_creation_evalStat(
+        formation = Formation.avec_ouverture_ou_creation_evalStat_formation(
             tel["trigramme_formation"]
         )
         #print("\n")
@@ -402,13 +402,13 @@ def test_traitement_eval_session_fonctionnel(
 
     try:
         set_iris_chemin_specifique(typeExport="Sessions", chemin=tel["chemin_IRIS_sessions"])  # On redéfinit le chemin d'IRIS Sessions
-        formation = Formation.avec_ouverture_ou_creation_evalStat(tel["trigramme_formation"])
+        formation = Formation.avec_ouverture_ou_creation_evalStat_formation(tel["trigramme_formation"])
         session = Session.avec_ouverture_ou_traitement_evalStat(
             formation=formation,
             code_IRIS=tel["code_IRIS"],
             chemin_csv=tel["chemin_csv_session"],
             # ecrire_eval_formation=True,  # Valeur par défaut = True
-            ouvrirDossier=True
+            ouvrir_dossier=True
         )
         # Vérifications de session
         assert session.eval.fe is not None
@@ -477,13 +477,13 @@ def test_eval_session_multi_csv(
         dataset = evalstat_csv_datasets[dataset_index]
         set_iris_chemin_specifique(typeExport="Sessions", chemin=tel["chemin_IRIS_sessions"])  # On redéfinit le chemin d'IRIS Sessions
 
-        formation = Formation.avec_ouverture_ou_creation_evalStat(tel["trigramme_formation"])
+        formation = Formation.avec_ouverture_ou_creation_evalStat_formation(tel["trigramme_formation"])
         session = Session.avec_ouverture_ou_traitement_evalStat(
             formation=formation,
             code_IRIS=dataset["code_IRIS"],
             chemin_csv=dataset["csv"],
             # ecrire_eval_formation=True,  # Valeur par défaut = True
-            ouvrirDossier=False
+            ouvrir_dossier=False
         )
 
 

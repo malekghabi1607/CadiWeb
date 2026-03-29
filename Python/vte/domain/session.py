@@ -48,7 +48,7 @@ class Session:
         code_IRIS: int, 
         chemin_csv:Optional[Path|str]=None, 
         ecrire_eval_formation:bool=True, 
-        ouvrirDossier:bool=False
+        ouvrir_dossier:bool=False
         ) -> Session:
         """
         Crée une l'instance de Session en traitant son EvalStat.
@@ -75,7 +75,7 @@ class Session:
             session=instance,
             chemin_csv=chemin_csv,
             ecrire_eval_formation=ecrire_eval_formation,
-            ouvrirDossier=ouvrirDossier
+            ouvrir_dossier=ouvrir_dossier
             )
         return instance
 

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from functools import cached_property
 from pathlib import Path
 from typing import Optional, Protocol
 
@@ -11,6 +12,7 @@ from vte.domain.fdc import FdC
 from vte.domain.iris import IRIS_traite
 from vte.utils.office import FichierWord
 from vte.utils.utils import *
+from vte.utils.utils_instn import construire_chemin_config
 
 # TODO : Pour l'instant c'est une classe de traitement. Le jour où j'ai besoin d'ouvrir un EvalStat pour le lire uniquement, prendre modèle sur IRIS avec des classes de lecture et de traitement
 
@@ -55,9 +57,29 @@ class BilanFormation:
 
 
     # =========================
-    # === METHODES INTERNES === 
+    # === METHODES EXTERNES === 
     # =========================
+    @staticmethod
+    def construire_chemin_word_bilan_formation_output(trigramme_formation:Optional[str]=None, annee:Optional[int]=None) -> Path:
+        """
+        Construit le chemin de sortie du bilan de formation (à partir des données de la config CHEMIN_WORD_BILAN_FORMATION_OUTPUT) :
+            - le chemin est transformé en unc (s'il y a un raccourci lecteur réseau sur le poste de l'utilisateur on transforme en chemin réseau complet) ;
+            - l'utilisateur peut optimiser le chemin (chemin le plus long entre l'attendu et ce qui existe).
 
+        :param trigramme_formation: Trigramme de la formation. Défaut = None
+        :type trigramme_formation: Optional[str], optional
+
+        :param annee: Année du bilan de formation. Défaut = None.
+        :type annee: Optional[int], optional
+
+        :return: Le chemin de sortie du bilan de formation.
+        :rtype: Path
+        """
+        return construire_chemin_config(
+            chemin_a_completer = config.CHEMIN_WORD_BILAN_FORMATION_OUTPUT,
+            trigramme_formation = trigramme_formation, 
+            annee = annee
+        )
 
 
     # =========================
@@ -67,8 +89,8 @@ class BilanFormation:
     def annee(self) -> Optional[int]:
         return self._annee
     
-    @property
-    def chemin_word_bilan_output(self) -> Path:
+    @cached_property
+    def chemin_word_bilan_formation_output(self) -> Path:
         """
         Renvoie le chemin de sortie du bilan de formation.
         Cette donnée est stockée dans le fichier de config (valeur par défaut).
@@ -76,8 +98,10 @@ class BilanFormation:
         :return: Chemin de sortie du bilan de formation.
         :rtype: Path
         """
-        return config.format_path(config.CHEMIN_WORD_BILAN_FORMATION_OUTPUT, trigramme_formation=self.trigramme_formation, annee=self._annee)
+        #return config.format_path(config.CHEMIN_WORD_BILAN_FORMATION_OUTPUT, trigramme_formation=self.trigramme_formation, annee=self._annee)
+        return BilanFormation.construire_chemin_word_bilan_formation_output(trigramme_formation=self.trigramme_formation, annee=self._annee)
 
+    #TODO mettre les cached_property (on peut prendre exeemple sur bilan session)
     @property
     def df_sessions_filtre(self) -> DataFrame:
         """
@@ -178,7 +202,7 @@ class BilanFormation_V3(BilanFormation):
         instance = cls(formation=formation, annee=annee)
 
         # On teste la pré-existance du bilan Word sinon on n'exécute pas
-        continuer = verifier_existance_fichier(instance.chemin_word_bilan_output)
+        continuer = verifier_existance_fichier(instance.chemin_word_bilan_formation_output)
 
         if continuer:
             

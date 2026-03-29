@@ -35,4 +35,4 @@ tuple_csv_stagiaires_22B = (
     r"P:\FORMATIONS_C\22B\P07-bilan-sessions-et-bilan-formation\rapports-sessions-CSV-evaluations\S-17606 - 22B - 06-2025\S-17606-FC25-22B-VTE-CAR-Stagiaires.csv",
 )
 
-tuple_csv_stagiaires = tuple_csv_stagiaires_948 + tuple_csv_stagiaires_TEL + tuple_csv_stagiaires_22B
+tuple_csv_stagiaires_Tous = tuple_csv_stagiaires_948 + tuple_csv_stagiaires_TEL + tuple_csv_stagiaires_22B

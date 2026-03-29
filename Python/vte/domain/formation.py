@@ -40,7 +40,7 @@ class Formation:
 
     # TODO : voir si ce n'est pas un constructeur de traitement finalement (déplacer plus bas et renommer)
     @classmethod
-    def avec_ouverture_ou_creation_evalStat(cls, trigramme_formation: str) -> Formation:
+    def avec_ouverture_ou_creation_evalStat_formation(cls, trigramme_formation: str) -> Formation:  # pytesté
         """
         Crée une instance de Formation en créant un evalStat formation (ou en l'ouvrant s'il existe déjà)
 
@@ -54,7 +54,7 @@ class Formation:
         return instance
 
     @classmethod
-    def avec_ajout_sessions(cls, trigramme_formation: str, codes_IRIS:int|Iterable[int]) -> Formation:
+    def avec_ajout_sessions(cls, trigramme_formation: str, codes_IRIS:int|Iterable[int]) -> Formation:  # pytesté
         """
         Initialise une instance de Formation contenant une ou plusieurs instances de Session.
 
@@ -84,7 +84,7 @@ class Formation:
     # Méthodes de traitement : on fera toutes les étapes intemédiaires si besoin (créer formation, ajouter sessions, ajouter FdC...)
 
     @classmethod
-    def pour_traitement_bilanSessions_depuis_codesIRIS(cls, codes_IRIS:int|Iterable[int], annee:Optional[int]=None, periode:str="Année") -> Formation:
+    def pour_traitement_bilanSessions_depuis_codesIRIS(cls, codes_IRIS:int|Iterable[int], annee:Optional[int]=None, periode:str="Année") -> Formation:  # pytesté dans test_bilansSessions
         """
         Génère un bilan de sessions à partir d'un ou plusieurs codes IRIS (un bilan pour une session ou pour plusieurs sessions (période)).
 
@@ -115,7 +115,7 @@ class Formation:
         return instance 
 
     @classmethod
-    def pour_traitement_bilanSessions_depuis_periode(cls, trigramme_formation:str, annee:int, periode:str="Année") -> Formation:
+    def pour_traitement_bilanSessions_depuis_periode(cls, trigramme_formation:str, annee:int, periode:str="Année") -> Formation:  # pytesté dans test_bilansSessions
         """
         Permet de générer un bilan de sessions selon une année et une période qui est l'un de ces éléments : ["1er semestre", "2nd semestre", "Année"]
 
@@ -179,7 +179,7 @@ class Formation:
         """
 
         #On crée l'instance avec ouverture de l'EvalStat formation
-        instance = cls.avec_ouverture_ou_creation_evalStat(trigramme_formation=trigramme_formation)
+        instance = cls.avec_ouverture_ou_creation_evalStat_formation(trigramme_formation=trigramme_formation)
 
         # On ajoute la session 
         instance.ajout_sessions(codes_IRIS=code_IRIS)
@@ -202,7 +202,7 @@ class Formation:
     # =========================
     # === METHODES EXTERNES ===
     # =========================
-    def ouvrir_ou_creer_eval_formation(self) -> None:
+    def ouvrir_ou_creer_eval_formation(self) -> None:  # pytesté avec Formation.avec_ouverture_ou_creation_evalStat
         """
         Définit self._eval en créant ou ouvrant l'évaluation de la formation à l'instance de Formation.
 
@@ -211,7 +211,7 @@ class Formation:
         if self._eval is None:
             self._eval = EvalStat_formation.avec_ouverture_ou_creation(formation=self)
 
-    def ouvrir_fdc(self, chemin_fdc:Optional[Path|str] = None) -> None:
+    def ouvrir_fdc(self, chemin_fdc:Optional[Path|str] = None) -> None:  # pytesté
         """
         Ouvre la fiche de coûts de la formation (i.e. définit self._fdc).
 
@@ -222,7 +222,7 @@ class Formation:
         """
         self._fdc = FdC.depuis_chemin(formation=self, chemin_fdc=chemin_fdc)
 
-    def ajout_sessions(self, codes_IRIS:int|Iterable[int]) -> None:
+    def ajout_sessions(self, codes_IRIS:int|Iterable[int]) -> None:  # pytesté avec Formation.avec_ajout_sessions
         """
         Ajouter une ou plusieurs sessions au dictionnaire de la formation.
 
@@ -237,7 +237,7 @@ class Formation:
             if code_IRIS not in [session.code_IRIS for session in self._sessions]:
                 self._sessions.append(Session(formation=self, code_IRIS=code_IRIS))
 
-    def ouvrir_ou_traiter_eval_sessions(
+    def ouvrir_ou_traiter_eval_sessions(  # pytesté
         self,
         ecrire_eval_formation: Optional[bool] = False, 
         ouvrirDossier: Optional[bool] = False
@@ -266,7 +266,7 @@ class Formation:
         # Sauvegarde de l'eval formation
         self.eval.ecrit_et_sauve_df_siModif()
 
-    def ajout_bilan_sessions_avec_traitement(self, codes_IRIS:Optional[int|Iterable[int]]=None, annee:Optional[int]=None, periode:str="Année") -> None:
+    def ajout_bilan_sessions_avec_traitement(self, codes_IRIS:Optional[int|Iterable[int]]=None, annee:Optional[int]=None, periode:str="Année") -> None:  # pytesté dans test_bilansSessions
         """
         On ajoute un nouveau bilan de sessions à self._bilans_sessions[annee][periode].
 
@@ -305,7 +305,7 @@ class Formation:
     # ====================
     # === METHODES GET ===
     # ====================
-    def get_session_par_codeIRIS(self, code_IRIS:int) -> Optional[Session]:
+    def get_session_par_codeIRIS(self, code_IRIS:int) -> Optional[Session]:  # pytesté
         """
         Renvoie la session de la liste self._sessions avec le code_IRIS.
 

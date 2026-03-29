@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import cached_property
 import math
 from pathlib import Path
 from typing import Optional, Protocol
@@ -7,7 +8,7 @@ from typing import Optional, Protocol
 from vte.core import config
 from vte.utils.utils import *
 from vte.utils.office import FichierExcel
-from vte.utils.utils_instn import recupere_trig_formation_depuis_chemin
+from vte.utils.utils_instn import construire_chemin_config, recupere_trig_formation_depuis_chemin
 
 # ======================================================================================
 # PROTOCOLES
@@ -141,11 +142,30 @@ class FdC:
         return self.prevus_participants + depassementAutorise
 
 
+    @staticmethod
+    def construire_chemin_repertoire_fdc(trigramme_formation:Optional[str]=None) -> Path:
+        """
+        Construit le chemin du répertoire de la fiche de coûts de la formation (à partir des données de la config REPERTOIRE_FDC) :
+            - le chemin est transformé en unc (s'il y a un raccourci lecteur réseau sur le poste de l'utilisateur on transforme en chemin réseau complet) ;
+            - l'utilisateur peut optimiser le chemin (chemin le plus long entre l'attendu et ce qui existe).
+
+        :param trigramme_formation: Trigramme de la formation. Défaut = None
+        :type trigramme_formation: Optional[str], optional
+
+        :return: Le chemin de sortie du bilan de sessions.
+        :rtype: Path
+        """
+        return construire_chemin_config(
+            chemin_a_completer = config.REPERTOIRE_FDC,
+            trigramme_formation = trigramme_formation
+        )
+
+
 
     # =========================
     # === GETTERS / SETTERS ===
     # =========================
-    @property
+    @cached_property
     def trigramme_formation(self) -> str|None:
         """
         Renvoie le trigramme de la formation.
@@ -196,9 +216,9 @@ class FdC:
         sDateFdC = dateFdC.strftime("%d/%m/%Y")
         return sDateFdC
 
-    @property
+    @cached_property
     def dossier_plan_classement(self) -> Path:
-        return config.format_path(config.REPERTOIRE_FDC, trigramme_formation=self.trigramme_formation)
+        return FdC.construire_chemin_repertoire_fdc(trigramme_formation=self.trigramme_formation)
 
 
     # ========================================================

@@ -33,7 +33,7 @@ def test_avec_traitement_evalStat(mock, formation, tel):
         code_IRIS=tel["code_IRIS"],
         chemin_csv=None,
         ecrire_eval_formation=False,
-        ouvrirDossier=False
+        ouvrir_dossier=False
     )
 
     assert session.trigramme_formation == tel["trigramme_formation"]

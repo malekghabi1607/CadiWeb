@@ -29,55 +29,55 @@ En effet, on ne peut pas accéder à une fixture dans le décorateur @pytest...
 En déclarant avant, on a l'info pour faire le .keys() et on l'emploie pour définir le fixture
 """
 DATASETS_CODES_IRIS = {
-        "Bilan unique par code IRIS. CSV dans eval formation": {
-            "chemin_IRIS_sessions": tel["chemin_IRIS_sessions"],
-            "trigramme_formation": tel["trigramme_formation"],
-            "codes_IRIS": tel["code_IRIS"],
-            "chemin_bilanSessions": tel["chemin_bilanSessions"],
+    "Bilan unique par code IRIS. CSV dans eval formation": {
+        "chemin_IRIS_sessions": tel["chemin_IRIS_sessions"],
+        "trigramme_formation": tel["trigramme_formation"],
+        "codes_IRIS": tel["code_IRIS"],
+        "chemin_bilanSessions": tel["chemin_bilanSessions"],
 
-            # mocks
-            "mock_verifier_existance_fichier": True,  # True = on continue
-            #"mock_statut_eval": "Traité",
+        # mocks
+        "mock_verifier_existance_fichier": True,  # True = on continue
+        #"mock_statut_eval": "Traité",
 
-            # attendu
-            #"expected_statut": "OK",
-            },
+        # attendu
+        #"expected_statut": "OK",
+        },
 
 
-        "Bilan unique par code IRIS. CSV introuvable": {
-            "chemin_IRIS_sessions": tel["chemin_IRIS_sessions"],
-            "trigramme_formation": tel["trigramme_formation"],
-            "codes_IRIS": 17343,
-            "chemin_bilanSessions": chemin_vers_unc(Path(r"P:\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\2025\P07-Pr05-F05-Bilan session-S-17343-FC25-TEL-VTE-CAR-UEM.docx")),
+    "Bilan unique par code IRIS. CSV introuvable": {
+        "chemin_IRIS_sessions": tel["chemin_IRIS_sessions"],
+        "trigramme_formation": tel["trigramme_formation"],
+        "codes_IRIS": 17343,
+        "chemin_bilanSessions": chemin_vers_unc(Path(r"P:\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\2025\P07-Pr05-F05-Bilan session-S-17343-FC25-TEL-VTE-CAR-UEM.docx")),
 
-            # mocks
-            "mock_verifier_existance_fichier": True,  # True = on continue
-            #"mock_statut_eval": "Exclu - Aucun CSV fourni",
+        # mocks
+        "mock_verifier_existance_fichier": True,  # True = on continue
+        #"mock_statut_eval": "Exclu - Aucun CSV fourni",
 
-            # attendu
-            #"expected_statut": "Exclu - Aucun CSV fourni",
-            },
+        # attendu
+        #"expected_statut": "Exclu - Aucun CSV fourni",
+        },
 
-    }
+}
 
 DATASETS_PERIODE = {
-        "Bilan TEL annee 2024 (3 sessions, 2 CSV seulement)": {
-            "chemin_IRIS_sessions": tel["chemin_IRIS_sessions"],
-            "trigramme_formation": tel["trigramme_formation"],
-            "annee": 2024,
-            "periode": "Année",
-            "chemin_bilanSessions": chemin_vers_unc(Path(r"P:\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\2024\P07-Pr05-F05-Bilan session-Année 2024-UEM.docx")),
-            
-            # mocks
-            "mock_verifier_existance_fichier": True,  # True = on continue
-            "mock_demande_sessions_a_retenir": [15830, 15942, 16161],
-            #"mock_statut_eval": "Exclu - Aucun CSV fourni",
+    "Bilan TEL annee 2024 (3 sessions, 2 CSV seulement)": {
+        "chemin_IRIS_sessions": tel["chemin_IRIS_sessions"],
+        "trigramme_formation": tel["trigramme_formation"],
+        "annee": 2024,
+        "periode": "Année",
+        "chemin_bilanSessions": chemin_vers_unc(Path(r"P:\FORMATIONS_C\TEL\P07-bilan-sessions-et-bilan-formation\2024\P07-Pr05-F05-Bilan session-Année 2024-UEM.docx")),
+        
+        # mocks
+        "mock_verifier_existance_fichier": True,  # True = on continue
+        "mock_demande_sessions_a_retenir": [15830, 15942, 16161],
+        #"mock_statut_eval": "Exclu - Aucun CSV fourni",
 
-            # attendu
-            #"expected_statut": "Exclu - Aucun CSV fourni",
-            },
+        # attendu
+        #"expected_statut": "Exclu - Aucun CSV fourni",
+        },
 
-    }
+}
 
 STATUTS_EVAL_NON_TRAITE = {
     15830 : "Exclu - Aucun CSV fourni",
