@@ -43,7 +43,7 @@ def test_avec_traitement_evalStat(mock, formation, tel):
         session=session,
         chemin_csv=None,
         ecrire_eval_formation=False,
-        ouvrirDossier=False
+        ouvrir_dossier=False
     )
 
 # ----------------------------------------------------------------------

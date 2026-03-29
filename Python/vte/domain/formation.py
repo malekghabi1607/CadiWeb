@@ -294,7 +294,7 @@ class Formation:
             # Alors on traite à partir de la période
             bilan = BilanSessions.depuis_periode(formation=self, annee=annee, periode=periode)
 
-        # Les champs année et période peuvent être complétés/définis lors du traitement de BilanSessions, donc je ne peut affcter self._bilans_sessions[bilan.annee][bilan.periode] que maintenant
+        # Les champs année et période peuvent être complétés/définis lors du traitement de BilanSessions, donc je ne peut affecter self._bilans_sessions[bilan.annee][bilan.periode] que maintenant
         # On initialise le dictionnaire de 2nd niveau si non déjà fait
         if bilan.annee not in self._bilans_sessions.keys():
             self._bilans_sessions[bilan.annee] = {}
