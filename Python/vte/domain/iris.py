@@ -536,7 +536,6 @@ class IRIS:
     # ==========================
     # === IHM ===
     # ==========================
-    # TODO : attention, je convertissais les codes IRIS en str. J'ai remis en int
     @staticmethod
     def demander_liste_codes_IRIS(message="Pour exclure des sessions : entrez un ou plusieurs code IRIS (numéro à 5 chiffres) séparés par des espaces ou des virgules (ou rien pour passer) : ", type_sortie:int|str=int) -> list[int|str]:
         """
@@ -1253,7 +1252,7 @@ class IRIS_traite(IRIS):
 
         Par défaut la période est toute l'année, sinon il faut préciser "1er semestre" ou "2nd semestre".
 
-        #On ouvre et lit l'export sessions IRIS si et seulement si il n'est pas déjà ouvert et lu avant
+        Trié de sorte que la session la plus récente est en 1ère ligne.
         
         :param trigramme_formation: trigramme filtré. Si non renseigné : pas de filtre sur ce critère.
         :type trigramme_formation: Optional[str]
@@ -1278,8 +1277,8 @@ class IRIS_traite(IRIS):
             - le trigramme de la formation en cours (si donné en argument).
 
         Par défaut la période est toute l'année, sinon il faut préciser "1er semestre" ou "2nd semestre".
-
-        #On ouvre et lit l'export sessions IRIS si et seulement si il n'est pas déjà ouvert et lu avant
+        
+        Trié de sorte que la session la plus récente est en 1ère ligne.
         
         :param trigramme_formation: trigramme filtré. Si non renseigné : pas de filtre sur ce critère.
         :type trigramme_formation: Optional[str]
