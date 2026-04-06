@@ -9,7 +9,7 @@ from pandas import DataFrame
 from vte.core.iris_referentiel import *
 from vte.core import config
 from vte.domain.fdc import FdC
-from vte.domain.iris import IRIS_traite
+from vte.domain.iris import IRIS_sessions
 from vte.utils.office import FichierWord
 from vte.utils.utils import *
 from vte.utils.utils_instn import construire_chemin_config
@@ -41,8 +41,8 @@ class Formation_protocol(Protocol):
 # ======================================================================================
 class BilanFormation:
     # === VARIABLES PARTAGÉES ENTRE TOUTES LES INSTANCES
-    _iris_sessions:Optional[IRIS_traite] = None  # Fichier Excel qui contient les extracts IRIS Sessions (ou a minima celles de la période en cours) → Plusieurs bilan peuvent être fait à partir de cet extract, c'est donc une variable de classe
-    _iris_ventes:Optional[IRIS_traite] = None  # Fichier Excel qui contient les extracts IRIS Ventes (ou a minima celles de la période en cours) → Plusieurs bilan peuvent être fait à partir de cet extract, c'est donc une variable de classe
+    _iris_sessions:Optional[IRIS_sessions] = None  # Fichier Excel qui contient les extracts IRIS Sessions (ou a minima celles de la période en cours) → Plusieurs bilan peuvent être fait à partir de cet extract, c'est donc une variable de classe
+    _iris_ventes:Optional[IRIS_sessions] = None  # Fichier Excel qui contient les extracts IRIS Ventes (ou a minima celles de la période en cours) → Plusieurs bilan peuvent être fait à partir de cet extract, c'est donc une variable de classe
 
     #_df_sessions_filtre:Optional[pd.DataFrame] = None
 

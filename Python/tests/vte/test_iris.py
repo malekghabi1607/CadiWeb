@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 
-from vte.domain.iris import IRIS_natif, IRIS_traite
+from vte.domain.iris import IRIS_natif, IRIS_sessions
 from vte.utils.office import *
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -103,7 +103,7 @@ def test_iris_traite_charge_avec_fe_vide(de_iris_traite_session):
     """
     Comportement attendu : on ne cahrge pas le fichier Excel
     """
-    iris = IRIS_traite(
+    iris = IRIS_sessions(
         typeExport=de_iris_traite_session["typeExport"],
         fe=de_iris_traite_session["fe_vide"]
     )
@@ -113,7 +113,7 @@ def test_iris_traite_charge_avec_fe_vide(de_iris_traite_session):
     assert iris.fe.chemin_fichier is None
 
 def test_iris_traite_charge_avec_fe(de_iris_traite_session):
-    iris = IRIS_traite(
+    iris = IRIS_sessions(
         typeExport=de_iris_traite_session["typeExport"],
         fe=de_iris_traite_session["fe"]
     )
@@ -123,7 +123,7 @@ def test_iris_traite_charge_avec_fe(de_iris_traite_session):
     assert iris.fe.chemin_fichier == de_iris_traite_session["chemin"]
 
 def test_iris_traite_charge_avec_chemin(de_iris_traite_session):
-    iris = IRIS_traite(
+    iris = IRIS_sessions(
         typeExport=de_iris_traite_session["typeExport"],
         chemin=de_iris_traite_session["chemin"]
     )

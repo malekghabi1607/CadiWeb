@@ -214,7 +214,7 @@ class EvalStat:
   
     # Liens avec IRIS
     @property
-    def iris_sessions(self) -> IRIS_traite:
+    def iris_sessions(self) -> IRIS_sessions:
         return get_iris(typeExport="Sessions")
     
     @property
@@ -455,6 +455,60 @@ class EvalStat_formation(EvalStat):
         
         return Path(df["Chemin fichier CSV"].iloc[0])
 
+    def calculer_stats_criteres(self) -> dict[str, dict[str, int|float|str|None]]:
+        """
+        Calcule les statistiques (nombre de retours, moyenne retours, agrégation des commentaires) de tous les critères.
+
+        Fait ce traitement pour tous les éléments dont nous avons des CSV (i.e. appartenant à liste_codesIRIS_pour_statsCSV)
+        
+        Retourne un dictionnaire de la forme :
+        {
+            "Nom du critère": {
+                "Nombre": ...,
+                "Moyenne": ...,
+                "Commentaires": ...
+            },
+            ...
+        }
+
+        :return: Un dictionnaire de tous les critères
+        :rtype: dict
+        """
+
+        # S'il n'y a pas de CSV disponibles pour les stats, alors ce n'est pas la peine de faire les stats
+        if len(self.liste_codesIRIS_pour_statsCSV) > 0 :
+            # On récupère la iste des critères
+            liste_criteres = self.df_stagiaires_filtre_statsCSV['Critère'].dropna().unique()
+
+
+            # On fait les stats pour chaque critère
+            for critere in liste_criteres:
+                # Dataframe filtré sur ce critère
+                df_filtre = self.df_stagiaires_filtre_statsCSV[self.df_stagiaires_filtre_statsCSV['Critère'] == critere]
+                
+                # Nombre d'éléments avec ce critère
+                nb = len(df_filtre)
+                # Moyenne de ce critère
+                moyenne = float(df_filtre['Note'].mean()) if nb > 0 else None
+
+                # On concatère les commentaires associés
+                commentaires_concat = "\n".join(
+                    "• " + c.strip()
+                    for c in df_filtre['Commentaires'].dropna().astype(str)
+                    if c.strip() != ""
+                )
+
+                # On met toutes ces données en forme dans _stats_stagiaires
+                self._stats_stagiaires[critere] = {
+                    "Nombre": nb,
+                    "Moyenne": moyenne,
+                    "Commentaires": commentaires_concat
+                }
+        #else:
+            #vlog.print("Info", f"⚠️  Aucun CSV disponible pour ce bilan : les statistiques des stagiaires ne seront pas évaluées.")
+            #self._commentairesBilan += f"\n⚠️  Aucun CSV disponible pour ce bilan : les statistiques des stagiaires ne seront pas évaluées.\n"
+
+        #return self._stats_stagiaires
 
     @staticmethod
     def construire_chemin_eval_formation(trigramme_formation:Optional[str]=None) -> Path:
@@ -476,6 +530,41 @@ class EvalStat_formation(EvalStat):
     
     
 
+    # === Méthodes get ===
+    def _get_codesIRIS_par_statut_evalStat(self, statut_evalStat: str) -> list[int]:
+        """
+        Retourne une liste des codes IRIS pour un statut donné.
+
+        :param statut_evalStat: statut EvalStat (["Traité", "Traité - Code IRIS déjà dans l'évaluation de la formation", "Traité - CSV déjà dans l'évaluation de la formation", "Exclu - Aucun CSV fourni", "Exclu - Code IRIS pas dans Extract IRIS sessions", "Exclu - Problème lecture CSV", "Exclu - CSV vide / Aucun retour"])
+        :type statut_evalStat: str
+        :return: une liste des codes IRIS avec ce statut
+        :rtype: list[int]
+        """
+        codes_IRIS = []
+        for code_IRIS in self._codes_IRIS:
+            session = self._formation.get_session_par_codeIRIS(code_IRIS)
+            if session.eval.statut == statut_evalStat:
+                codes_IRIS.append(code_IRIS)
+        return codes_IRIS
+
+    def _get_codesIRIS_par_statut_pourBilan(self, statut_pourBilan: str) -> list[int]:
+        """
+        Retourne une liste des codes IRIS pour une clé de mapping donnée (statut pour bilan, i.e. mieux nommés).
+
+        :param statut_pourBilan: Statut "pour bilan" (i.e. mieux nommés) ["Exploités pour les évaluations (CSV présents)", "Exploités pour les évaluations (CSV présents)", "Exclus des évaluations (problème traitement CSV)", "Exclus des évaluations (CSV manquants)", "Exclus des évaluations (CSV vide / aucun retour)", "Exclus entièrement du bilan (non présent dans IRIS / mauvais code)"] 
+        :type statut_pourBilan: str
+        :return: une liste des codes IRIS avec ce statut
+        :rtype: list[int]
+        """
+        #pprint(self._mapping_statuts)
+
+        statut_evalStat = next((clef for clef, valeur in self._mapping_statuts.items() if valeur == statut_pourBilan), None)
+        if statut_evalStat is None:
+            return []
+        return self._get_codesIRIS_par_statut_evalStat(statut_evalStat)
+
+
+
     # =========================
     # === GETTERS / SETTERS ===
     # =========================
@@ -489,6 +578,17 @@ class EvalStat_formation(EvalStat):
         return EvalStat_formation.construire_chemin_eval_formation(trigramme_formation=self.trigramme_formation)
 
 
+    @cached_property
+    def liste_codesIRIS_pour_statsCSV(self) -> list[int]:
+        """
+        Retourne la liste des codes IRIS pour lesquels on peut calculer les stats à partir des CSV.
+
+        Ca correspond aux codes IRIS pour lesquels le CSV est fonctionnel et non vide.
+
+        :return: La liste des codes IRIS pour lesquels on peut calculer les stats à partir des CSV.
+        :rtype: list[int]
+        """
+        return self._get_codesIRIS_par_statut_pourBilan("Exploités pour les évaluations (CSV présents et non vides)")
 
 
 

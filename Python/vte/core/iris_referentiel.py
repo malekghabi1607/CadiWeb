@@ -3,7 +3,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Dict, Optional
 
-from vte.domain.iris import IRIS, IRIS_traite
+from vte.domain.iris import IRIS, IRIS_sessions
 
 
 
@@ -17,7 +17,7 @@ from vte.domain.iris import IRIS, IRIS_traite
 # CACHE INTERNE
 # ======================================================================================
 
-_cache: Dict[str, IRIS] = {}
+_cache: Dict[str, IRIS_sessions] = {}
 _chemins_specifiques: Dict[str, Optional[Path]] = {}
 
 
@@ -26,7 +26,7 @@ _chemins_specifiques: Dict[str, Optional[Path]] = {}
 # ======================================================================================
 
 # === FONCTIONS DE BASE ===
-def get_iris(typeExport: str, chemin:Optional[Path]=None) -> IRIS_traite:
+def get_iris(typeExport: str, chemin:Optional[Path]=None) -> IRIS_sessions:
     """
     Retourne une instance IRIS chargée pour un type donné.
     Si elle n'existe pas encore, elle est créée et mise en cache.
@@ -44,12 +44,12 @@ def get_iris(typeExport: str, chemin:Optional[Path]=None) -> IRIS_traite:
 
     # On charge IRIS selon le type d'export s'il n'a pas déjà été chargé auparavant
     if typeExport not in _cache:
-        iris = IRIS_traite(typeExport=typeExport, chemin=chemin)
+        iris = IRIS_sessions(typeExport=typeExport, chemin=chemin)
         _cache[typeExport] = iris
 
     return _cache[typeExport]
 
-def reload_iris(type_export: str, chemin:Optional[Path]=None) -> IRIS_traite:
+def reload_iris(type_export: str, chemin:Optional[Path]=None) -> IRIS_sessions:
     """
     Recharge le cache
     """
@@ -94,6 +94,10 @@ def dico_trigrammes_codes_IRIS_a_partir_de_codes_IRIS(codes_IRIS:int|Iterable[in
 
     # Possible avant .tolist() : .unique() pour valeurs uniques ; .dropna() pour gérer valeurs manquantes
     #return df[df["Code IRIS"].isin(codes_IRIS)]["Trigramme formation"].unique().tolist()
+    # TODO : il semble que ❌ Tu ignores codes_IRIS → tu prends TOUT
+    # TODO FIX :
+    # TODO df_filtre = df[df["Code IRIS"].isin(codes_IRIS)]
+    # TODO return df_filtre.groupby("Trigramme formation")["Code IRIS"].apply(tuple).to_dict()
     return df.groupby("Trigramme formation")["Code IRIS"].apply(tuple).to_dict()
 
 

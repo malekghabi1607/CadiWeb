@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import date
+from functools import cached_property
 from pathlib import Path
 from tkinter.ttk import Style
 from typing import Iterable, List, Optional, Tuple, Any, Type
+from enum import Enum
 
 #import pandas as pd
 from pandas import *
@@ -112,7 +115,13 @@ class ConfigExportIRIS:
             f"{afficher_infos('Output', self._output)}"
         )
 
-
+# TODO : _typeExport est fragile : mettre enum
+"""
+class TypeExport(Enum):
+    SESSIONS = "Sessions"
+    VENTES = "Ventes"
+"""
+# TODO : ensuite, remplacer avec get_iris(TypeExport.SESSIONS)
 # ======================================================================================
 # CLASSE IRIS (objet fichier)
 # ======================================================================================
@@ -162,6 +171,10 @@ class IRIS:
     }
 
 
+
+
+
+
     # ====================
     # === Constructeur ===
     # ====================
@@ -175,6 +188,16 @@ class IRIS:
         self._typeExport = typeExport  # Nom du type d'export : ["Sessions", "Formations", "Ventes", "Insciptions"]
         self._fe: Optional[FichierExcel] = None  # Fichier Excel de l'export IRIS
 
+
+
+
+        # TODO quand j'ai des match ; passer par mapping:
+        """
+        CONVERSIONS = {
+            "Sessions": self._convert_sessions,
+            "Ventes": self._convert_ventes
+        }
+        """
 
     # ================================================
     # === Méthodes statiques de traitement d'infos ===
@@ -945,16 +968,17 @@ class IRIS_natif(IRIS):
         )
 
 
+
+
+
 # ======================================================================================
-# CLASSE IRIS (objet fichier) pour les IRIS traités (héritage de IRIS)
+# CLASSE IRIS_TRAITE (classe abstraite générique, hérite de IRIS)
 # ======================================================================================
-class IRIS_traite(IRIS):
-    """
-    Classe qui permet d'ouvrir et traiter un Extract IRIS déjà traité
-    """
-    def __init__(self, typeExport:str, chemin:Optional[Path]=None, fe:Optional[FichierExcel]=None, IRIS_plus_recent:Optional[bool]=True):
+class IRIS_traite(IRIS, ABC):
+
+    def __init__(self, chemin:Optional[Path]=None, fe:Optional[FichierExcel]=None, IRIS_plus_recent:Optional[bool]=True):
         """
-        Charge un fichier IRIS déjà traité.
+        Classe abstraite pour charger un fichier IRIS déjà traité.
 
         Par défaut on prend automatiquement le fichier IRIS le plus récent (IRIS_plus_recent = True).
         Si chemin est donné, alors on pointe vers celui-ci.
@@ -971,15 +995,15 @@ class IRIS_traite(IRIS):
         :type IRIS_plus_recent: bool
         """
         # On initialise la classe mère
-        super().__init__(typeExport=typeExport)
+        #super().__init__(typeExport = self.TYPE_EXPORT)
+        super().__init__(typeExport = self._typeExport)
 
         # On affecte les arguments aux variables d'instance
-        self._typeExport = typeExport
         self._fe = fe
 
         # Si chemin non donné et IRIS_plus_recent = True, alors on prend le fichier IRIS le plus récent.
         # Si l'utilisateur force un chemin, alors on prendra cette valeur (chemin) 
-        if (chemin is None) and (IRIS_plus_recent):
+        if (chemin is None) and IRIS_plus_recent:
             chemin = self._chemin_IRIS_traite_plus_recent()
 
         # On ouvre le fichier IRIS s'il n'existe pas encore
@@ -987,11 +1011,10 @@ class IRIS_traite(IRIS):
         self._charger_excel(fe=self._fe, chemin=chemin)
 
 
-
     # =========================
     # === METHODES INTERNES ===
     # =========================
-    def _charger_excel(self, fe:Optional[FichierExcel]=None, chemin:Optional[Path]=None):
+    def _charger_excel(self, chemin:Optional[Path]=None) -> None:
         """
             Charge dans _fe l’extract IRIS traité (excel VTE qui concatène plusieurs natifs) s'il n'existe pas déjà.
             Soit on fournit un FichierExcel, soit un chemin vers ce fichier .xlsx
@@ -1000,8 +1023,6 @@ class IRIS_traite(IRIS):
             Si chemin est vide, alors on demande à l'utilisateur de pointer un fichier.
             On crée un FichierExcel depuis le chemin et on le met dans _fe.
     
-            :param fe: FichierExcel de l'extract IRIS que l'on souhaite traiter
-            :type fe: FichierExcel
             :param chemin: Chemin de l'extract IRIS que l'on souhaite traiter
             :type chemin: Path
     
@@ -1016,7 +1037,7 @@ class IRIS_traite(IRIS):
             .. note:: Rien du tout.
             .. todo:: Rien du tout.
         """
-        if fe is None:
+        if self._fe is None:
             timer.debut(f"Lecture fichier IRIS {self._typeExport.lower()}")
                 
             # S'il n'y a pas de chemin, alors l'utilisateur le pointe
@@ -1030,40 +1051,9 @@ class IRIS_traite(IRIS):
             self._convertit_types_colonnes_df()
 
             # On trie # TODO : pour l'instant ça marche avec tous mes types (sessions et ventes ; j'ai pas testé avec les autres)
-            self.df = self.df.sort_values(by="Date début ses.")  # Trie par "Date début ses."
+            self.df = self.df.sort_values(by=self._nom_colonne_debut_session)  # Trie par "Date début ses."
 
             timer.fin()
-
-    def _convertit_types_colonnes_df(self):
-        """
-            L'import du df convertit en entiers ou en d'autres types certaines colonnes alors que ça ne devrait pas (ex. : trigrammes, code IRIS sur l'extract sessions).
-            
-            Il en résulte que des filtres ne fonctionnement pas sans conversion.
-            On convertit donc des colonnes à cette fin.
-            
-            Ex. sur l'extract Session de IRIS :
-               - trigrammes -> str;
-               - code IRIS -> str (? Pourquoi str et pas int).
-    
-            :Example:
-
-            >>> convertit_types_colonnes_df()
-
-    
-            .. seealso:: Rien du tout.
-            .. warning:: Rien du tout.
-            .. note:: Rien du tout.
-            .. todo:: Rien du tout.
-        """
-        # Les conversion dépendent du type d'extract à cause des noms des colonnes
-        match self._typeExport:
-            case "Sessions":
-                self.df["Trigramme formation"] = self.df["Trigramme formation"].astype(str)  # Retype "Trigramme formation"
-                #self.df["Code IRIS"] = self.df["Code IRIS"].astype(str)  # Retype "Code IRIS"
-
-            case "Ventes":
-                # On convertit la colonne "Date de début" en datetime
-                self.df['Date de début'] = pd.to_datetime(self.df['Date de début'])
 
     def _chemin_IRIS_traite_plus_recent(self) -> Path:
         """
@@ -1074,6 +1064,16 @@ class IRIS_traite(IRIS):
         Returns:
             Path: Chemin du fichier le plus récent, ou None si aucun fichier correspondant n'est trouvé.
         """
+        # Fonction pour extraire la date du nom de fichier
+        def extraire_date(fichier):
+            match = re.search(r"-COMPLET-(\d{4}\.\d{2}\.\d{2})$", fichier.stem)
+            if not match:
+                raise ValueError(
+                    f"Format de date incorrect dans le nom du fichier : {fichier.name}"
+                )
+            return datetime.strptime(match.group(1), "%Y.%m.%d")
+        
+      
         # Récupérer le répertoire depuis self.cei._output.chemin_fichier
         repertoire = self.cei._output.chemin_fichier.parent
         #print(repertoire)
@@ -1088,15 +1088,6 @@ class IRIS_traite(IRIS):
         if not fichiers:
             return None
 
-        # Fonction pour extraire la date du nom de fichier
-        def extraire_date(fichier):
-            match = re.search(r"-COMPLET-(\d{4}\.\d{2}\.\d{2})$", fichier.stem)
-            if not match:
-                raise ValueError(
-                    f"Format de date incorrect dans le nom du fichier : {fichier.name}"
-                )
-            return datetime.strptime(match.group(1), "%Y.%m.%d")
-
         # Trier les fichiers par date extraite du nom (du plus récent au plus ancien)
         fichiers_tries = sorted(fichiers, key=extraire_date, reverse=True)
 
@@ -1105,13 +1096,16 @@ class IRIS_traite(IRIS):
 
         # Retourner le chemin du fichier le plus récent
         return fichier_iris_plus_recent
-
+    
+    @abstractmethod
+    def _convertit_types_colonnes_df(self) -> None:
+        pass
 
 
     # ====================
     # === METHODES GET ===
     # ====================
-    def get_champ_depuis_codesIRIS(self, champ:str, codes_IRIS:int|Iterable[int], valeurUnique:bool=False) -> str|tuple[str]|int|tuple[int]|date|tuple[date]:
+    def get_champ_depuis_codes_IRIS(self, champ:str, codes_IRIS:int|Iterable[int], valeurUnique:bool=False) -> str|tuple[str]|int|tuple[int]|date|tuple[date]:
         """
         Méthode générique quel que soit le champ.
 
@@ -1121,17 +1115,15 @@ class IRIS_traite(IRIS):
 
         Si le champ est de type date (datetime64 pandas), il est converti en `datetime.date`
 
-        :param champ: Nom de la colonne de IRIS session dont il faut récupérer la valeur ("Trigramme formation", "Session" (intitulé foramtion), "Date début ses.", "Année début ses.", "Lieu principal"...)
+        :param champ: Nom de la colonne de l'export IRIS dont il faut récupérer la valeur ("Trigramme formation", "Session" (intitulé foramtion), "Date début ses.", "Année début ses.", "Lieu principal"...)
         :type champ: str
-        :param code_IRIS: Code IRIS de la formation dont on souhaite récupérer les valeur du champ.
-        :type code_IRIS: int|Iterable[int]
+        :param codes_IRIS: Codes IRIS de la formation dont on souhaite récupérer les valeurs du champ.
+        :type codes_IRIS: int|Iterable[int]
         :param valeurUnique: Si valeurUnique est True on vérifie qu'on n'a qu'un seul retour sinon on lance une erreur. Défaut = False
         :type valeurUnique: bool, optional
-        :return: La ou les valeurs d'un champ d'un IRIS traité (sessions...) correspondant à code_IRIS. Si valeurUnique=True, type retour = str|int|date ; sinon un tuple.
+        :return: La ou les valeurs d'un champ d'un IRIS traité (sessions...) correspondant à codes_IRIS. Si valeurUnique=True, type retour = str|int|date ; sinon un tuple.
         :rtype: str|tuple[str]|int|tuple[int]|date|tuple[date]
-        """
-        # TODO : à un moment je pourrai mettre un switch avec le typeExport → Pour l'instant je n'en ai pas besoin
-        
+        """      
         # On évalue notre sortie
         df = self.df_filtre_codes_IRIS(codes_IRIS=codes_IRIS)
         
@@ -1173,8 +1165,8 @@ class IRIS_traite(IRIS):
         """
 
         # On récupère les dates de début (déjà en datetime.date)
-        dates_debuts = self.get_champ_depuis_codesIRIS(
-            champ="Date début ses.",
+        dates_debuts = self.get_champ_depuis_codes_IRIS(
+            champ=self.nom_colonne_debut_session,
             codes_IRIS=codes_IRIS
         )
 
@@ -1187,7 +1179,7 @@ class IRIS_traite(IRIS):
         if meme_annee:
             annee = date_min.year
         else:
-            vlog.log_erreur(f"Tous les codes IRIS sont censés être sur la même année, or date min = {date_min} et date max = {date_max}")
+            vlog.log_erreur(f"Tous les codes IRIS sont sensés être sur la même année, or date min = {date_min} et date max = {date_max}")
 
         # Bornes en datetime.date (pas pandas)
         debut_annee = date(annee, 1, 1)
@@ -1213,20 +1205,16 @@ class IRIS_traite(IRIS):
     # ============================
     # === METHODES LIEES AU DF ===
     # ============================
-    def affiche_df_moins_de_colonnes(df:DataFrame) -> None:
+    def affiche_df_colonnes_principales(self) -> None:
         """
         print le DataFrame avec filtre des colonnes pour affichage : ['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Présents', 'Statut Session', 'N° Session']
-
-        :param df: DataFrame à afficher
-        :type df: DataFrame
         """
         print(tabulate(
-            df[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Présents', 'Statut Session', 'N° Session']], 
+            self.df[self._colonnes_principales], 
             headers='keys', 
             tablefmt='pretty', 
             showindex=False
         ))
-
 
     def df_filtre_codes_IRIS(self, codes_IRIS:int|Iterable[int])  -> DataFrame:
         """
@@ -1245,39 +1233,13 @@ class IRIS_traite(IRIS):
          
          Les critères dépendent du typé d'export ; pour sessions :
             - Statut Session != "Annulée" (toujours) ;
-            - Nb. Nommés != 0 (toujours) ;
+            - Nb. Nommés != 0 (toujours ; ssi IRIS sessions) ;
             - l'année de la session (si donné en argument) ;
             - la période de la session (si donné en argument) ;
             - le trigramme de la formation en cours (si donné en argument).
 
         Par défaut la période est toute l'année, sinon il faut préciser "1er semestre" ou "2nd semestre".
 
-        Trié de sorte que la session la plus récente est en 1ère ligne.
-        
-        :param trigramme_formation: trigramme filtré. Si non renseigné : pas de filtre sur ce critère.
-        :type trigramme_formation: Optional[str]
-        :param annee: année du filtre. Si non renseignée, alors année en cours.
-        :type annee: Optional[int]
-        :param periode: période du filtre ("1er semestre", "2nd semestre"). Si non renseigné, alors période="Année".
-        :type periode: Optional[str]
-        :return: extract IRIS VTE filtré
-        :rtype: DataFrame
-        """
-        match self._typeExport:
-            case "Sessions":
-                return self.df_filtre_periode_sessions(trigramme_formation=trigramme_formation, annee=annee, periode=periode)
-
-    def df_filtre_periode_sessions(self, trigramme_formation:Optional[str] = None, annee:Optional[int] = None, periode:Optional[str] = None) -> DataFrame:
-        """
-        Renvoie le dataframe de l'extract IRIS filtré VTE selon plusieurs critères :
-            - Statut Session != "Annulée" (toujours) ;
-            - Nb. Nommés != 0 (toujours) ;
-            - l'année de la session (si donné en argument) ;
-            - la période de la session (si donné en argument) ;
-            - le trigramme de la formation en cours (si donné en argument).
-
-        Par défaut la période est toute l'année, sinon il faut préciser "1er semestre" ou "2nd semestre".
-        
         Trié de sorte que la session la plus récente est en 1ère ligne.
         
         :param trigramme_formation: trigramme filtré. Si non renseigné : pas de filtre sur ce critère.
@@ -1296,40 +1258,70 @@ class IRIS_traite(IRIS):
         #self.charger_excel_IRIS()
 
         # Application du pré-filtre immuable : statut (session != annulé) et (Nb. nommés != 0)
-        df_sessions_filtre = self.df[
-            (self.df['Statut Session'] != "Annulée") &
-            (self.df['Nb. Nommés'] != 0)
-        ]
-        #print(self.df_sessions_filtre)
+        df = self.df_prefiltre
+        #print(self.df)
 
 
         # Si trigramme en argument, alors on filtre sur le trigramme
         if trigramme_formation is not None:
-            df_sessions_filtre = df_sessions_filtre[
-                (df_sessions_filtre['Trigramme formation'] == trigramme_formation)
+            df = df[
+                (df['Trigramme formation'] == trigramme_formation)
             ]
-            #print(self.df_sessions_filtre)
+            #print(self.df)
 
         # Si données temporelles (année ou période ou les deux)
         if periode is not None:
             # Si période en argument, alors on filtre sur la période (plus restrictif que l'année)
             date_debut, date_fin = debut_fin_periode(annee=annee, periode=periode)
-            df_sessions_filtre = df_sessions_filtre[
-                (df_sessions_filtre['Date début ses.'] >= date_debut) &
-                (df_sessions_filtre['Date début ses.'] <= date_fin)
+            df = df[
+                (df[self.nom_colonne_debut_session] >= date_debut) &
+                (df[self.nom_colonne_debut_session] <= date_fin)
             ]   
         elif annee is not None:
-            df_sessions_filtre = df_sessions_filtre[
-                (df_sessions_filtre['Année début ses.'] == annee)
+            df = df[
+                (df[self.nom_colonne_debut_session] == annee)
             ]
-        #print(self.df_sessions_filtre)
+        #print(self.df)
 
 
         # On trie
-        df_sessions_filtre = df_sessions_filtre.sort_values("Date début ses.", ascending=False)
+        df = df.sort_values(self.nom_colonne_debut_session, ascending=False)
 
-        return df_sessions_filtre
+        return df
 
+
+
+
+    # =========================
+    # === GETTERS / SETTERS === 
+    # =========================
+    @property
+    @abstractmethod
+    def nom_colonne_debut_session(self) -> str:
+        pass
+    
+    @property
+    @abstractmethod
+    def nom_colonne_statut_session(self) -> str:
+        pass
+
+    @cached_property
+    @abstractmethod
+    def df_prefiltre(self) -> DataFrame:
+        """
+        Fait un premier pré-filtre sur le DataFrame de l'IRIS :
+            - sur IRIS sessions, on fait :
+                - Statut Session != "Annulée",
+                - Nb. Nommés != 0 ;
+            - sur IRIS ventes, on fait :
+                - Statut session != "Annulée".
+        """
+        pass
+
+    #    @property
+    #    @abstractmethod
+    #    def TYPE_EXPORT(self) -> str:
+    #        pass
 
 
 
@@ -1365,6 +1357,67 @@ class IRIS_traite(IRIS):
                     texte_bouton_choisir=f"Choisir extract IRIS {str.lower(self._typeExport)} {self.cei._codeExport} à nouveau"
                     )
 
+
+
+
+# ==========================================================================================================
+# SOUS-CLASSE CONCRETE IRIS_sessions (objet fichier) pour les IRIS sessions traités (spécifie IRIS_traite, hérite de IRIS)
+# ==========================================================================================================
+class IRIS_sessions(IRIS_traite):
+    """
+    Classe qui permet d'ouvrir et traiter un Extract IRIS sessions déjà traité
+    """
+
+    # ===========================
+    # === VARIABLES DE CLASSE ===
+    # ===========================
+    #TYPE_EXPORT = "Sessions"
+    _typeExport:str = "Sessions"
+    _nom_colonne_debut_session:str = "Date début ses."
+    _nom_colonne_statut_session:str = "Statut Session"
+
+    _colonnes_principales:list[str] = ['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Nommés', 'Statut Session', 'N° Session']
+
+    # =========================
+    # === METHODES INTERNES ===
+    # =========================
+    def _convertit_types_colonnes_df(self) -> None:
+        """
+            L'import du df convertit en entiers ou en d'autres types certaines colonnes alors que ça ne devrait pas (ex. : trigrammes, code IRIS sur l'extract sessions).
+            
+            Il en résulte que des filtres ne fonctionnement pas sans conversion.
+            On convertit donc des colonnes à cette fin.
+            
+            Ex. sur l'extract Session de IRIS :
+               - trigrammes -> str;
+               - code IRIS -> str (? Pourquoi str et pas int).
+    
+            :Example:
+
+            >>> convertit_types_colonnes_df()
+
+    
+            .. seealso:: Rien du tout.
+            .. warning:: Rien du tout.
+            .. note:: Rien du tout.
+            .. todo:: Rien du tout.
+        """
+        # Les conversion dépendent du type d'extract à cause des noms des colonnes
+        self.df["Trigramme formation"] = self.df["Trigramme formation"].astype(str)  # Retype "Trigramme formation"
+        #self.df["Code IRIS"] = self.df["Code IRIS"].astype(str)  # Retype "Code IRIS"
+
+
+
+    # ============================
+    # === METHODES LIEES AU DF ===
+    # ============================
+
+
+
+
+    # ===========
+    # === IHM ===
+    # ===========
     def demande_sessions_a_retenir(self, trigramme_formation:str = None, annee:Optional[int] = None, periode:Optional[str] = None) -> list[int]:
         """
         Demande à l'utilisateur les sessions qu'il souhaite retenir de la période choisie :
@@ -1389,21 +1442,15 @@ class IRIS_traite(IRIS):
         annee, periode = utils_periode(annee, periode)
 
         # On filtre sur le trigramme et la période demandée
-        df_filtre = self.df_filtre_periode(trigramme_formation=trigramme_formation, annee=annee, periode=periode)
+        df_filtre = self.df_filtre_periode(trigramme_formation=trigramme_formation, annee=annee, periode=periode).copy()
+
+        # Adaptation format date
+        #df_filtre['Date début ses.'] = pd.to_datetime(df_filtre['Date début ses.']).dt.strftime("%d/%m/%Y")
+        #df_filtre['Date fin ses.'] = pd.to_datetime(df_filtre['Date fin ses.']).dt.strftime("%d/%m/%Y")
 
         # On affiche à l'utilisateur les sessions et dates et statuts 
         vlog.print("Info", f"\nListe des sessions {trigramme_formation} dans {self.chemin.name} - {periode} {annee}", style=["jaune"])
-
-        # Adaptation format date
-        df_filtre['Date début ses.'] = pd.to_datetime(df_filtre['Date début ses.']).dt.strftime("%d/%m/%Y")
-        df_filtre['Date fin ses.'] = pd.to_datetime(df_filtre['Date fin ses.']).dt.strftime("%d/%m/%Y")
-
-        print(tabulate(
-            df_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Nommés', 'Statut Session', 'N° Session']], 
-            headers='keys', 
-            tablefmt='pretty', 
-            showindex=False
-        ))
+        self.affiche_df_colonnes_principales()
         
         # On demande à l'utilisateur les sessions qu'il veut exclure
         sessionsRetenues = self.demander_liste_codes_IRIS()
@@ -1417,12 +1464,7 @@ class IRIS_traite(IRIS):
 
         # On affiche à l'utilisateur les sessions finalement retenues
         vlog.print("Info", "\nSessions retenues pour le bilan :", style=["jaune"])
-        print(tabulate(
-            df_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Nommés', 'Statut Session', 'N° Session']], 
-            headers='keys', 
-            tablefmt='pretty', 
-            showindex=False
-        ))
+        self.affiche_df_colonnes_principales()
 
         return sessionsRetenues
 
@@ -1504,12 +1546,280 @@ class IRIS_traite(IRIS):
 
 
 
+    # =========================
+    # === GETTERS / SETTERS === 
+    # =========================
+    @property
+    def nom_colonne_debut_session(self) -> str:
+        return self._nom_colonne_debut_session
+    
+    @property
+    def nom_colonne_statut_session(self) -> str:
+        return self._nom_colonne_statut_session
+
+    @cached_property
+    def df_prefiltre(self) -> DataFrame:
+        """
+        Fait un premier pré-filtre sur le DataFrame de l'IRIS :
+            - sur IRIS sessions, on fait :
+                - Statut Session != "Annulée",
+                - Nb. Nommés != 0.
+        """
+        return self.df[
+            (self.df[self.nom_colonne_statut_session] != "Annulée") &
+            (self.df[self.nom_colonne_debut_session] != 0)
+        ]
 
 
+
+
+# ==========================================================================================================
+# SOUS CLASSE CONCRETE IRIS_ventes (objet fichier) pour les IRIS sessions traités (spécifie IRIS_traite, hérite de IRIS)
+# ==========================================================================================================
+class IRIS_ventes(IRIS_traite):
+    """
+    Classe qui permet d'ouvrir et traiter un Extract IRIS sessions déjà traité
+    """
+    
+
+    # ===========================
+    # === VARIABLES DE CLASSE ===
+    # ===========================
+    #TYPE_EXPORT = "Ventes"
+    _typeExport:str = "Ventes"
+    _nom_colonne_debut_session:str = "Date de début"
+    _nom_colonne_statut_session:str = "Statut session"
+
+    _colonnes_principales:list[str] = ['Code IRIS', 'RP', 'Date de début', 'Lieux Principal', "Statut session", 'Type', 'N° Session', 'Intitulé Client', 'Nb Inscriptions', 'Total HT', 'Type tarif']
+
+    # TODO à virer après les phases de test
+    #chemin_IRIS_ventes:Path = Path(chemin_vers_unc(r"R:\_Echanges\VTE\Prog\IRIS\Extracts complets\R04301_Ventes-COMPLET-2026.02.12.xlsx"))
+    
+    # =========================
+    # === METHODES INTERNES ===
+    # =========================
+    def _convertit_types_colonnes_df(self) -> None:
+        """
+            L'import du df convertit en entiers ou en d'autres types certaines colonnes alors que ça ne devrait pas (ex. : trigrammes, code IRIS sur l'extract sessions).
+            
+            Il en résulte que des filtres ne fonctionnement pas sans conversion.
+            On convertit donc des colonnes à cette fin.
+            
+            Ex. sur l'extract Ventes de IRIS :
+               - Date de début -> datetime.
+    
+            :Example:
+
+            >>> convertit_types_colonnes_df()
+
+    
+            .. seealso:: Rien du tout.
+            .. warning:: Rien du tout.
+            .. note:: Rien du tout.
+            .. todo:: Rien du tout.
+        """
+        # Les conversion dépendent du type d'extract à cause des noms des colonnes
+        # On convertit la colonne "Date de début" en datetime
+        self.df['Date de début'] = pd.to_datetime(self.df['Date de début'])
+
+
+    # =========================
+    # === METHODES EXTERNES ===
+    # =========================
+    def prix_formation_annee_str(self, trigramme_formation:str, annee:int) -> str:
+        """
+        Renvoie le ou les prix d'une formation pour une année donnée en argument.
+        Ce ou ces prix sont donnés au format str pour être inclus dans un bilan (ex. formation)
+
+        :param trigramme_formation: Trigramme de la formation
+        :type trigramme_formation: str
+        :param annee: Année pour laquelle on souhaite avoir le ou les prix
+        :type annee: int
+        :return: Prix de la formation au format str prête à être intégrée à un bilan de formation
+        :rtype: str
+        """
+
+        # Dataframe avec les colonnes créées pour calculer le prix de la formation de l'année donnée en argument
+        df_travail = self.df_prix_formation_annee(trigramme_formation=trigramme_formation, annee=annee)
+
+        if len(df_travail["Prix HT EE"].unique()) == 1:  # Cas avec une seule valeur de prix
+            prix_annee = f"{df_travail.iloc[0]["Prix HT EE"]} {df_travail.iloc[0]["Unité prix"]}"
+        else :  # Cas avec plusieurs valeurs de prix
+            # On affiche le tableau avec les différents prix
+            print(df_travail[['Date de début', 'N° Session','Intitulé Client', 'CEA', 'Nb Inscriptions', 'Total HT', 'Type tarif', 'Prix HT EE', 'Unité prix']])
+
+            # Regrouper les lignes par "Prix HT EE" et "Unité prix"
+            df_travail_groupe = df_travail.groupby(['Prix HT EE', 'Unité prix'])
+
+            # Initialiser une liste pour stocker les lignes de texte
+            lignes_texte = []
+
+            # Parcourir chaque groupe
+            for (prix, unite), groupe in df_travail_groupe:
+                # Créer une liste des éléments pour chaque ligne du groupe
+                elements = []
+                for _, row in groupe.iterrows():
+                    element = f"{row['N° Session']}; {row['Date de début']}; {row['Intitulé Client']}; {row['Nb Inscriptions']}; {row['Total HT']}; {row['Type tarif']}"
+                    elements.append(element)
+
+                # Créer la ligne de texte pour le groupe
+                ligne_texte = f"• {prix} {unite} :\n\t- " + "\n\t- ".join(elements)
+                lignes_texte.append(ligne_texte)
+
+            # Joindre toutes les lignes de texte avec des sauts de ligne
+            prix_annee = "\n".join(lignes_texte)
+
+        return prix_annee
+
+
+
+    # ====================
+    # === METHODES GET ===
+    # ====================
+
+
+    def get_periode_depuis_codes_IRIS_AVIRER(self, codes_IRIS: int | Iterable[int]) -> tuple[int, str]:
+        """
+        Récupère l'année et la période ("1er semestre", "2nd semestre", "Année")
+        correspondant à un ou plusieurs codes IRIS, à partir des dates de début de session.
+
+        Les dates sont récupérées via get_champ_depuis_codesIRIS, qui renvoie des objets `datetime.date`.
+
+        Hypothèses :
+        - Toutes les sessions doivent appartenir à la même année (sinon on lève une erreur).
+        - La période est déterminée en fonction de la date minimale et maximale.
+
+        :param codes_IRIS: Code(s) IRIS des sessions à analyser
+        :type codes_IRIS: int | Iterable[int]
+
+        :return: Tuple (année, période)
+                - année : int
+                - période : str ("1er semestre", "2nd semestre", "Année")
+        :rtype: tuple[int, str]
+        """
+
+        # On récupère les dates de début (déjà en datetime.date)
+        dates_debuts = self.get_champ_depuis_codes_IRIS(
+            champ="Date début ses.",
+            codes_IRIS=codes_IRIS
+        )
+
+        date_min = min(dates_debuts)
+        date_max = max(dates_debuts)
+
+        # Vérification même année
+        meme_annee = all(date_debut.year == date_min.year for date_debut in dates_debuts)
+
+        if meme_annee:
+            annee = date_min.year
+        else:
+            vlog.log_erreur(f"Tous les codes IRIS sont censés être sur la même année, or date min = {date_min} et date max = {date_max}")
+
+        # Bornes en datetime.date (pas pandas)
+        debut_annee = date(annee, 1, 1)
+        fin_semestre_1 = date(annee, 6, 30)
+        debut_semestre_2 = date(annee, 7, 1)
+        fin_annee = date(annee, 12, 31)
+
+        # Détermination de la période
+        if date_min >= debut_annee and date_max <= fin_semestre_1:
+            periode = "1er semestre"
+        elif date_min >= debut_semestre_2 and date_max <= fin_annee:
+            periode = "2nd semestre"
+        elif date_min >= debut_annee and date_max <= fin_annee:
+            periode = "Année"
+        else:
+            vlog.log_erreur(
+                f"Période incohérente : date min = {date_min}, date max = {date_max}"
+            )
+
+        return annee, periode
+
+
+    # ============================
+    # === METHODES LIEES AU DF ===
+    # ============================
+    def df_prix_formation_annee(self, trigramme_formation:str, annee:int) -> DataFrame:
+        """
+        Génère le DataFrame qui permettra d'évaluer le prix de la formation d'une année.
+        Crée entre autres les colonnes :
+        - CEA ;
+        - Prix HT EE ;
+        - Unité prix.
+
+        :param trigramme_formation: Trigramme de la formation
+        :type trigramme_formation: str
+        :param annee: Année pour laquelle on souhaite créer le dataframe (le prix par extention)
+        :type annee: int
+        :return: le dataframe avec les colonnes rajoutées qui permettront de calculer le prix de cette année
+        :rtype: DataFrame
+        """
+
+        # Filtrer le DataFrame sur le "Trigramme formation" = "TEL" et sur les années n et n-1
+        #df_filtre = self.df[(self.df['Trigramme formation'] == self._trigramme_formation) & (iris_ventes.df['Date de début'].dt.year.isin([self._annee-1, self._annee]))]
+        df_filtre = self.df_filtre_periode(trigramme_formation=trigramme_formation, annee=annee)
+
+        # Créer un DataFrame df_travail avec les colonnes spécifiées
+        df_travail = df_filtre[self._colonnes_principales]
+
+        # Ajouter une colonne "CEA" (booléen) pour tester si les 3 premières lettres de "Intitulé Client" = "CEA"
+        df_travail['CEA'] = df_travail['Intitulé Client'].str[:3] == 'CEA'
+
+        # Ajouter une colonne "Prix HT EE" (si tarif CEA, alors on divise par 0.9 ; si on est sur un forfait/pers., alors on divise par nombre d'inscriptions)
+        df_travail['Prix HT EE'] = df_travail.apply(
+            lambda row: (row['Total HT'] / 0.9 if row['CEA'] else row['Total HT']) / row['Nb Inscriptions'] if row['Type tarif'] == 'Forfait/Pers.' else (row['Total HT'] / 0.9 if row['CEA'] else row['Total HT'])
+            , axis=1)
+
+        # Arrondir le résultat à l'entier le plus proche
+        df_travail['Prix HT EE'] = df_travail['Prix HT EE'].round()
+
+        # Ajouter une colonne "Unité prix" en fonction du "Type de tarif"
+        df_travail['Unité prix'] = df_travail['Type tarif'].apply(lambda x: '€ HT (forfait)' if x == 'Forfait' else '€ HT/pers.')
+
+
+        # Vérification que tous les tarifs sont bien les mêmes
+        # J'exclue les lignes si "Prix HT EE" = NaN
+        df_travail = df_travail.dropna(subset=['Prix HT EE'])
+
+        # J'exclue les lignes si "Prix HT EE" = 0
+        df_travail = df_travail[df_travail['Prix HT EE'] != 0]
+
+        return df_travail
 
     # =========================
     # === GETTERS / SETTERS === 
     # =========================
+    @property
+    def nom_colonne_debut_session(self) -> str:
+        return self._nom_colonne_debut_session
+    
+    @property
+    def nom_colonne_statut_session(self) -> str:
+        return self._nom_colonne_statut_session
+
+    @cached_property
+    def df_prefiltre(self) -> DataFrame:
+        """
+        Fait un premier pré-filtre sur le DataFrame de l'IRIS :
+            - sur IRIS sessions, on fait :
+                - Statut Session != "Annulée".
+        """
+        return self.df[
+            (self.df[self.nom_colonne_statut_session] != "Annulée")
+        ]
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -4,6 +4,7 @@ from functools import cached_property
 import math
 from pathlib import Path
 from typing import Optional, Protocol
+from datetime import date, datetime
 
 from vte.core import config
 from vte.utils.utils import *
@@ -262,6 +263,54 @@ class FdC:
             print(f"Valeur inattendue pour une année : {anneeCreationFormation} (type {type(anneeCreationFormation)})")
             anneeCreationFormation = 1900
         return anneeCreationFormation
+
+    @property
+    def date_creationFormation(self) -> date:
+        """
+        Retourne la date de conception de la formation (C9).
+        
+        Si la valeur est :
+        - une date/datetime → retourne la date
+        - un objet avec attribut year → retourne le 01/01/year
+        - un entier → considéré comme une année → retourne le 01/01/année
+        - une chaîne → tentative de conversion
+        - sinon → retourne le 01/01/1900
+        
+        :return: la date de conception de la formation
+        :rtype: date
+        """
+        date_excel = self.tableau["C9"]
+
+        if isinstance(date_excel, datetime):
+            return date_excel.date()
+
+        if isinstance(date_excel, date):
+            return date_excel
+
+        if hasattr(date_excel, "year"):
+            return date(date_excel.year, 1, 1)
+
+        if isinstance(date_excel, int):
+            return date(date_excel, 1, 1)
+
+        if isinstance(date_excel, str):
+            try:
+                # tentative simple ISO (YYYY-MM-DD)
+                return datetime.fromisoformat(date_excel).date()
+            except Exception:
+                try:
+                    # tentative format FR courant
+                    return datetime.strptime(date_excel, "%d/%m/%Y").date()
+                except Exception:
+                    try:
+                        # si c'est juste une année en string
+                        annee = int(date_excel)
+                        return date(annee, 1, 1)
+                    except Exception:
+                        pass
+
+        print(f"Valeur inattendue pour une date : {date_excel} (type {type(date_excel)})")
+        return date(1900, 1, 1)
 
     @property
     def min_participants_cea(self) -> int:

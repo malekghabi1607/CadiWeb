@@ -12,7 +12,7 @@ from vte.core import config
 from vte.core.iris_referentiel import get_iris
 from vte.domain.evalStat import EvalStat_formation
 from vte.domain.session import Session
-from vte.domain.iris import IRIS, IRIS_traite
+from vte.domain.iris import IRIS, IRIS_sessions
 from vte.services.evalStat_services import EvalStat_services
 from vte.utils.office import FichierExcel, FichierWord, Mail
 from vte.utils.utils import *
@@ -54,6 +54,7 @@ class BilanSessions:
     _CRITERES_A_ENLEVER:list[str] = [  # Critères à ne pas retenir pour le calcul des moyennes < 3
         "Comment avez-vous connu cette formation ?", "Avez-vous d'autres besoins de formation ?", "Commentaires, remarques, suggestions", "Recommanderiez-vous cette formation ?"]
 
+    # TODO : à adapter → Renvoi vers evalStat
     # Dictionnaire pour mapper les statuts aux clés de self._statuts ["Exploités pour les évaluations (CSV présents)", "Exploités pour les évaluations (CSV présents)", "Exclus des évaluations (problème traitement CSV)", "Exclus des évaluations (CSV manquants)", "Exclus des évaluations (CSV vide / aucun retour)", "Exclus entièrement du bilan (non présent dans IRIS / mauvais code)"]
     _mapping_statuts:dict[str, str] = {
         "Traité": "Exploités pour les évaluations (CSV présents et non vides)",                                  # Exploités pour stats initiales → Dans _demande_sessions_a_exclure
@@ -195,38 +196,6 @@ class BilanSessions:
     # === METHODES INTERNES === 
     # =========================
 
-    # === Méthodes get ===
-    def _get_codesIRIS_par_statut_evalStat(self, statut_evalStat: str) -> list[int]:
-        """
-        Retourne une liste des codes IRIS pour un statut donné.
-
-        :param statut_evalStat: statut EvalStat (["Traité", "Traité - Code IRIS déjà dans l'évaluation de la formation", "Traité - CSV déjà dans l'évaluation de la formation", "Exclu - Aucun CSV fourni", "Exclu - Code IRIS pas dans Extract IRIS sessions", "Exclu - Problème lecture CSV", "Exclu - CSV vide / Aucun retour"])
-        :type statut_evalStat: str
-        :return: une liste des codes IRIS avec ce statut
-        :rtype: list[int]
-        """
-        codes_IRIS = []
-        for code_IRIS in self._codes_IRIS:
-            session = self._formation.get_session_par_codeIRIS(code_IRIS)
-            if session.eval.statut == statut_evalStat:
-                codes_IRIS.append(code_IRIS)
-        return codes_IRIS
-
-    def _get_codesIRIS_par_statut_pourBilan(self, statut_pourBilan: str) -> list[int]:
-        """
-        Retourne une liste des codes IRIS pour une clé de mapping donnée (statut pour bilan, i.e. mieux nommés).
-
-        :param statut_pourBilan: Statut "pour bilan" (i.e. mieux nommés) ["Exploités pour les évaluations (CSV présents)", "Exploités pour les évaluations (CSV présents)", "Exclus des évaluations (problème traitement CSV)", "Exclus des évaluations (CSV manquants)", "Exclus des évaluations (CSV vide / aucun retour)", "Exclus entièrement du bilan (non présent dans IRIS / mauvais code)"] 
-        :type statut_pourBilan: str
-        :return: une liste des codes IRIS avec ce statut
-        :rtype: list[int]
-        """
-        #pprint(self._mapping_statuts)
-
-        statut_evalStat = next((clef for clef, valeur in self._mapping_statuts.items() if valeur == statut_pourBilan), None)
-        if statut_evalStat is None:
-            return []
-        return self._get_codesIRIS_par_statut_evalStat(statut_evalStat)
 
     def _get_generateur_word(self, version: str) -> BilanSessions_generateur_word:
         """
@@ -281,6 +250,7 @@ class BilanSessions:
         # On ouvre ou on traite les EvalStats non déjà créés
         EvalStat_services.ouvrir_ou_traiter_evalStat_depuis_liste_codes_IRIS(codes_IRIS=self._codes_IRIS, formation=self._formation)
 
+    # TODO : à adapter → Renvoi vers evalStat
     def _calculer_stats_criteres(self) -> None: # dict[str, dict[str, int|float|str|None]]:
         """
         Calcule les statistiques (nombre de retours, moyenne retours, agrégation des commentaires) de tous les critères.
@@ -447,6 +417,40 @@ class BilanSessions:
             unite=unite
         )
 
+    # === Méthodes get ===
+    # TODO : à adapter → Renvoi vers evalStat
+    def _get_codesIRIS_par_statut_evalStat(self, statut_evalStat: str) -> list[int]:
+        """
+        Retourne une liste des codes IRIS pour un statut donné.
+
+        :param statut_evalStat: statut EvalStat (["Traité", "Traité - Code IRIS déjà dans l'évaluation de la formation", "Traité - CSV déjà dans l'évaluation de la formation", "Exclu - Aucun CSV fourni", "Exclu - Code IRIS pas dans Extract IRIS sessions", "Exclu - Problème lecture CSV", "Exclu - CSV vide / Aucun retour"])
+        :type statut_evalStat: str
+        :return: une liste des codes IRIS avec ce statut
+        :rtype: list[int]
+        """
+        codes_IRIS = []
+        for code_IRIS in self._codes_IRIS:
+            session = self._formation.get_session_par_codeIRIS(code_IRIS)
+            if session.eval.statut == statut_evalStat:
+                codes_IRIS.append(code_IRIS)
+        return codes_IRIS
+
+    # TODO : à adapter → Renvoi vers evalStat
+    def _get_codesIRIS_par_statut_pourBilan(self, statut_pourBilan: str) -> list[int]:
+        """
+        Retourne une liste des codes IRIS pour une clé de mapping donnée (statut pour bilan, i.e. mieux nommés).
+
+        :param statut_pourBilan: Statut "pour bilan" (i.e. mieux nommés) ["Exploités pour les évaluations (CSV présents)", "Exploités pour les évaluations (CSV présents)", "Exclus des évaluations (problème traitement CSV)", "Exclus des évaluations (CSV manquants)", "Exclus des évaluations (CSV vide / aucun retour)", "Exclus entièrement du bilan (non présent dans IRIS / mauvais code)"] 
+        :type statut_pourBilan: str
+        :return: une liste des codes IRIS avec ce statut
+        :rtype: list[int]
+        """
+        #pprint(self._mapping_statuts)
+
+        statut_evalStat = next((clef for clef, valeur in self._mapping_statuts.items() if valeur == statut_pourBilan), None)
+        if statut_evalStat is None:
+            return []
+        return self._get_codesIRIS_par_statut_evalStat(statut_evalStat)
 
 
 
@@ -547,6 +551,7 @@ class BilanSessions:
             if code_IRIS not in self.liste_codesIRIS_exclus_totalement
         ]
     
+    # TODO : à adapter → Renvoi vers evalStat
     @cached_property
     def liste_codesIRIS_pour_statsCSV(self) -> list[int]:
         """
@@ -613,15 +618,15 @@ class BilanSessions:
 
     # Liens avec IRIS 
     @cached_property
-    def iris_sessions(self) -> IRIS_traite:
+    def iris_sessions(self) -> IRIS_sessions:
         return get_iris(typeExport="Sessions")
   
     @cached_property
     def intitule_formation(self) -> str:
         """
-        Intitulé de la formation (prend le nom de la dernière ligne pour avoir la dernière mise à jour)
+        Intitulé de la formation (prend le nom de la première ligne pour avoir la dernière mise à jour)
         """
-        return self.df_sessions_filtre_periode["Session"].iloc[-1]
+        return self.df_sessions_filtre_periode["Session"].iloc[0]
 
     @cached_property
     def mois_session(self) -> str:
@@ -721,7 +726,7 @@ class BilanSessions:
 
 
 # ======================================================================================
-# CLASSE BilanSessions_generateur_word
+# CLASSE BilanSessions_generateur_word (générique)
 # ======================================================================================
 class BilanSessions_generateur_word(ABC):
     """
@@ -807,7 +812,7 @@ class BilanSessions_generateur_word(ABC):
 
 
 # ======================================================================================
-# PROTOCOLES
+# CLASSE Bilan_V3 (spécifique V3)
 # ======================================================================================
 class Bilan_V3(BilanSessions_generateur_word):
 
@@ -933,7 +938,7 @@ class Bilan_V3(BilanSessions_generateur_word):
                 lambda v: v.replace("_x000D_", "\n"),
                 default=""
             )
-            """
+            """3.
             try:
                 self._satisfactionGlobale_moy = f'{self._bilanSession._stats_stagiaires["Satisfaction globale"]["Moyenne"]:.1f}/5'
             except:

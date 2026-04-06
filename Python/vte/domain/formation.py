@@ -8,6 +8,7 @@ from vte.domain.bilanSessions import BilanSessions
 from vte.domain.evalStat import EvalStat_formation
 from vte.domain.fdc import FdC
 from vte.domain.session import Session
+from vte.domain.specs import Specs
 from vte.utils.utils import convertir_collection, vlog
 
 # ======================================================================================
@@ -28,6 +29,9 @@ class Formation:
 
         # Une formation a une fiche de coûts
         self._fdc:Optional[FdC] = None
+
+        # Une formation a des specs pédagogiques
+        self._specs:Optional[Specs] = None
         
         # Une formation a une ou plusieurs sessions
         self._sessions:list[Session] = []
@@ -100,7 +104,7 @@ class Formation:
         :rtype: Formation
         """
         # On évalue le trigramme de la formation
-        trigramme_formation = get_iris(typeExport="Sessions").get_champ_depuis_codesIRIS(champ="Trigramme formation", codes_IRIS=codes_IRIS, valeurUnique=True)
+        trigramme_formation = get_iris(typeExport="Sessions").get_champ_depuis_codes_IRIS(champ="Trigramme formation", codes_IRIS=codes_IRIS, valeurUnique=True)
 
         # On définit la formation et on ajoute les sessions
         instance = cls.avec_ajout_sessions(trigramme_formation=trigramme_formation, codes_IRIS=codes_IRIS)
@@ -193,6 +197,8 @@ class Formation:
         return instance
 
 
+    # TODO méthode pour relancer clients d'une formation avec sessions à venir + option désinscription
+
 
     # =========================
     # === METHODES INTERNES ===
@@ -221,6 +227,17 @@ class Formation:
         :type chemin_fdc: Optional[Path | str], optional
         """
         self._fdc = FdC.depuis_chemin(formation=self, chemin_fdc=chemin_fdc)
+
+    def ouvrir_specs(self, chemin_specs:Optional[Path|str] = None) -> None:  # pytesté
+        """
+        Ouvre les specs pédago de la formation (i.e. définit self._specs).
+
+        Si le chemin n'est pas donné, alors on ouvre un filedialog.
+
+        :param chemin_specs: Chemin des specs pédago. Défaut = None
+        :type chemin_specs: Optional[Path | str], optional
+        """
+        self._specs = Specs.depuis_chemin(formation=self, chemin=chemin_specs)
 
     def ajout_sessions(self, codes_IRIS:int|Iterable[int]) -> None:  # pytesté avec Formation.avec_ajout_sessions
         """
@@ -377,3 +394,11 @@ class Formation:
     @fdc.setter
     def fdc(self, valeur:FdC) -> None:
         self._fdc = valeur
+
+    @property
+    def specs(self) -> Optional[Specs]:
+        return self._specs
+    
+    @specs.setter
+    def specs(self, valeur:Specs) -> None:
+        self._specs = valeur
