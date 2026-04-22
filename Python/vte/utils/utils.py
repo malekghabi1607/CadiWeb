@@ -1306,30 +1306,64 @@ def convertir_tuple_str(input:str|tuple[str]) -> tuple[str]:
 
 T = TypeVar('T')
 def convertir_collection(
-    input: Union[T, Iterable[T]],
-    type_retour: Type[Union[Tuple[T, ...], List[T], Iterable[T]]] = Iterable
-) -> Union[Tuple[T, ...], List[T], Iterable[T]]:
+    input: Optional[Union[T, Iterable[T]]],
+    type_retour: Type[Union[Tuple[T, ...], List[T], Iterable[T]]] = Iterable,
+    renvoyer_none: bool = False
+) -> Optional[Union[Tuple[T, ...], List[T], Iterable[T]]]:
     """
-    Convertit un élément ou un iterable en une collection du type spécifié.
+    Convertit un élément, un iterable ou None en une collection du type spécifié.
+
+    Si `input` est None :
+    - si `renvoyer_none=True` → retourne None
+    - sinon → retourne une collection vide du type demandé
 
     Args:
-        input: L'élément ou l'iterable à convertir.
-        type_retour: Le type de retour souhaité (tuple, list, ou iterable). Par défaut, tuple.
+        input: L'élément, l'iterable ou None à convertir.
+        type_retour: Le type de retour souhaité (tuple, list, ou iterable générique).
+        renvoyer_none: Définit le comportement si input est None.
 
     Returns:
-        Une collection du type spécifié.
+        Une collection du type spécifié, ou None selon le cas.
     """
+
+    # =========================
+    # CAS 1 — input est None
+    # =========================
+    if input is None:
+        # Si on veut propager le None
+        if renvoyer_none:
+            return None
+
+        # Sinon, on retourne une collection vide du bon type
+        if type_retour is tuple:
+            return ()
+        elif type_retour is list:
+            return []
+        else:
+            return []
+
+    # =========================
+    # CAS 2 — input déjà du bon type
+    # =========================
     if isinstance(input, type_retour):
         return input
-    elif isinstance(input, Iterable) and not isinstance(input, str):  # Exclure les str pour éviter les caractères individuels
+
+    # =========================
+    # CAS 3 — input est un iterable (mais pas str)
+    # =========================
+    elif isinstance(input, Iterable) and not isinstance(input, str):
         return type_retour(input)
+
+    # =========================
+    # CAS 4 — input est un élément simple
+    # =========================
     else:
         if type_retour is tuple:
             return (input,)
         elif type_retour is list:
             return [input]
         else:
-            return [input]  # Par défaut, retourne une liste pour un iterable générique
+            return [input]  # fallback pour iterable générique
 
 def convertir_liste_str(x: Any) -> list[str]:
     """

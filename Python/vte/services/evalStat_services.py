@@ -50,6 +50,11 @@ class EvalStat_services:
     """
     Services métier autour des exports IRIS.
     """
+
+
+    # ======================================
+    # === TRAITEMENTS PLUSIEURS EVALSTAT ===
+    # ======================================
     @staticmethod
     #def ouvrir_ou_traiter_evalStat_depuis_liste_codes_IRIS(codes_IRIS:Iterable[int], formation:Optional[Formation]=None, ouvrirDossier:bool=False) -> dict[str, dict[str, str]]:
     def ouvrir_ou_traiter_evalStat_depuis_liste_codes_IRIS(codes_IRIS:Iterable[int], formation:Optional[Formation_protocol]=None, ouvrirDossier:bool=False) -> None:
@@ -111,9 +116,6 @@ class EvalStat_services:
             
             # On sauvegarde l'évaluation de la formation
             formation.eval.ecrit_et_sauve_df_siModif()
-
-
-
 
     # TODO : non fonctionnel en l'état -> à retravailler
     @staticmethod
@@ -190,4 +192,5 @@ class EvalStat_services:
         statuts_csv = EvalStat_services.ouvrir_ou_traiter_evalStat_depuis_dico_csv(dico_csv=dico_csv, ouvrirDossier=ouvrirDossier)
         
         return statuts_csv
+
 

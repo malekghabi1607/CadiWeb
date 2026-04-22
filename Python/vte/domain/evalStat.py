@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional, Protocol
 
 import pandas as pd
+from pandas import DataFrame
 
 from vte.core import config
 from vte.core.iris_referentiel import *
@@ -22,9 +23,14 @@ class Formation_protocol(Protocol):
     """
     Protocol de Formation : permet de simuler une formation en évitant les références circulaires
     """
+    def get_session_par_codeIRIS(self, code_IRIS:int) -> Optional[Session_protocol]: ...
+
     @property
     def trigramme_formation(self) -> str: ...
-
+    
+    @property
+    def sessions(self) -> list[Session_protocol]: ...
+    
     @property
     def eval(self) -> EvalStat_formation|None: ...
 
@@ -68,7 +74,7 @@ class EvalStat:
     # ===========================
         
     # === dico_colonnes[critère d'évaluation][type d'info] ===
-    dico_colonnes:dict[str, dict[str, str]] = {
+    _dico_colonnes:dict[str, dict[str, str]] = {
         "Comment avez-vous connu cette formation ?": {"Type colonne": "Commentaires seuls", "Groupe critère": "Question ouverte"},
         "Accueil, organisation et qualité des informations délivrées": {"Type colonne": "Avec commentaire", "Groupe critère": "Accueil & conseils"},
         "Conseils et orientation avant l'inscription": {"Type colonne": "Avec commentaire", "Groupe critère": "Accueil & conseils"},
@@ -86,6 +92,9 @@ class EvalStat:
         "Commentaires, remarques, suggestions": {"Type colonne": "Commentaires seuls", "Groupe critère": "Question ouverte"},
     }
 
+    # TODO : à adapter → Renvoi vers evalStat
+    _criteres_sans_note_standard:list[str] = [  # Critères qui n'ont pas de valeur "classique" pour les stats (i.e. ce sont des bool ou des str), ils ne sont pas à retenir pour le calcul des moyennes < 3
+        "Comment avez-vous connu cette formation ?", "Avez-vous d'autres besoins de formation ?", "Commentaires, remarques, suggestions", "Recommanderiez-vous cette formation ?"]
 
     # === Colonnes du CSV avec les noms qu'il faudrait (sans espaces en trop ou trucs bizares) ===
     _colonnes_csv_bonsNoms = [
@@ -183,27 +192,40 @@ class EvalStat:
 
 
 
+
+
+    # =========================
+    # === METHODES EXTERNES ===
+    # =========================
+
+
+
+
     # =========================
     # === GETTERS / SETTERS ===
     # =========================
+    @property
+    def criteres_sans_note_standard(self) -> list[str]:
+        return self._criteres_sans_note_standard
+
     @property
     def fe(self) -> FichierExcel|None:
         return self._fe
      
     @property
-    def df_csv(self) -> pd.DataFrame|None:
+    def df_csv(self) -> DataFrame|None:
         return self._fe.get_df_tableau("CSV_stagiaires")
 
     @df_csv.setter
-    def df_csv(self, valeur:pd.DataFrame) -> None:
+    def df_csv(self, valeur:DataFrame) -> None:
         self._fe.set_df_tableau("CSV_stagiaires", df=valeur)
 
     @property
-    def df_stagiaires(self) -> pd.DataFrame|None:
+    def df_stagiaires(self) -> DataFrame|None:
         return self._fe.get_df_tableau("Stagiaires")
 
     @df_stagiaires.setter
-    def df_stagiaires(self, valeur:pd.DataFrame) -> None:
+    def df_stagiaires(self, valeur:DataFrame) -> None:
         self._fe.set_df_tableau("Stagiaires", df=valeur)
 
     @property
@@ -211,14 +233,12 @@ class EvalStat:
         return self._fe.chemin_fichier
 
     # Liens avec IRIS sessions
-  
-    # Liens avec IRIS
     @property
     def iris_sessions(self) -> IRIS_sessions:
         return get_iris(typeExport="Sessions")
     
     @property
-    def df_IRIS_sessions(self) -> pd.DataFrame:
+    def df_IRIS_sessions(self) -> DataFrame:
         return self.iris_sessions.df
 
 
@@ -455,9 +475,99 @@ class EvalStat_formation(EvalStat):
         
         return Path(df["Chemin fichier CSV"].iloc[0])
 
-    def calculer_stats_criteres(self) -> dict[str, dict[str, int|float|str|None]]:
+
+
+
+    def liste_codesIRIS_avec_CSV_presents_et_non_vides(self, codes_IRIS:Optional[int|Iterable[int]]=None) -> list[int]:
         """
-        Calcule les statistiques (nombre de retours, moyenne retours, agrégation des commentaires) de tous les critères.
+        Retourne, parmi une liste donnée, la liste des codes IRIS pour lesquels on peut calculer les stats à partir des CSV (i.e. codes IRIS pour lesquels le CSV est fonctionnel et non vide).
+
+        On emploie uniquement les codes_IRIS (sous-partie) parmi toutes les sessions comprises dans formation.sessions. Si None, alors on fait toutes les sessions.
+
+        :param codes_IRIS: Sous-partie des codes IRIS à traiter parmi toutes les sessions étant dans formation.sessions. Si None, alors on fait toutes les sessions de formation. Défaut = None.
+        :type codes_IRIS: Optional[int|Iterable[int]], optional
+        :return: La liste des codes IRIS pour lesquels on peut calculer les stats à partir des CSV.
+        :rtype: list[int]
+        """
+        return self.get_codesIRIS_par_statutBilan(
+            codes_IRIS=codes_IRIS,
+            statut_pourBilan="Exploités pour les évaluations (CSV présents et non vides)"
+            )
+
+    def get_codesIRIS_par_statutBilan(self, statut_pourBilan: str, codes_IRIS:Optional[int|Iterable[int]]=None) -> list[int]:
+        """
+        Retourne, parmi une liste donnée, la liste des codes IRIS ayant un statut "bilan" (i.e. avec labell plus littéraire) donné en argument.
+        On emploie uniquement les codes_IRIS (sous-partie) parmi toutes les sessions comprises dans formation.sessions. Si None, alors on fait toutes les sessions :
+        - on boucle sur les codes_IRIS demandés en argument ;
+        - on récupère la Session correspondante depuis formations.sessions ;
+        - on regarde le statut de l'eval de la session ;
+        - si le statut est celui spécifié on stocke dans la liste qui sera en sortie.
+
+        
+        :param statut_pourBilan: Statut "bilan" (i.e. plus littéraire que statut session) ["Exploités pour les évaluations (CSV présents)", "Exploités pour les évaluations (CSV présents)", "Exclus des évaluations (problème traitement CSV)", "Exclus des évaluations (CSV manquants)", "Exclus des évaluations (CSV vide / aucun retour)", "Exclus entièrement du bilan (non présent dans IRIS / mauvais code)"] 
+        :type statut_pourBilan: str
+        :param codes_IRIS: Sous-partie des codes IRIS à traiter parmi toutes les sessions étant dans formation.sessions. Si None, alors on fait toutes les sessions de formation. Défaut = None.
+        :type codes_IRIS: Optional[int|Iterable[int]], optional
+        :return: une liste des codes IRIS avec ce statut
+        :rtype: list[int]
+        """
+        #pprint(self._mapping_statuts)
+
+        #statut_evalStat = next((clef for clef, valeur in self._mapping_statuts.items() if valeur == statut_pourBilan), None)
+        statut_evalStat = next((clef for clef, valeur in EvalStat_session._mapping_statuts.items() if valeur == statut_pourBilan), None)
+        if statut_evalStat is None:
+            return []
+        return self.get_codesIRIS_par_statutEvalStat(statut_evalStat, codes_IRIS)
+
+    def get_codesIRIS_par_statutEvalStat(self, statut_evalStat: str, codes_IRIS:Optional[int|Iterable[int]]=None) -> list[int]:
+        """
+        Retourne, parmi une liste donnée, la liste des codes IRIS ayant un statut donné en argument.
+        On emploie uniquement les codes_IRIS (sous-partie) parmi toutes les sessions comprises dans formation.sessions. Si None, alors on fait toutes les sessions :
+        - on boucle sur les codes_IRIS demandés en argument ;
+        - on récupère la Session correspondante depuis formations.sessions ;
+        - on regarde le statut de l'eval de la session ;
+        - si le statut est celui spécifié on stocke dans la liste qui sera en sortie.
+
+        :param statut_evalStat: statut EvalStat (["Traité", "Traité - Code IRIS déjà dans l'évaluation de la formation", "Traité - CSV déjà dans l'évaluation de la formation", "Exclu - Aucun CSV fourni", "Exclu - Code IRIS pas dans Extract IRIS sessions", "Exclu - Problème lecture CSV", "Exclu - CSV vide / Aucun retour"])
+        :type statut_evalStat: str
+        :param codes_IRIS: Sous-partie des codes IRIS à traiter parmi toutes les sessions étant dans formation.sessions. Si None, alors on fait toutes les sessions de formation. Défaut = None.
+        :type codes_IRIS: Optional[int|Iterable[int]], optional
+        :return: une liste des codes IRIS avec ce statut
+        :rtype: list[int]
+        """
+
+        """
+        # ANCIEN
+        codes_IRIS = convertir_collection(codes_IRIS)
+        codes_IRIS_f = []
+        for code_IRIS in codes_IRIS:
+            session = formation.get_session_par_codeIRIS(code_IRIS)
+            if session.eval.statut == statut_evalStat:
+                codes_IRIS_f.append(code_IRIS)
+        return codes_IRIS_f
+        """
+
+        codes_IRIS = convertir_collection(codes_IRIS)
+        codes_IRIS_f = []
+        for session in self._formation.sessions:
+            if session.eval.statut == statut_evalStat:  # Statut demandé
+                if len(codes_IRIS) == 0:  # Si == 0, on regarde parmi toutes les sessions
+                    codes_IRIS_f.append(session.code_IRIS)
+                else:
+                    if session.code_IRIS in codes_IRIS:  # S'il y a des éléments dans codes_IRIS, alors on ne regarde que parmi ces éléments
+                        codes_IRIS_f.append(session.code_IRIS)
+
+        return codes_IRIS_f
+
+
+
+
+
+    def calculer_stats_criteres(self, codes_IRIS:Optional[int|Iterable[int]]=None) -> dict[str, dict[str, int|float|str|None]]:
+        """
+        Calcule, pour une liste code_IRIS donnée, les statistiques (nombre de retours, moyenne retours, agrégation des commentaires) de tous les critères.
+
+        Si codes_IRIS=None, on fait les stats pour toutes les sessions dans formation.sessions (sinon on prend les formations.session qui sont dans codes_IRIS uniquement).
 
         Fait ce traitement pour tous les éléments dont nous avons des CSV (i.e. appartenant à liste_codesIRIS_pour_statsCSV)
         
@@ -471,12 +581,77 @@ class EvalStat_formation(EvalStat):
             ...
         }
 
+        
+        :param codes_IRIS: Sous-partie des codes IRIS à traiter parmi toutes les sessions étant dans formation.sessions. Si None, alors on fait toutes les sessions de formation. Défaut = None.
+        :type codes_IRIS: Optional[int|Iterable[int]], optional
+        :return: Un dictionnaire de tous les critères
+        :rtype: dict
+        """
+        # Je ne veux faire les stats que des codes_IRIS qui sont dans formations.sessions
+        # S'il y a des stats, alors les codes IRIS seront dans l'eval formation
+
+        # S'il n'y a pas de CSV disponibles pour les stats, alors ce n'est pas la peine de faire les stats
+        if len(self.liste_codesIRIS_avec_CSV_presents_et_non_vides(codes_IRIS = codes_IRIS)) > 0 :
+            # On récupère la iste des critères
+            liste_criteres = self.df_stagiaires_filtre_statsCSV['Critère'].dropna().unique()
+
+
+            # On fait les stats pour chaque critère
+            for critere in liste_criteres:
+                # Dataframe filtré sur ce critère
+                df_filtre = self.df_stagiaires_filtre_statsCSV[self.df_stagiaires_filtre_statsCSV['Critère'] == critere]
+                
+                # Nombre d'éléments avec ce critère
+                nb = len(df_filtre)
+                # Moyenne de ce critère
+                moyenne = float(df_filtre['Note'].mean()) if nb > 0 else None
+
+                # On concatère les commentaires associés
+                commentaires_concat = "\n".join(
+                    "• " + c.strip()
+                    for c in df_filtre['Commentaires'].dropna().astype(str)
+                    if c.strip() != ""
+                )
+
+                # On met toutes ces données en forme dans _stats_stagiaires
+                self._stats_stagiaires[critere] = {
+                    "Nombre": nb,
+                    "Moyenne": moyenne,
+                    "Commentaires": commentaires_concat
+                }
+        #else:
+            #vlog.print("Info", f"⚠️  Aucun CSV disponible pour ce bilan : les statistiques des stagiaires ne seront pas évaluées.")
+            #self._commentairesBilan += f"\n⚠️  Aucun CSV disponible pour ce bilan : les statistiques des stagiaires ne seront pas évaluées.\n"
+
+        #return self._stats_stagiaires
+  
+    def calculer_stats_criteres_BAK(self, codes_IRIS:Optional[int|Iterable[int]]=None) -> dict[str, dict[str, int|float|str|None]]:
+        """
+        Calcule, pour une liste code_IRIS donnée, les statistiques (nombre de retours, moyenne retours, agrégation des commentaires) de tous les critères.
+
+        Si codes_IRIS=None, on fait les stats pour toutes les sessions dans formation.sessions (sinon on prend les formations.session qui sont dans codes_IRIS uniquement).
+
+        Fait ce traitement pour tous les éléments dont nous avons des CSV (i.e. appartenant à liste_codesIRIS_pour_statsCSV)
+        
+        Retourne un dictionnaire de la forme :
+        {
+            "Nom du critère": {
+                "Nombre": ...,
+                "Moyenne": ...,
+                "Commentaires": ...
+            },
+            ...
+        }
+
+        
+        :param codes_IRIS: Sous-partie des codes IRIS à traiter parmi toutes les sessions étant dans formation.sessions. Si None, alors on fait toutes les sessions de formation. Défaut = None.
+        :type codes_IRIS: Optional[int|Iterable[int]], optional
         :return: Un dictionnaire de tous les critères
         :rtype: dict
         """
 
         # S'il n'y a pas de CSV disponibles pour les stats, alors ce n'est pas la peine de faire les stats
-        if len(self.liste_codesIRIS_pour_statsCSV) > 0 :
+        if len(self.liste_codesIRIS_avec_CSV_presents_et_non_vides()) > 0 :
             # On récupère la iste des critères
             liste_criteres = self.df_stagiaires_filtre_statsCSV['Critère'].dropna().unique()
 
@@ -510,6 +685,22 @@ class EvalStat_formation(EvalStat):
 
         #return self._stats_stagiaires
 
+    def df_stagiaires_filtre_statsCSV(self, codes_IRIS:Optional[int|Iterable[int]]=None) -> DataFrame:
+        """
+        df_stagiaires (eval formation) filtré sur les codes IRIS pour lesquels on peut calculer les stats à partir des CSV.
+
+        Ca correspond aux codes IRIS pour lesquels le CSV est fonctionnel et non vide.
+
+        On emploie uniquement les codes_IRIS (sous-partie) parmi toutes les sessions comprises dans formation.sessions. Si None, alors on fait toutes les sessions.
+
+        :param codes_IRIS: Sous-partie des codes IRIS à traiter parmi toutes les sessions étant dans formation.sessions. Si None, alors on fait toutes les sessions de formation. Défaut = None.
+        :type codes_IRIS: Optional[int|Iterable[int]], optional
+        :return: df_stagiaires (eval formation) filtré sur les codes IRIS pour lesquels on peut calculer les stats à partir des CSV.
+        :rtype: DataFrame
+        """
+        return self.df_stagiaires[self.df_stagiaires['Code IRIS'].isin(self.liste_codesIRIS_avec_CSV_presents_et_non_vides(codes_IRIS = codes_IRIS))]
+    
+
     @staticmethod
     def construire_chemin_eval_formation(trigramme_formation:Optional[str]=None) -> Path:
         """
@@ -530,39 +721,7 @@ class EvalStat_formation(EvalStat):
     
     
 
-    # === Méthodes get ===
-    def _get_codesIRIS_par_statut_evalStat(self, statut_evalStat: str) -> list[int]:
-        """
-        Retourne une liste des codes IRIS pour un statut donné.
-
-        :param statut_evalStat: statut EvalStat (["Traité", "Traité - Code IRIS déjà dans l'évaluation de la formation", "Traité - CSV déjà dans l'évaluation de la formation", "Exclu - Aucun CSV fourni", "Exclu - Code IRIS pas dans Extract IRIS sessions", "Exclu - Problème lecture CSV", "Exclu - CSV vide / Aucun retour"])
-        :type statut_evalStat: str
-        :return: une liste des codes IRIS avec ce statut
-        :rtype: list[int]
-        """
-        codes_IRIS = []
-        for code_IRIS in self._codes_IRIS:
-            session = self._formation.get_session_par_codeIRIS(code_IRIS)
-            if session.eval.statut == statut_evalStat:
-                codes_IRIS.append(code_IRIS)
-        return codes_IRIS
-
-    def _get_codesIRIS_par_statut_pourBilan(self, statut_pourBilan: str) -> list[int]:
-        """
-        Retourne une liste des codes IRIS pour une clé de mapping donnée (statut pour bilan, i.e. mieux nommés).
-
-        :param statut_pourBilan: Statut "pour bilan" (i.e. mieux nommés) ["Exploités pour les évaluations (CSV présents)", "Exploités pour les évaluations (CSV présents)", "Exclus des évaluations (problème traitement CSV)", "Exclus des évaluations (CSV manquants)", "Exclus des évaluations (CSV vide / aucun retour)", "Exclus entièrement du bilan (non présent dans IRIS / mauvais code)"] 
-        :type statut_pourBilan: str
-        :return: une liste des codes IRIS avec ce statut
-        :rtype: list[int]
-        """
-        #pprint(self._mapping_statuts)
-
-        statut_evalStat = next((clef for clef, valeur in self._mapping_statuts.items() if valeur == statut_pourBilan), None)
-        if statut_evalStat is None:
-            return []
-        return self._get_codesIRIS_par_statut_evalStat(statut_evalStat)
-
+    
 
 
     # =========================
@@ -578,18 +737,6 @@ class EvalStat_formation(EvalStat):
         return EvalStat_formation.construire_chemin_eval_formation(trigramme_formation=self.trigramme_formation)
 
 
-    @cached_property
-    def liste_codesIRIS_pour_statsCSV(self) -> list[int]:
-        """
-        Retourne la liste des codes IRIS pour lesquels on peut calculer les stats à partir des CSV.
-
-        Ca correspond aux codes IRIS pour lesquels le CSV est fonctionnel et non vide.
-
-        :return: La liste des codes IRIS pour lesquels on peut calculer les stats à partir des CSV.
-        :rtype: list[int]
-        """
-        return self._get_codesIRIS_par_statut_pourBilan("Exploités pour les évaluations (CSV présents et non vides)")
-
 
 
 # ======================================================================================
@@ -604,6 +751,21 @@ class EvalStat_session(EvalStat):
        - la création des fichiers d'évaluation au format xlsx,
        - l'appel à EvalStat_formation pour la création/mise à jour du fichier d'évaluation de la formation au format xlsx.
     """
+    
+    # TODO : à adapter → Renvoi vers evalStat
+    # Dictionnaire pour mapper les statuts aux clés de self._statuts ["Exploités pour les évaluations (CSV présents)", "Exploités pour les évaluations (CSV présents)", "Exclus des évaluations (problème traitement CSV)", "Exclus des évaluations (CSV manquants)", "Exclus des évaluations (CSV vide / aucun retour)", "Exclus entièrement du bilan (non présent dans IRIS / mauvais code)"]
+    _mapping_statuts:dict[str, str] = {
+        "Traité": "Exploités pour les évaluations (CSV présents et non vides)",                                  # Exploités pour stats initiales → Dans _demande_sessions_a_exclure
+        #  "Traité - CSV déjà dans fichier global": "Exploités pour les évaluations (CSV présents et non vides)",   # Exploités pour les stats stagiaires → Dans _maj_evalstat_formation
+        "Exclu - Aucun CSV fourni": "Exclus des évaluations (CSV manquant)",                   # Exclus des évaluations car problème au traitement des CSV → Dans _maj_evalstat_formation
+        "Exclu - Code IRIS pas dans Extract IRIS sessions": "Exclus entièrement du bilan (non présent dans IRIS / mauvais code)",  # Exclus entièrement du bilan car sessions non réalisées ou mauvais RP (exclus par l'utilisateur) → Dans _maj_evalstat_formation
+        "Exclu - Problème lecture CSV": "Exclus des évaluations (problème traitement CSV)",         # Exclus des évaluations car CSV stagiaires manquants → Dans _maj_evalstat_formation
+        "Exclu - CSV vide / Aucun retour": "Exclus des évaluations (CSV vide / aucun retour)",      # Exclus des évaluations car le CSV est vide (i.e. aucun retour d'utilisateur)
+    }
+
+    
+    
+    
     # =====================
     # === CONSTRUCTEURS ===
     # =====================
@@ -688,7 +850,7 @@ class EvalStat_session(EvalStat):
     # ===================================================
     # === MÉTHODES D’INSTANCE - TRAITEMENT INDIVIDUEL ===
     # ===================================================
-    def _charger_csv_stagiaire(self) -> Optional[pd.DataFrame] :
+    def _charger_csv_stagiaire(self) -> Optional[DataFrame] :
         """
         Permet de stocker un CSV dans un dataframe en employant le bon encodage
         Si le return est None c'est qu'il y a eu un problème ou que le dataframe est vide (csv présent avec en-têtes mais sans ligne).
@@ -698,7 +860,7 @@ class EvalStat_session(EvalStat):
         :param chemin_csv: chemin du csv à charger
         :type chemin_csv: Path
         :return: le dataframe du csv. Si None, c'est qu'il y a eu un problème ou que le dataframe est vide (csv présent avec en-têtes mais sans ligne).
-        :rtype: Optional[pd.DataFrame]
+        :rtype: Optional[DataFrame]
         """
         codage_csv = trouve_encodage_csv(self._chemin_csv)  # On récupère l'encodage et on importe le CSV dans un DataFrame
         try:
@@ -761,7 +923,7 @@ class EvalStat_session(EvalStat):
             base = {col: row[col] for col in self._colonnes_csv_fixes}  # Création des colonnes qui seront répétées à chaque fois
             base["NOM Prénom"] = f"{str(row['Nom']).upper()} {row['Prénom']}".strip()  # Création du champ "NOM Prénom"
 
-            for critere, meta in self.dico_colonnes.items():
+            for critere, meta in self._dico_colonnes.items():
                 if critere not in row:
                     continue
                 type_col = meta["Type colonne"]
@@ -819,7 +981,7 @@ class EvalStat_session(EvalStat):
                         })
 
         # Construction du DataFrame final
-        self.df_stagiaires = pd.DataFrame(df_long)
+        self.df_stagiaires = DataFrame(df_long)
 
         # Réorganise les colonnes pour placer "NOM Prénom" juste après "Nom"
         colonnes = list(self.df_stagiaires.columns)
@@ -1241,6 +1403,10 @@ class EvalStat_session(EvalStat):
     # === GETTERS / SETTERS ===
     # =========================
     # Lié à EvalStat_session
+    @property
+    def mapping_statuts(self) -> dict[str, str]:
+        return self._mapping_statuts
+
     @property
     def chemin_csv(self) -> Path:
         return self._chemin_csv
