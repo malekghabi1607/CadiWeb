@@ -96,8 +96,8 @@ class EvalStat:
         "Commentaires, remarques, suggestions": {"Type colonne": "Commentaires seuls", "Groupe critère": "Question ouverte"},
     }
 
-    # TODO : à adapter → Renvoi vers evalStat
-    _criteres_sans_note_standard:list[str] = [  # Critères qui n'ont pas de valeur "classique" pour les stats (i.e. ce sont des bool ou des str), ils ne sont pas à retenir pour le calcul des moyennes < 3
+    # === Critères qui n'ont pas de valeur "classique" pour les stats (i.e. ce sont des bool ou des str), ils ne sont pas à retenir pour le calcul des moyennes < 3 ===
+    _criteres_sans_note_standard:list[str] = [  
         "Comment avez-vous connu cette formation ?", "Avez-vous d'autres besoins de formation ?", "Commentaires, remarques, suggestions", "Recommanderiez-vous cette formation ?"]
 
     # === Colonnes du CSV avec les noms qu'il faudrait (sans espaces en trop ou trucs bizares) ===
@@ -139,7 +139,6 @@ class EvalStat:
     # === Colonnes descriptives à recopier ===
     _colonnes_csv_fixes = [
         "Chemin fichier CSV", "Prénom", "Nom", "Entreprise", "Code session"]
-
 
     # === Colonnes de l'extract IRIS Sessions à récupérer ===
     _colonnes_sessions = [
@@ -754,7 +753,6 @@ class EvalStat_session(EvalStat):
        - l'appel à EvalStat_formation pour la création/mise à jour du fichier d'évaluation de la formation au format xlsx.
     """
     
-    # TODO : à adapter → Renvoi vers evalStat
     # Dictionnaire pour mapper les statuts aux clés de self._statuts ["Exploités pour les évaluations (CSV présents)", "Exploités pour les évaluations (CSV présents)", "Exclus des évaluations (problème traitement CSV)", "Exclus des évaluations (CSV manquants)", "Exclus des évaluations (CSV vide / aucun retour)", "Exclus entièrement du bilan (non présent dans IRIS / mauvais code)"]
     _mapping_statuts:dict[str, str] = {
         "Traité": "Exploités pour les évaluations (CSV présents et non vides)",                                  # Exploités pour stats initiales → Dans _demande_sessions_a_exclure
