@@ -101,10 +101,10 @@ def test_iris_natif_avec_creationExport(iris_natif_session):
 # ======================================================================================
 def test_iris_traite_charge_avec_fe_vide(de_iris_traite_session):
     """
-    Comportement attendu : on ne cahrge pas le fichier Excel
+    Comportement attendu : on ne charge pas le fichier Excel
     """
     iris = IRIS_sessions(
-        typeExport=de_iris_traite_session["typeExport"],
+        #typeExport=de_iris_traite_session["typeExport"],
         fe=de_iris_traite_session["fe_vide"]
     )
 
@@ -114,7 +114,7 @@ def test_iris_traite_charge_avec_fe_vide(de_iris_traite_session):
 
 def test_iris_traite_charge_avec_fe(de_iris_traite_session):
     iris = IRIS_sessions(
-        typeExport=de_iris_traite_session["typeExport"],
+        #typeExport=de_iris_traite_session["typeExport"],
         fe=de_iris_traite_session["fe"]
     )
 
@@ -124,7 +124,7 @@ def test_iris_traite_charge_avec_fe(de_iris_traite_session):
 
 def test_iris_traite_charge_avec_chemin(de_iris_traite_session):
     iris = IRIS_sessions(
-        typeExport=de_iris_traite_session["typeExport"],
+        #typeExport=de_iris_traite_session["typeExport"],
         chemin=de_iris_traite_session["chemin"]
     )
 

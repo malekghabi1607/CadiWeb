@@ -5,7 +5,7 @@ from collections.abc import Iterable
 
 from vte.core.iris_referentiel import get_iris
 from vte.domain.bilanSessions import BilanSessions
-from vte.domain.evalStat import EvalStat_formation
+from vte.domain.evalStat import EvalStat_formation, EvalStat_session
 from vte.domain.fdc import FdC
 from vte.domain.session import Session
 from vte.domain.specs import Specs
@@ -334,6 +334,77 @@ class Formation:
         :rtype: Optional[Session]
         """
         return next((session for session in self.sessions if session.code_IRIS == code_IRIS), None)
+
+    @staticmethod
+    def get_codesIRIS_par_statutBilan(formation:Formation, statut_pourBilan: str, codes_IRIS:Optional[int|Iterable[int]]=[]) -> list[int]:
+        """
+        Retourne, parmi une liste donnée, la liste des codes IRIS ayant un statut "bilan" (i.e. avec labell plus littéraire) donné en argument.
+        On emploie uniquement les codes_IRIS (sous-partie) parmi toutes les sessions comprises dans formation.sessions. Si None, alors on fait toutes les sessions :
+        - on boucle sur les codes_IRIS demandés en argument ;
+        - on récupère la Session correspondante depuis formations.sessions ;
+        - on regarde le statut de l'eval de la session ;
+        - si le statut est celui spécifié on stocke dans la liste qui sera en sortie.
+
+        :param formation: Objet formation dans lequel nous allons chercher les evaluations.
+        :type formation: Formation
+        :param statut_pourBilan: Statut "bilan" (i.e. plus littéraire que statut session) ["Exploités pour les évaluations (CSV présents)", "Exploités pour les évaluations (CSV présents)", "Exclus des évaluations (problème traitement CSV)", "Exclus des évaluations (CSV manquants)", "Exclus des évaluations (CSV vide / aucun retour)", "Exclus entièrement du bilan (non présent dans IRIS / mauvais code)"] 
+        :type statut_pourBilan: str
+        :param codes_IRIS: Sous-partie des codes IRIS à traiter parmi toutes les sessions étant dans formation.sessions. Si None, alors on fait toutes les sessions de formation. Défaut = [].
+        :type codes_IRIS: Optional[int|Iterable[int]]
+        :return: une liste des codes IRIS avec ce statut
+        :rtype: list[int]
+        """
+        #pprint(self._mapping_statuts)
+
+        #statut_evalStat = next((clef for clef, valeur in self._mapping_statuts.items() if valeur == statut_pourBilan), None)
+        statut_evalStat = next((clef for clef, valeur in EvalStat_session._mapping_statuts.items() if valeur == statut_pourBilan), None)
+        if statut_evalStat is None:
+            return []
+        return Formation.get_codesIRIS_par_statutEvalStat(formation, statut_evalStat, codes_IRIS)
+
+    @staticmethod
+    def get_codesIRIS_par_statutEvalStat(formation:Formation, statut_evalStat: str, codes_IRIS:Optional[int|Iterable[int]]=[]) -> list[int]:
+        """
+        Retourne, parmi une liste donnée, la liste des codes IRIS ayant un statut donné en argument.
+        On emploie uniquement les codes_IRIS (sous-partie) parmi toutes les sessions comprises dans formation.sessions. Si None, alors on fait toutes les sessions :
+        - on boucle sur les codes_IRIS demandés en argument ;
+        - on récupère la Session correspondante depuis formations.sessions ;
+        - on regarde le statut de l'eval de la session ;
+        - si le statut est celui spécifié on stocke dans la liste qui sera en sortie.
+
+        :param formation: Objet formation dans lequel nous allons chercher les evaluations.
+        :type formation: Formation
+        :param statut_evalStat: statut EvalStat (["Traité", "Traité - Code IRIS déjà dans l'évaluation de la formation", "Traité - CSV déjà dans l'évaluation de la formation", "Exclu - Aucun CSV fourni", "Exclu - Code IRIS pas dans Extract IRIS sessions", "Exclu - Problème lecture CSV", "Exclu - CSV vide / Aucun retour"])
+        :type statut_evalStat: str
+        :param codes_IRIS: Sous-partie des codes IRIS à traiter parmi toutes les sessions étant dans formation.sessions. Si None, alors on fait toutes les sessions de formation. Défaut = [].
+        :type codes_IRIS: Optional[int|Iterable[int]]
+        :return: une liste des codes IRIS avec ce statut
+        :rtype: list[int]
+        """
+
+        """
+        # ANCIEN
+        codes_IRIS = convertir_collection(codes_IRIS)
+        codes_IRIS_f = []
+        for code_IRIS in codes_IRIS:
+            session = formation.get_session_par_codeIRIS(code_IRIS)
+            if session.eval.statut == statut_evalStat:
+                codes_IRIS_f.append(code_IRIS)
+        return codes_IRIS_f
+        """
+
+        codes_IRIS = convertir_collection(codes_IRIS)
+        codes_IRIS_f = []
+        for session in formation.sessions:
+            if session.eval.statut == statut_evalStat:  # Statut demandé
+                if len(codes_IRIS) == 0:  # Si == 0, on regarde parmi toutes les sessions
+                    codes_IRIS_f.append(session.code_IRIS)
+                else:
+                    if session.code_IRIS in codes_IRIS:  # S'il y a des éléments dans codes_IRIS, alors on ne regarde que parmi ces éléments
+                        codes_IRIS_f.append(session.code_IRIS)
+
+        return codes_IRIS_f
+
 
 
     # =========================

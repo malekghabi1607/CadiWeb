@@ -8,6 +8,7 @@ from vte.domain.evalStat import EvalStat_session
 from vte.domain.formation import Formation
 from vte.domain.session import Session
 from vte.domain.bilanSessions import BilanSessions
+from vte.domain.iris import IRIS_traite, IRIS_sessions, IRIS_ventes
 from vte.utils.utils import backup_fichier_test, chemin_vers_unc, restore_nom_fichier_test
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
@@ -15,7 +16,7 @@ from conftest import tel_data
 
 tel = tel_data()
 
-# Giode mock
+# Guide mock
 """
 Cas	Où mocker
 from X import Y	module_qui_utilise.Y
@@ -134,7 +135,8 @@ def apply_mocks(monkeypatch, dataset):
         return dataset["mock_demande_sessions_a_retenir"]
 
     monkeypatch.setattr(
-        "vte.core.iris_referentiel.IRIS_traite.demande_sessions_a_retenir",
+        IRIS_sessions,
+        "demande_sessions_a_retenir",
         fake_demande_sessions_a_retenir
     )
 
@@ -220,7 +222,23 @@ def test_bilanSession_depuis_periode(nom_cas, dataset, monkeypatch):
 
 
 def main():
-    verif_bilanSession_periode()
+    #verif_bilanSession_periode()
+    print("CAS DISPONIBLES:")
+    for i, k in enumerate(DATASETS_CODES_IRIS.keys()):
+        print(i, k)
+
+    idx = int(input("Choisir un cas : "))
+
+    nom_cas = list(DATASETS_CODES_IRIS.keys())[idx]
+    dataset = DATASETS_CODES_IRIS[nom_cas]
+
+    monkeypatch = pytest.MonkeyPatch()
+
+    test_bilanSession_depuis_codesIRIS(
+        nom_cas,
+        dataset,
+        monkeypatch
+    )
 
 if __name__ == "__main__":
     main()

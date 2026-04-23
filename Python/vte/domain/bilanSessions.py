@@ -37,6 +37,9 @@ class Formation_protocol(Protocol):
     def eval(self) -> EvalStat_formation|None: ...
     
     def get_session_par_codeIRIS(self, code_IRIS:int) -> Optional[Session]: ...
+    
+    @staticmethod
+    def get_codesIRIS_par_statutBilan(formation:Formation_protocol, statut_pourBilan: str, codes_IRIS:Optional[int|Iterable[int]]=[]) -> list[int]:...
 
     #def ajout_sessions(self, codes_IRIS:int|Iterable[int]) -> None: ...
 
@@ -103,7 +106,7 @@ class BilanSessions:
         # --- Variables de traitement ---
         #self._statuts:dict[str, list] = {clef: [] for clef in self._mapping_statuts.values()}  # Dictionnaire qui liste les codes IRIS selon chaque statut
         self._statuts:dict[str, list] = {clef: [] for clef in EvalStat_session.mapping_statuts.values()}  # Dictionnaire qui liste les codes IRIS selon chaque statut
-        self._stats_stagiaires: dict[str, dict[str, int|float|str|None]] = {}  # Dictionnaire des stats des CSV
+        #self._stats_stagiaires: dict[str, dict[str, int|float|str|None]] = {}  # Dictionnaire des stats des CSV
         """
         dictionnaire de la forme :
         {
@@ -229,11 +232,12 @@ class BilanSessions:
             - préparation mail au n+1.
         """
         # On met à jour l'Excel evalstat de la formation si la session demandée par l'utilisateur ne s'y trouve pas
-        self._maj_evalstat()
+        EvalStat_services.ouvrir_ou_traiter_evalStat_depuis_liste_codes_IRIS(codes_IRIS=self._codes_IRIS, formation=self._formation)
 
-        # On calcule les stats
-        self._calculer_stats_criteres()
-        #pprint(instance._stats_stagiaires)
+        # On calcule les stats de eval formation selon les codes_IRIS à traiter
+        self.eval_formation.calculer_stats_criteres(codes_IRIS=self.codes_IRIS)
+        #pprint(self.eval_formation.stats_stagiaires)
+        
 
         # On construit le bilan de sessions
         self._construire_word(version="V3")
@@ -246,36 +250,6 @@ class BilanSessions:
 
 
     # === Détail pipeline ===
-    def _maj_evalstat(self) -> None:
-        """
-        Crée ou ouvre les EvalStat de la/les sessions demandées et met à jour le fichier EvalStat de la formation
-        Ne s'applique que si des sessions demandées par l'utilisateur ne s'y trouvent pas.
-        (on regarde les CSV qui ne sont pas dans le fichier Excel global à partir de la liste df_sessions_filtre['Code IRIS'])
-        """
-        # On ouvre ou on traite les EvalStats non déjà créés
-        EvalStat_services.ouvrir_ou_traiter_evalStat_depuis_liste_codes_IRIS(codes_IRIS=self._codes_IRIS, formation=self._formation)
-
-    def _calculer_stats_criteres(self) -> None: # dict[str, dict[str, int|float|str|None]]:
-        """
-        Calcule les statistiques (nombre de retours, moyenne retours, agrégation des commentaires) de tous les critères.
-
-        Fait ce traitement pour tous les éléments dont nous avons des CSV (i.e. appartenant à liste_codesIRIS_pour_statsCSV)
-        
-        Retourne un dictionnaire de la forme :
-        {
-            "Nom du critère": {
-                "Nombre": ...,
-                "Moyenne": ...,
-                "Commentaires": ...
-            },
-            ...
-        }
-
-        :return: Un dictionnaire de tous les critères
-        :rtype: dict
-        """
-        self.eval_formation.calculer_stats_criteres(codes_IRIS=self.codes_IRIS)
-
     def _calculer_stats_criteres_BAK(self) -> None: # dict[str, dict[str, int|float|str|None]]:
         """
         Calcule les statistiques (nombre de retours, moyenne retours, agrégation des commentaires) de tous les critères.
@@ -604,11 +578,12 @@ class BilanSessions:
         :return: La liste des codes IRIS pour lesquels on peut calculer les stats à partir des CSV.
         :rtype: list[int]
         """
-        #return self._get_codesIRIS_par_statut_pourBilan("Exploités pour les évaluations (CSV présents et non vides)")
-        return EvalStat_formation.get_codesIRIS_par_statutBilan(
+        # Je passe par self._formation et pas Formation_protocol car la méthode statique d'un protocole n'est pas appelée et reste dans le protocole.
+        # En effet les méthodes statiques sont des méthodes de classe or les contrats fais avec les protocoles se font sur des méthodes instanciées.
+        return self._formation.get_codesIRIS_par_statutBilan(
             formation=self._formation,
-            codes_IRIS=self._codes_IRIS,
-            statut_pourBilan="Exploités pour les évaluations (CSV présents et non vides)"
+            statut_pourBilan="Exploités pour les évaluations (CSV présents et non vides)",
+            codes_IRIS=self._codes_IRIS
         )
 
     @cached_property
@@ -935,7 +910,12 @@ class Bilan_V3(BilanSessions_generateur_word):
             for statut_evalStat, statut_pourBilan in EvalStat_session.mapping_statuts.items():
                 if (statut_evalStat not in ["Traité", "Exclu - Code IRIS pas dans Extract IRIS sessions"]) :
                     # On filtre par statut
-                    codes_statut = self._bilanSessions._get_codesIRIS_par_statut_evalStat(statut_evalStat)
+                    #codes_statut = self._get_codesIRIS_par_statut_evalStat(statut_evalStat)
+                    codes_statut = self._bilanSessions._formation.get_codesIRIS_par_statutBilan(
+                        formation=self._bilanSessions._formation,
+                        codes_IRIS=self._bilanSessions.codes_IRIS,
+                        statut_pourBilan=statut_pourBilan
+                        )
 
                     # On fait l'intersection avec ceux qui ont pb CSV
                     codes_finaux = [c for c in codes_statut if c in l_codes_IRIS]
@@ -975,55 +955,36 @@ class Bilan_V3(BilanSessions_generateur_word):
         # On n'affecte les champs suivants que si des CSV sont disponibles pour les stats
         if len(self._bilanSessions.liste_codesIRIS_pour_statsCSV) > 0 :
             # Satisfaction globale
-            self._champs["satisfactionGlobale_moy"] = self._get_stat_avec_format(
+            self._champs["satisfactionGlobale_moy"] = self._bilanSessions.eval_formation.get_stat_avec_format(
                 "Satisfaction globale",
                 "Moyenne",
                 lambda v: f"{v:.1f}/5"
             )
-            self._champs["satisfactionGlobale_com"] = self._get_stat_avec_format(
+            self._champs["satisfactionGlobale_com"] = self._bilanSessions.eval_formation.get_stat_avec_format(
                 "Satisfaction globale",
                 "Commentaires",
                 lambda v: v.replace("_x000D_", "\n"),
                 default=""
             )
-            """3.
-            try:
-                self._satisfactionGlobale_moy = f'{self._bilanSession._stats_stagiaires["Satisfaction globale"]["Moyenne"]:.1f}/5'
-            except:
-                self._satisfactionGlobale_moy = "Pas de donnée"      
-            try:
-                self._satisfactionGlobale_com = self._bilanSession._stats_stagiaires["Satisfaction globale"]["Commentaires"].replace("_x000D_", "\n")
-            except:
-                pass
-            """
 
             # Recommanderiez-vous + commentaires remarques suggestions
-            self._champs["recommandation_moy"] = self._get_stat_avec_format(
+            self._champs["recommandation_moy"] = self._bilanSessions.eval_formation.get_stat_avec_format(
                 "Recommanderiez-vous cette formation ?",
                 "Moyenne",
                 lambda v: f"{v/5*100:.0f}%"  # (on divise par 5 car on a un booléen stcké sous forme de note sur 5 : 0 = False, 5 = True)
             )
-            self._champs["commentairesRemarquesSuggestions_com"] = self._get_stat_avec_format(
+            self._champs["commentairesRemarquesSuggestions_com"] = self._bilanSessions.eval_formation.get_stat_avec_format(
                 "Commentaires, remarques, suggestions",
                 "Commentaires",
                 lambda v: v.replace("_x000D_", "\n"),
                 default=""
             )
-            """
-            try:
-                self._recommandation_moy = f'{self._bilanSession._stats_stagiaires["Recommanderiez-vous cette formation ?"]["Moyenne"]/5*100:.0f}%'  # (on divise par 5 car on a un booléen stcké sous forme de note sur 5 : 0 = False, 5 = True)
-            except:
-                self._recommandation_moy = "Pas de donnée"        
-            try:
-                self._commentairesRemarquesSuggestions_com = self._bilanSession._stats_stagiaires["Commentaires, remarques, suggestions"]["Commentaires"].replace("_x000D_", "\n")
-            except:
-                pass
-            """
+
 
             # Notes inférieures à 3
             stats_sous_3 = {  # Dictionnaire pour les critères dont la moyenne est inférieure à 3 et non exclus (critères dans la liste self._CRITERES_A_ENLEVER)
                 critere: valeurs
-                for critere, valeurs in self._bilanSessions._stats_stagiaires.items()
+                for critere, valeurs in self._bilanSessions.eval_formation.stats_stagiaires.items()
                 if (
                     #critere not in self._bilanSessions._CRITERES_A_ENLEVER
                     critere not in self._bilanSessions.eval_formation.criteres_sans_note_standard
@@ -1081,51 +1042,6 @@ class Bilan_V3(BilanSessions_generateur_word):
     # ====================
     # === MÉTHODES GET === 
     # ====================
-    def _get_stat(self, critere: str, champ: str, default=None) -> int|float|str|None:
-        """
-        Récupère une stat depuis le dictionnaire _stats_stagiaires
-
-        :param critere: Critère de la stat à récupérer
-        :type critere: str
-        :param champ: Champ de ce critère à récupérer (["Nombre", "Moyenne", "Commentaires"])
-        :type champ: str
-        :param default: Valeur retournée si ce critère n'existe pas. Défaut = None
-        :type default: _type_, optional
-        :return: la valeur du champ de ce critère (ex. _stats_stagiaires["Satisfaction globale"]["Moyenne"])
-        :rtype: int|float|str|None
-        """
-        stats = self._bilanSessions._stats_stagiaires.get(critere)
-        if not stats:
-            return default
-
-        valeur = stats.get(champ)
-        return valeur if valeur is not None else default
-
-    def _get_stat_avec_format(self, critere: str, champ: str, format:Callable[[Any], str], default:str="Pas de donnée") -> str:
-        """
-        Récupère et formatte une stat depuis le dictionnaire _stats_stagiaires
-
-        :param critere: Critère de la stat à récupérer
-        :type critere: str
-        :param champ: _descChamp de ce critère à récupérer (["Nombre", "Moyenne", "Commentaires"])ription_
-        :type champ: str
-        :param format: format à appliquer (ex. lambda v: f"{v:.1f}/5" ou lambda v: f"{v/5*100:.0f}%" ou lambda v: v.replace("_x000D_", "\n"))
-        :type format: Callable[[Any], str]
-        :param default: Valeur renvoyée si aucune donnée. Défaut = "Pas de donnée"
-        :type default: str, optional
-        :return: une statistique formatée en str
-        :rtype: str
-        """
-        valeur = self._get_stat(critere, champ)
-
-        if valeur is None:
-            return default
-
-        try:
-            return format(valeur)
-        except Exception:
-            return default
-
 
 
 

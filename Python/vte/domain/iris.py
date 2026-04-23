@@ -976,7 +976,272 @@ class IRIS_natif(IRIS):
 # ======================================================================================
 class IRIS_traite(IRIS, ABC):
 
-    def __init__(self, chemin:Optional[Path]=None, fe:Optional[FichierExcel]=None, IRIS_plus_recent:Optional[bool]=True):
+    _registry = {}
+
+    def __new__(cls, *args, **kwargs):
+        """
+        Surcharge de la méthode spéciale __new__ afin de transformer la classe abstraite
+        IRIS_traite en "fabrique" (factory) de ses sous-classes concrètes.
+
+        🎯 Objectif
+        ----------
+        Permettre une instanciation centralisée de la forme :
+
+            >>> iris = IRIS_traite(typeExport="Sessions")
+
+        sans que l'utilisateur ait besoin de connaître explicitement la sous-classe
+        correspondante (ex. IRIS_sessions, IRIS_ventes, etc.).
+
+        Autrement dit, cette méthode permet de retourner dynamiquement une instance
+        de la bonne sous-classe en fonction de la valeur de `typeExport`.
+
+        ⚙️ Fonctionnement
+        ----------------
+        - Si la classe appelée est directement IRIS_traite :
+            1. On récupère l'argument `typeExport` depuis kwargs
+            2. On recherche dans le registre (_registry) la sous-classe associée
+            3. On instancie dynamiquement cette sous-classe
+            4. On retourne cette instance
+
+        - Si la classe appelée est déjà une sous-classe (ex. IRIS_sessions) :
+            → Comportement normal (instanciation classique)
+
+        📦 Registre (_registry)
+        ----------------------
+        Le dictionnaire `_registry` contient les correspondances :
+
+            {
+                "Sessions": IRIS_sessions,
+                "Ventes": IRIS_ventes,
+                ...
+            }
+
+        Ce registre est automatiquement rempli via la méthode __init_subclass__.
+
+        ⚠️ Points importants
+        -------------------
+        - Cette méthode est appelée AVANT __init__
+        - Elle contrôle le type réel de l'objet instancié
+        - Elle permet de contourner l'impossibilité d'instancier une classe abstraite directement
+
+        🚫 Cas d'erreur
+        --------------
+        - Si `typeExport` n'est pas fourni → ValueError
+        - Si `typeExport` n'est pas reconnu → ValueError
+
+        🔁 Exemple de flux complet
+        -------------------------
+            >>> iris = IRIS_traite(typeExport="Sessions")
+
+            → appel de __new__(IRIS_traite, ...)
+            → récupération de "Sessions"
+            → lookup dans _registry
+            → trouve IRIS_sessions
+            → retourne instance de IRIS_sessions
+
+            → ensuite __init__ de IRIS_sessions est appelé
+
+        Returns
+        -------
+        instance
+            Instance de la sous-classe appropriée (ex. IRIS_sessions, IRIS_ventes, etc.)
+        """
+        
+        # Si on instancie directement IRIS_traite
+        if cls is IRIS_traite:
+            typeExport = kwargs.pop("typeExport", None)
+            chemin = kwargs.get("chemin")
+
+            if typeExport is None:
+                raise ValueError("typeExport est requis")
+        
+            # On charge les modules des sous-classes (astuce pour initialiser IRIS_traite._registry)
+            if not cls._registry:
+                _load_subclasses()
+
+            # Sélection de la sous-classe
+            try:
+                subclass = cls._registry[typeExport]
+            except KeyError:
+                raise ValueError(f"typeExport inconnu : {typeExport}")
+
+            # On instancie la bonne sous-classe
+            instance = super().__new__(subclass)
+            return instance
+
+        # Cas normal (appel depuis une sous-classe)
+        return super().__new__(cls)
+
+    def __init_subclass__(cls, **kwargs):
+        """
+        Méthode spéciale appelée automatiquement par Python à chaque définition
+        d'une sous-classe de IRIS_traite.
+
+        🎯 Objectif
+        ----------
+        Enregistrer automatiquement chaque sous-classe concrète dans un registre central
+        (_registry), afin de permettre à __new__ de retrouver dynamiquement la bonne
+        classe à instancier.
+
+        Cela permet d'éviter :
+        - un mapping manuel (typeExport → classe)
+        - la duplication de logique dans plusieurs fichiers
+
+        ⚙️ Fonctionnement
+        ----------------
+        Lorsqu'une sous-classe est définie :
+
+            class IRIS_sessions(IRIS_traite):
+                _typeExport = "Sessions"
+
+        Python exécute automatiquement :
+
+            IRIS_traite.__init_subclass__(IRIS_sessions)
+
+        Cette méthode :
+            1. Vérifie que la sous-classe possède un attribut `_typeExport`
+            2. Ajoute une entrée dans le registre :
+
+                _registry["Sessions"] = IRIS_sessions
+
+        📦 Registre (_registry)
+        ----------------------
+        Dictionnaire de correspondance entre :
+            - une clé métier (typeExport)
+            - une classe concrète
+
+        Exemple après chargement du module :
+
+            {
+                "Sessions": IRIS_sessions,
+                "Ventes": IRIS_ventes
+            }
+
+        ⏱️ Moment d'exécution
+        --------------------
+        Très important :
+        - Cette méthode est appelée **au moment de la définition de la classe**
+        (donc à l'import du module), et NON à l'instanciation.
+        - Le registre est donc prêt avant tout appel à IRIS_traite(...)
+
+        ⚠️ Points importants
+        -------------------
+        - Fonctionne uniquement si les sous-classes sont importées (donc exécutées)
+        - Si une sous-classe n'est jamais importée → elle ne sera pas enregistrée
+
+        🔁 Exemple de flux complet
+        -------------------------
+            Chargement du module :
+
+            class IRIS_sessions(IRIS_traite):
+                _typeExport = "Sessions"
+
+            → appel automatique de __init_subclass__
+            → enregistrement dans _registry
+
+            Plus tard :
+
+            >>> IRIS_traite(typeExport="Sessions")
+
+            → __new__ utilise _registry pour trouver IRIS_sessions
+
+        Parameters
+        ----------
+        cls : type
+            La sous-classe en cours de définition (ex. IRIS_sessions)
+
+        Returns
+        -------
+        None
+        """
+        super().__init_subclass__(**kwargs)
+
+        if hasattr(cls, "_typeExport"):
+            IRIS_traite._registry[cls._typeExport] = cls
+
+    def _load_subclasses():
+        """
+        Charge explicitement les sous-classes concrètes de IRIS_traite afin de déclencher
+        leur enregistrement automatique dans le registre interne (_registry).
+
+        🎯 Objectif
+        ----------
+        Permettre l'utilisation de l'API suivante :
+
+            >>> iris = IRIS_traite(typeExport="Sessions")
+
+        sans avoir besoin d'importer explicitement les classes concrètes
+        (IRIS_sessions, IRIS_ventes, etc.) dans chaque module appelant.
+
+        ⚙️ Fonctionnement
+        ----------------
+        Cette fonction réalise des imports "tardifs" (lazy imports) des modules contenant
+        les sous-classes concrètes :
+
+            from .iris_sessions import IRIS_sessions
+            from .iris_ventes import IRIS_ventes
+
+        Lors de ces imports, Python exécute la définition des classes, ce qui déclenche
+        automatiquement la méthode spéciale __init_subclass__ de IRIS_traite.
+
+        Cette méthode ajoute alors chaque sous-classe dans le registre interne :
+
+            IRIS_traite._registry = {
+                "Sessions": IRIS_sessions,
+                "Ventes": IRIS_ventes,
+                ...
+            }
+
+        Ainsi, après appel de _load_subclasses, la méthode __new__ de IRIS_traite
+        est capable de retrouver dynamiquement la bonne classe à instancier.
+
+        ⏱️ Quand cette fonction est-elle appelée ?
+        -----------------------------------------
+        Typiquement, elle est appelée dans __new__ de IRIS_traite, uniquement si le
+        registre est vide :
+
+            if not cls._registry:
+                _load_subclasses()
+
+        Cela garantit que :
+        - les sous-classes sont chargées uniquement si nécessaire
+        - on évite les imports circulaires au chargement du module
+
+        🔄 Pourquoi utiliser des imports tardifs ?
+        -----------------------------------------
+        Pour éviter les imports circulaires :
+
+            iris.py → iris_sessions.py → iris.py
+
+        En déplaçant les imports à l'intérieur d'une fonction, on diffère leur exécution
+        jusqu'au moment où ils sont réellement nécessaires.
+
+        ⚠️ Points importants
+        -------------------
+        - Cette fonction ne retourne rien : son effet est de bord (remplissage du registre)
+        - Elle doit être appelée avant toute tentative d'instanciation dynamique
+        - Si une sous-classe n'est pas importée ici (ou ailleurs), elle ne sera pas disponible
+
+        🔁 Exemple de flux complet
+        -------------------------
+            >>> iris = IRIS_traite(typeExport="Sessions")
+
+            → __new__ détecte que _registry est vide
+            → appel de _load_subclasses()
+            → import de IRIS_sessions
+            → __init_subclass__ enregistre "Sessions"
+            → __new__ récupère IRIS_sessions
+            → instance créée correctement
+
+        Returns
+        -------
+        None
+        """
+        from .iris_sessions import IRIS_sessions
+        from .iris_ventes import IRIS_ventes
+
+
+    def __init__(self, chemin:Optional[Path]=None, fe:Optional[FichierExcel]=None, IRIS_plus_recent:Optional[bool]=True, **kwargs):
         """
         Classe abstraite pour charger un fichier IRIS déjà traité.
 
@@ -984,6 +1249,9 @@ class IRIS_traite(IRIS, ABC):
         Si chemin est donné, alors on pointe vers celui-ci.
 
         Si fe est donné, alors on ne fait rien (c'est qu'il est déjà chargé)
+
+        ⚠️ Tous les kwargs supplémentaires sont ignorés volontairement
+        pour permettre l'utilisation de la factory via typeExport.
 
         :param typeExport: spécifie le type d'export. Doit être dans cette liste : ["Sessions", "Formations", "Ventes", "Insciptions"]
         :type typeExport: str
@@ -1008,7 +1276,7 @@ class IRIS_traite(IRIS, ABC):
 
         # On ouvre le fichier IRIS s'il n'existe pas encore
         # Si chemin = None, alors _charger_excel le gèrera pour faire pointer l'utilisateur
-        self._charger_excel(fe=self._fe, chemin=chemin)
+        self._charger_excel(chemin=chemin)
 
 
     # =========================
