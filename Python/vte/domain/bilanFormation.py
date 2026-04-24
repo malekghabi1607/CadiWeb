@@ -2,6 +2,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from functools import cached_property
 from pathlib import Path
+from pprint import pprint
 from typing import Any, Callable, Iterable, Optional, Protocol
 from mailmerge import MailMerge
 import pandas as pd
@@ -10,10 +11,15 @@ from pandas import DataFrame
 from vte.core import config
 from vte.core.iris_referentiel import get_iris, set_iris_chemin_specifique
 from vte.domain.fdc import FdC
-from vte.domain.iris import IRIS_sessions, IRIS_ventes
+from vte.domain.iris import IRIS, IRIS_sessions, IRIS_ventes
+from vte.domain.evalStat import EvalStat_formation, EvalStat_session
 from vte.domain.specs import Specs
+from vte.services.evalStat_services import EvalStat_services
+from vte.utils.office import FichierWord
+from vte.utils.utils import *
 from vte.utils.utils import chemin_vers_unc
 from vte.utils.utils_instn import construire_chemin_config
+
 
 
 # ======================================================================================
@@ -31,6 +37,9 @@ class Formation_protocol(Protocol):
     def trigramme_formation(self) -> str: ...
 
     @property
+    def eval(self) -> EvalStat_formation|None: ...
+
+    @property
     def fdc(self) -> Optional[FdC]: ...
 
     @property
@@ -40,6 +49,9 @@ class Formation_protocol(Protocol):
 
     def ouvrir_specs(self, chemin_specs:Optional[Path|str] = None) -> None:  ...
 
+    @staticmethod
+    def get_codesIRIS_par_statutBilan(formation:Formation_protocol, statut_pourBilan: str, codes_IRIS:Optional[int|Iterable[int]]=[]) -> list[int]:...
+
 # ======================================================================================
 # CLASSE BilanFormation
 # ======================================================================================
@@ -47,30 +59,190 @@ class BilanFormation:
     # =====================
     # === CONSTRUCTEURS ===
     # =====================
-    def __init__(self, formation:Formation_protocol, annee:int):
+    def __init__(self, formation:Formation_protocol, annee:int, codes_IRIS:Optional[int|Iterable[int]]=[]) -> None:
         # Données de l'utilisateur
         self._formation:Formation_protocol = formation
         self._annee:int = annee
+
+        self._codes_IRIS:list[int] = codes_IRIS
+        
+        # --- Variables de traitement ---
+        self._statuts:dict[str, list] = {clef: [] for clef in EvalStat_session.mapping_statuts.values()}  # Dictionnaire qui liste les codes IRIS selon chaque statut
+
+    @classmethod   
+    def depuis_codesIRIS(cls, formation:Formation_protocol, codes_IRIS:int|Iterable[int], annee:Optional[int]=None, periode:str="Année") -> BilanFormation:
+        """
+        Génère un bilan de formation à partir d'un ou plusieurs codes IRIS.
+
+        Si annee est donnée, alors on ne fait pas de contrôle. Sinon on la détermine avec la période grâce aux codes IRIS et à IRIS sessions.
+
+        :param formation: Objet formation associé à ce bilan
+        :type formation: Formation_protocol
+        :param codes_IRIS: Codes IRIS des sessions pour lesquels on souhaite faire le bilan
+        :type codes_IRIS: int|Iterable[int]
+        :param annee: Année du bilan (s'il n'est pas donné on l'obtiendra d'IRIS sessions)
+        :type annee: Optional[int], optional
+        :return: Un objet bilan de formation de ce ou ces code(s) IRIS
+        :rtype: BilanFormation
+        """
+        # On évalue l'année et la période à partir des codes IRIS si besoin (sinon aucune vérification : on fait confiance à l'utilisateur)
+        if annee is None:
+            annee, _ = get_iris(typeExport="Sessions").get_periode_depuis_codes_IRIS(codes_IRIS=codes_IRIS)
+        
+        # On initialise l'instance 
+        instance = cls(formation=formation, annee=annee, codes_IRIS=codes_IRIS)
+
+        # === ON FAIT LES VERIFICATIONS QUI ANNULERAIENT LE TRAITEMENT ===
+        continuer = instance.verifier_traitement_bilan()
+        if not continuer:
+            return
+
+        # === TRAITEMENT DU BILAN DE SESSIONS ===
+        instance._traiter()
+
+        return instance
+
+    @classmethod   
+    def depuis_annee(cls, formation:Formation_protocol, annee:int) -> Optional[BilanFormation]:
+        """
+        Permet de générer un bilan de formation selon une année
+
+        :param formation: Objet formation associé à ce bilan
+        :type formation: Formation_protocol
+        :param annee: Année du bilan
+        :type annee: int
+        :return: Un objet bilan de formation des codes IRIS sélectionnés par l'utilisateur
+        :rtype: Optional[BilanFormation]
+        """
+        # On demande à l'utilisateur les sessions qu'il souhaite exclure
+        codes_IRIS = get_iris(typeExport="Sessions").demande_sessions_a_exclure(
+            trigramme_formation=formation.trigramme_formation,
+            annee=annee
+        )
+
+        # On traite le bilan de formation
+        if len(codes_IRIS) > 0:  # Si on a des codes IRIS à traiter, on traite le bilan de formation
+            return BilanFormation.depuis_codesIRIS(
+                formation=formation,
+                codes_IRIS=codes_IRIS,
+                annee=annee
+            )
+        else:  # Si aucun code IRIS n'a été sélectionné, on print un warning
+            vlog.print("Info", f"⚠️  Toutes les sessions sont exclues : il n'y a plus de raison de faire le bilan de formation.")
+            return None
+
 
 
 
     # =========================
     # === METHODES INTERNES === 
     # =========================
-    def creer_texte_rp(self) -> str:
+    # === Pipeline métier ===
+    def _traiter(self) -> None:
         """
-        Crée le texte des rp afin d'arriver à ceci : "Vincent TESTARD (UEM) ; Antony LEBLED (UECC)"
+        Traite le bilan de sessions :
+            - mise à jour des evalStat ;
+            - calcul des stats des csv (moyennes, concaténation commentaires...) ;
+            - création du word (calcul et fusion des champs de fusion) ;
+            - ouverture word (pour adaptations par utilisateur) ;
+            - préparation mail au n+1.
+        """
+        # On met à jour l'Excel evalstat de la formation si la session demandée par l'utilisateur ne s'y trouve pas
+        EvalStat_services.ouvrir_ou_traiter_evalStat_depuis_liste_codes_IRIS(codes_IRIS=self._codes_IRIS, formation=self._formation)
+
+        # On calcule les stats de eval formation selon les codes_IRIS à traiter
+        self.eval_formation.calculer_stats_criteres(codes_IRIS=self.codes_IRIS)
+        #pprint(self.eval_formation.stats_stagiaires)
         
-        :return: Un texte correspondant à la description
-        :rtype: str
+
+        # On construit le bilan de sessions
+        self._construire_word(version="V3")
+
+        # On ouvre le word
+        FichierWord.depuisFichier(chemin_fichier=self.chemin_word_bilan_formation_output, charger_contentControl=False, afficherWord=True)
+
+    def _get_generateur_word(self, version: str) -> BilanFormation_generateur_word:
         """
-        return BilanFormation.creer_texte_rp(df_sessions=self.df_sessions_filtre_annee)
+        Récupère la bonne version du générateur Word (si jamais on a plusieurs versions)
+
+        :param version: Version du bilan de formation à employer
+        :type version: str
+        :raises ValueError: Si problème
+        :return: le générateur du bilan de formation
+        :rtype: BilanFormation_generateur_word
+        """
+        if version == "V3":
+            return Bilan_V3(self)
+        else:
+            raise ValueError(f"Version inconnue : {version}")
+
+    def _construire_word(self, version: str = "V3") -> None:
+        """
+        Construit le Word (construit/calcule les champs puis les fusionne dans le Word)
+
+        :param version: Version du bilan de sessions. Défaut = "V3"
+        :type version: str, optional
+        """
+        builder = self._get_generateur_word(version)
+        builder.construire()
+
 
 
 
     # =========================
     # === METHODES EXTERNES === 
     # =========================
+    #def creer_texte_rp(self) -> str:
+    #    """
+    #    Crée le texte des rp afin d'arriver à ceci : "Vincent TESTARD (UEM) ; Antony LEBLED (UECC)"
+    #    
+    #    :return: Un texte correspondant à la description
+    #    :rtype: str
+    #    """
+    #    return BilanFormation.creer_texte_rp(df_sessions=self.df_sessions_filtre_annee)
+
+    def verifier_traitement_bilan(self) -> bool:
+        """
+        Vérifie si l'on doit traiter un bilan de formation à partir :
+            - le bilan Word n'existe pas déjà ;
+            - des codes IRIS (bien à 5 caractères + bien présent dans IRIS sessions).
+
+        Pour l'instant on coupe le programme en cas d'échec d'une vérification (la sortie bool=False ne sert à rien car non employée)
+
+        :return: Un bool pour dire si le traitement doit continuer :
+            - True on peut traiter l'EvalStat (aucun souci détecté) ; 
+            - False il ne faut pas traiter l'EvalStat (code IRIS ou CSV non détectés dans EvalStat + code IRIS présent dans IRIS sessions).
+        :rtype: bool
+        """
+        # Vérification 1 : on vérifie la pré-existance du bilan Word ; si il existe déjà, alors on arrête le traitement
+        continuer = verifier_existance_fichier(self.chemin_word_bilan_formation_output)
+        if not continuer:
+            vlog.log_erreur("❌  Bilan de formation déjà existant → Arrêt du traitement du bilan par l'utilisateur")
+            
+        
+        
+        # Vérifications 2 : liés à code_IRIS
+        for code_IRIS in self._codes_IRIS:
+            if code_IRIS is not None:
+                # 2.1 : On vérifie que code_iris est bien un entier à 5 chiffres
+                est_code_IRIS_valide, _ = IRIS.verifier_code_IRIS(code_IRIS, int)
+                if not est_code_IRIS_valide:
+                    vlog.log_erreur(f"❌  Code IRIS renseigné non valide : {code_IRIS}")
+                    #statut = "Exclu - Code IRIS renseigné non valide"
+                    #return False, statut
+
+
+                # 2.2 : On vérifie si le code_IRIS est bien existant dans l'extract IRIS sessions
+                if code_IRIS not in self.df_sessions_filtre_annee["Code IRIS"].values:
+                    vlog.log_erreur(f"❌  Code IRIS {code_IRIS} non trouvé dans l’extract IRIS.")
+                    #print(f"⚠️  Code IRIS {code_IRIS} non trouvé dans l’extract IRIS.")
+                    #statut = "Exclu - Code IRIS pas dans Extract IRIS sessions"
+                    #return False, statut
+ 
+
+        # Si rien n'a arrêté les vérifications, alors tout est OK
+        return True
+    
     @staticmethod
     def construire_chemin_word_bilan_formation_output(trigramme_formation:Optional[str]=None, annee:Optional[int]=None) -> Path:
         """
@@ -110,7 +282,7 @@ class BilanFormation:
         infos_rp = (
             groupe_rp["Prénom responsable pédag."] + " " +
             groupe_rp["Nom responsable pédag."] + " (" +
-            config.UNITES[groupe_rp["Lieu principal"]] + ")"
+            groupe_rp["Lieu principal"].map(config.UNITES) + ")"
         )
 
         # Joindre avec des virgules
@@ -138,7 +310,7 @@ class BilanFormation:
         else:
             texte_sessions = "session"
 
-        if len(nombre_sessions_par_lieu) > 1:
+        if len(nombre_sessions_par_lieu) >= 1:  # Si on veut rendre facultatif l'écriture de l'unité s'il y en a qu'une, alors on mettre > 1
             texte_detail = f"\n({' + '.join(f'{count} {config.UNITES[lieu]}' for lieu, count in nombre_sessions_par_lieu.items())})"
         else:
             texte_detail = ""
@@ -165,7 +337,7 @@ class BilanFormation:
         nombre_personnes_par_lieu = df_sessions.groupby('Lieu principal')['Nb. Nommés'].sum()
 
         # Créer le texte souhaité
-        texte_detail = f"\n({' + '.join(f'{count} {config.UNITES[lieu]}' for lieu, count in nombre_personnes_par_lieu.items())})" if len(nombre_personnes_par_lieu) > 1 else ""
+        texte_detail = f"\n({' + '.join(f'{count} {config.UNITES[lieu]}' for lieu, count in nombre_personnes_par_lieu.items())})" if len(nombre_personnes_par_lieu) >= 1 else ""  # Si on veut rendre facultatif l'écriture de l'unité s'il y en a qu'une, alors on mettre > 1
 
         texte = f"{nombre_personnes_total} pers.{texte_detail}"
         #print(texte)
@@ -183,7 +355,28 @@ class BilanFormation:
     @property
     def annee(self) -> Optional[int]:
         return self._annee
+
+    @property
+    def annee_nm1(self) -> Optional[int]:
+        return self._annee - 1
+
+    @property
+    def annee_np1(self) -> Optional[int]:
+        return self._annee + 1
+
+    @property
+    def codes_IRIS(self) -> Iterable[int]:
+        return self._codes_IRIS
     
+    @codes_IRIS.setter
+    def codes_IRIS(self, valeur:int|Iterable[int]) -> None:
+        if isinstance(valeur, int):
+            self._codes_IRIS = [valeur]
+        elif isinstance(valeur, Iterable) and not isinstance(valeur, str):  # Iterable[int] n’est pas valide dans isinstance
+            self._codes_IRIS = valeur
+        else:
+            vlog.log_erreur("La valeur n'est ni un int ni un Iterable de int (codes_IRIS.setter)")
+
     @cached_property
     def chemin_word_bilan_formation_output(self) -> Path:
         """
@@ -197,12 +390,35 @@ class BilanFormation:
         return BilanFormation.construire_chemin_word_bilan_formation_output(trigramme_formation=self.trigramme_formation, annee=self._annee)
 
 
+
+
+
     # Liens avec Formation
     @property
     def trigramme_formation(self) -> str:
         return self._formation.trigramme_formation
 
+    @property
+    def eval_formation(self) -> Optional[EvalStat_formation]:
+        return self._formation.eval
+    
+    @cached_property
+    def liste_codesIRIS_pour_stats(self) -> list[int]:
+        """
+        Retourne la liste des codes IRIS pour lesquels on peut calculer les stats à partir des CSV.
 
+        Ca correspond aux codes IRIS pour lesquels le CSV est fonctionnel et non vide.
+
+        :return: La liste des codes IRIS pour lesquels on peut calculer les stats à partir des CSV.
+        :rtype: list[int]
+        """
+        # Je passe par self._formation et pas Formation_protocol car la méthode statique d'un protocole n'est pas appelée et reste dans le protocole.
+        # En effet les méthodes statiques sont des méthodes de classe or les contrats fais avec les protocoles se font sur des méthodes instanciées.
+        return self._formation.get_codesIRIS_par_statutBilan(
+            formation=self._formation,
+            statut_pourBilan="Exploités pour les évaluations (CSV présents et non vides)",
+            codes_IRIS=self._codes_IRIS
+        )
 
     # Liens avec IRIS sessions
     @cached_property
@@ -249,21 +465,32 @@ class BilanFormation:
         Intitulé de la formation (prend le nom de la ligne la plus récente pour avoir la dernière mise à jour)
         """
         #return self.df_sessions_filtre_annee["Session"].iloc[0]
-        return self.df_session_filtre_ligne_plus_recente[["Session"]]
+        return self.df_session_filtre_ligne_plus_recente[["Session"]].iloc[0]
 
     @cached_property
-    def min_participants_sessions(self) -> str:
-        return self.df_session_filtre_ligne_plus_recente[["Min."]]
+    def min_participants_sessions(self) -> int:
+        return self.df_session_filtre_ligne_plus_recente[["Min."]].iloc[0].item()  # iloc pour avoir la ligne ; item() pour avoir un nombre python (sinon j'ai un np.int64)
 
     @cached_property
-    def max_participants_sessions(self) -> str:
-        return self.df_session_filtre_ligne_plus_recente[["Max."]]
+    def max_participants_sessions(self) -> int:
+        return self.df_session_filtre_ligne_plus_recente[["Max."]].iloc[0].item()
 
     @cached_property
-    def depassementAutorise_participants_sessions(self) -> str:
-        return self.df_session_filtre_ligne_plus_recente[["Dépass. autorisé"]]
+    def depassementAutorise_participants_sessions(self) -> int:
+        return self.df_session_filtre_ligne_plus_recente[["Dépass. autorisé"]].iloc[0].item()
 
 
+    # Lien avec FdC et IRIS sessions
+    @cached_property
+    def max_participants_fdc(self) -> int:
+        """
+        Renvoie le nombre max de participants (= prévu (FdC) + dépassement autorisé (IRIS Sessions) )
+
+        Returns:
+            int: le nombre max de participants (= prévu + dépassement autorisé)
+        """
+        return self._formation.fdc.nb_participants_prevus + self.depassementAutorise_participants_sessions
+    
 
     # Liens avec IRIS ventes
     @cached_property
@@ -308,19 +535,6 @@ class BilanFormation:
 
 
 
-    # Lien avec FdC et IRIS sessions
-    @cached_property
-    def max_participants_fdc(self) -> int:
-        """
-        Renvoie le nombre max de participants (= prévu (FdC) + dépassement autorisé (IRIS Sessions) )
-
-        Returns:
-            int: le nombre max de participants (= prévu + dépassement autorisé)
-        """
-        return self._formation.fdc.nb_participants_prevus + self.depassementAutorise_participants_sessions
-    
-
-
 # ======================================================================================
 # CLASSE BilanFormation_generateur_word (générique)
 # ======================================================================================
@@ -350,7 +564,7 @@ class BilanFormation_generateur_word(ABC):
         self._bilanFormation._formation.ouvrir_specs(chemin_specs=chemin_specs)
 
         # TODO à virer après les phases de test
-        chemin_IRIS_ventes:Path = Path(chemin_vers_unc(r"R:\_Echanges\VTE\Prog\IRIS\Extracts complets\R04301_Ventes-COMPLET-2026.02.12.xlsx"))
+        chemin_IRIS_ventes:Path = Path(chemin_vers_unc(r"R:\_Echanges\VTE\Prog\IRIS\Extracts complets\R04301_Ventes-COMPLET-2026.03.05.xlsx"))
         set_iris_chemin_specifique(typeExport="Ventes", chemin=chemin_IRIS_ventes)
         
         
@@ -407,7 +621,7 @@ class BilanFormation_generateur_word(ABC):
         self._recapDonnees = pd.concat([self._recapDonnees, ligne_fdc], ignore_index=True)
 
         print("\nRécap des données sur les différents fichiers (vérif. incohérence)")
-        print(self._recapDonnees)
+        pprint(self._recapDonnees)
         
     @abstractmethod
     def _construire_champs(self) -> None:
@@ -428,6 +642,9 @@ class BilanFormation_generateur_word(ABC):
         # Ouvre le document Word à partir du modèle
         document = MailMerge(self.CHEMIN_MODELE)
         #print(document.get_merge_fields())
+
+        # Le merge n'accepte que des valeurs strings → On convertit tout au cas où
+        self._champs = {k: str(v) for k, v in self._champs.items()}
 
         # Fusionne les champs de fusion
         document.merge(**self._champs)
@@ -481,8 +698,9 @@ class Bilan_V3(BilanFormation_generateur_word):
 
         # === On génère le word ===
         self._construire_entete()
-        self._construire_commentaires()
-        self._construire_stats()
+        self._construire_stats_iris()
+        self._construire_stats_eval_n()
+        self._construire_stats_eval_nm1()
 
 
     # =============================
@@ -493,13 +711,16 @@ class Bilan_V3(BilanFormation_generateur_word):
         Construit la partie en-tête du bilan de formation
         """
         # Infos génériques
-        self._champs["annee"] = self._bilanFormation._annee
+        self._champs["annee"] = self._bilanFormation.annee
+        self._champs["annee_nm1"] = self._bilanFormation.annee_nm1
+        self._champs["annee_np1"] = self._bilanFormation.annee_np1
+
         self._champs["titreFormation"] = self._bilanFormation.intitule_formation
         self._champs["trigramme_formation"] = self._bilanFormation.trigramme_formation
         self._champs["date_creationFormation"] = self._bilanFormation._formation.fdc.date_creationFormation.strftime("%d/%m/%Y")
 
         # Liste des RP et de leurs lieux
-        self._champs["rp"] = self._bilanFormation.creer_texte_rp()
+        self._champs["rp"] = self._bilanFormation.creer_texte_rp(df_sessions=self._bilanFormation.df_sessions_filtre_annee)
         
         self._champs["rt"] = ""
 
@@ -508,260 +729,180 @@ class Bilan_V3(BilanFormation_generateur_word):
         #self._champs["min_participants_ee"] = self._bilanFormation._formation.fdc.min_participants_ee
         self._champs["min_participants"] = self._bilanFormation._formation.fdc.min_participants
 
-        self._champs["prevus_participants"] = self._bilanFormation._formation.fdc.nb_participants_prevus
-        self._champs["max_participants"] = self._bilanFormation.max_participants_fdc  # Prévu + dépass autorisé sur IRIS ou IRIS Sessions (Max. + Dépass. autorisé)
+        self._champs["prevus_participants"] = f"{self._bilanFormation._formation.fdc.nb_participants_prevus} pers."
+        self._champs["max_participants"] = f"{self._bilanFormation.max_participants_fdc} pers."  # Prévu + dépass autorisé sur IRIS ou IRIS Sessions (Max. + Dépass. autorisé)
 
         self._champs["date_specs"] = self._bilanFormation._formation.specs.date_derniere_modification_str
 
-    def _construire_tableau(self) -> None:
+    def _construire_stats_iris(self) -> None:
         # Nombre de sessions (IRIS sessions)
-        self._nb_sessions_nm1 = BilanFormation.creer_texte_nb_sessions(self._bilanFormation.df_sessions_filtre_annee_nm1)
-        self._nb_sessions_n = BilanFormation.creer_texte_nb_sessions(self._bilanFormation.df_sessions_filtre_annee)
+        self._champs["nb_sessions_nm1"] = BilanFormation.creer_texte_nb_sessions(self._bilanFormation.df_sessions_filtre_annee_nm1)
+        self._champs["nb_sessions_n"] = BilanFormation.creer_texte_nb_sessions(self._bilanFormation.df_sessions_filtre_annee)
 
         # Nombre d'apprenants (IRIS sessions)
-        self._nb_apprenants_nm1 = BilanFormation.creer_texte_nb_apprenants(self._bilanFormation.df_sessions_filtre_annee_nm1)
-        self._nb_apprenants_n = BilanFormation.creer_texte_nb_apprenants(self._bilanFormation.df_sessions_filtre_annee)
+        self._champs["nb_apprenants_nm1"] = BilanFormation.creer_texte_nb_apprenants(self._bilanFormation.df_sessions_filtre_annee_nm1)
+        self._champs["nb_apprenants_n"] = BilanFormation.creer_texte_nb_apprenants(self._bilanFormation.df_sessions_filtre_annee)
 
         # Prix de référence (IRIS ventes)
-        self._prix_nm1 = self._bilanFormation.prix_nm1_str
-        self._prix_n = self._bilanFormation.prix_n_str
+        self._champs["prix_nm1"] = self._bilanFormation.prix_nm1_str
+        self._champs["prix_n"] = self._bilanFormation.prix_n_str
+
+    def _construire_stats_eval_n(self):
+        """
+        Construit la partie statistiques des évaluations de l'année n du bilan de formation
+        """
 
         # Stats evalStat
-        # TODO : j'en suis là
-        self._satisfactionGlobale_nm1:float = -1  # EvalStat
-        self._satisfactionGlobale_n:float = -1  # EvalStat
-        self._satisfactionGlobale_n_com:str = -1  # EvalStat
+        # TODO : avirer par la suite
+        #self._champs["satisfactionGlobale_nm1"] = -1  # EvalStat
+        #self._champs["satisfactionGlobale_n"] = -1  # EvalStat
+        #self._champs["satisfactionGlobale_n_com"] = ""  # EvalStat
 
-        self._qualiteAnimations_nm1:float = -1  # EvalStat
-        self._qualiteAnimations_n:float = -1  # EvalStat
-        self._qualiteAnimations_n_com:str = -1  # EvalStat
+        #self._champs["qualiteAnimations_nm1"] = -1  # EvalStat
+        #self._champs["qualiteAnimations_n"] = -1  # EvalStat
+        #self._champs["qualiteAnimations_n_com"] = ""  # EvalStat
 
-        self._qualiteMoyensPedagogiques_nm1:float = -1  # EvalStat
-        self._qualiteMoyensPedagogiques_n:float = -1  # EvalStat
-        self._qualiteMoyensPedagogiques_n_com:str = -1  # EvalStat
+        #self._champs["qualiteMoyensPedagogiques_nm1"] = -1  # EvalStat
+        #self._champs["qualiteMoyensPedagogiques_n"] = -1  # EvalStat
+        #self._champs["qualiteMoyensPedagogiques_n_com"] = ""  # EvalStat
 
-
-    def _construire_commentaires(self):
-        """
-        Construit la partie commentaires du bilan de sessions
-        """
-        commentaires = ""
-
-        # Cas avec aucun CSV dispo pour les stats
-        if len(self._bilanSessions.liste_codesIRIS_pour_statsCSV) == 0 :
-            vlog.print("Info", f"⚠️  Aucun CSV disponible pour ce bilan : les statistiques des stagiaires ne seront pas évaluées.")
-            commentaires = f"\n⚠️  Aucun CSV disponible pour ce bilan : les statistiques des stagiaires ne seront pas évaluées.\n"
         
-        # Cas avec certains CSV non dispo pour les stats mais pas tous
-        elif len(self._bilanSessions.liste_codesIRIS_pour_enTete) != len(self._bilanSessions.liste_codesIRIS_pour_statsCSV) :
-
-            print(self._bilanSessions.df_stagiaires_filtre_statsCSV_1ligne_par_session)
-            print()
-            print(self._bilanSessions.df_stagiaires_filtre_statsCSV_1ligne_par_session['N° Session'].tolist())
-
-            commentaires = "\n⚠️  Certaines sessions n'ont pas de CSV exploitables pour les statistiques (cf. liste ci-dessous)."
-            commentaires += "\n\nDonnées employées pour les statistiques :"
-            commentaires += "\n   • Sessions évaluées : "+"".join(f"\n       - {session}" for session in self._bilanSessions.df_stagiaires_filtre_statsCSV_1ligne_par_session['N° Session'].tolist())
-            commentaires += "\n   • Nombre d'apprenants sur ces sessions : " + f"{self._nb_apprenants:.0f}"
-            commentaires += "\n   • Nombre de stagiaires ayant formulé des retours : " + f"{self._nb_stagiaires_retours:.0f}"
-
-        # Affichage sessions avec pb CSV
-        if len(self._bilanSessions.liste_codesIRIS_avec_pb_CSV) > 0:
-            commentaires += "\n\nListe des sessions dont les statistiques n'ont pas pu être évaluées :"
-            l_codes_IRIS = self._bilanSessions.liste_codesIRIS_avec_pb_CSV
-
-            for statut_evalStat, statut_pourBilan in self._bilanSessions._mapping_statuts.items():
-                if (statut_evalStat not in ["Traité", "Exclu - Code IRIS pas dans Extract IRIS sessions"]) :
-                    # On filtre par statut
-                    codes_statut = self._bilanSessions._get_codesIRIS_par_statut_evalStat(statut_evalStat)
-
-                    # On fait l'intersection avec ceux qui ont pb CSV
-                    codes_finaux = [c for c in codes_statut if c in l_codes_IRIS]
-
-                    l_sessions = (
-                        self._bilanSessions.df_sessions_filtre_avec_pb_CSV[self._bilanSessions.df_sessions_filtre_avec_pb_CSV['Code IRIS'].isin(codes_finaux)]
-                        .dropna(subset=["N° Session"])
-                        .drop_duplicates(subset=['Code IRIS'])
-                        ["N° Session"]
-                        .tolist()
-                        )
-                    if len(l_sessions) > 0:
-                        commentaires += f"\n   • {statut_pourBilan} :" + "".join(f"\n       - {isession}" for isession in l_sessions)
-
-        # Affichage sessions exclues
-        if len(self._bilanSessions.liste_codesIRIS_exclus_totalement) > 0:
-            commentaires += "\n\nListe des sessions de la période entièrement exclues du bilan :"
-            l_codes_IRIS = self._bilanSessions.liste_codesIRIS_exclus_totalement
-            l_sessions = (
-                self._bilanSessions.df_sessions_filtre_exclus_totalement[self._bilanSessions.df_sessions_filtre_exclus_totalement['Code IRIS'].isin(l_codes_IRIS)]
-                .dropna()
-                .drop_duplicates(subset=['Code IRIS'])
-                ["N° Session"]
-                .tolist()
-                )
-            if len(l_sessions) > 0:
-                commentaires += "".join(f"\n       - {isession}" for isession in l_sessions)
-
-        #vlog.print("Info", f"\n{commentaires}")     
-
-        self._champs["commentairesBilan"] = commentaires
-
-    def _construire_stats(self):
-        """
-        Construit la partie statistiques du bilan de sessions
-        """
+        # === ANNEE N DU BILAN ===
         # On n'affecte les champs suivants que si des CSV sont disponibles pour les stats
-        if len(self._bilanSessions.liste_codesIRIS_pour_statsCSV) > 0 :
+        if len(self._bilanFormation.liste_codesIRIS_pour_stats) > 0 :
             # Satisfaction globale
-            self._champs["satisfactionGlobale_moy"] = self._get_stat_avec_format(
+            self._champs["satisfactionGlobale_n"] = self._bilanFormation.eval_formation.get_stat_avec_format(
                 "Satisfaction globale",
                 "Moyenne",
                 lambda v: f"{v:.1f}/5"
             )
-            self._champs["satisfactionGlobale_com"] = self._get_stat_avec_format(
+            self._champs["satisfactionGlobale_n_com"] = self._bilanFormation.eval_formation.get_stat_avec_format(
                 "Satisfaction globale",
                 "Commentaires",
                 lambda v: v.replace("_x000D_", "\n"),
                 default=""
             )
-            """
-            try:
-                self._satisfactionGlobale_moy = f'{self._bilanSession._stats_stagiaires["Satisfaction globale"]["Moyenne"]:.1f}/5'
-            except:
-                self._satisfactionGlobale_moy = "Pas de donnée"      
-            try:
-                self._satisfactionGlobale_com = self._bilanSession._stats_stagiaires["Satisfaction globale"]["Commentaires"].replace("_x000D_", "\n")
-            except:
-                pass
-            """
 
-            # Recommanderiez-vous + commentaires remarques suggestions
-            self._champs["recommandation_moy"] = self._get_stat_avec_format(
-                "Recommanderiez-vous cette formation ?",
+            
+            # Qualité des animations
+            self._champs["qualiteAnimations_n"] = self._bilanFormation.eval_formation.get_stat_avec_format(
+                "Qualité des animations",
                 "Moyenne",
-                lambda v: f"{v/5*100:.0f}%"  # (on divise par 5 car on a un booléen stcké sous forme de note sur 5 : 0 = False, 5 = True)
+                lambda v: f"{v:.1f}/5"
             )
-            self._champs["commentairesRemarquesSuggestions_com"] = self._get_stat_avec_format(
-                "Commentaires, remarques, suggestions",
+            self._champs["qualiteAnimations_n_com"] = self._bilanFormation.eval_formation.get_stat_avec_format(
+                "Qualité des animations",
                 "Commentaires",
                 lambda v: v.replace("_x000D_", "\n"),
                 default=""
             )
-            """
-            try:
-                self._recommandation_moy = f'{self._bilanSession._stats_stagiaires["Recommanderiez-vous cette formation ?"]["Moyenne"]/5*100:.0f}%'  # (on divise par 5 car on a un booléen stcké sous forme de note sur 5 : 0 = False, 5 = True)
-            except:
-                self._recommandation_moy = "Pas de donnée"        
-            try:
-                self._commentairesRemarquesSuggestions_com = self._bilanSession._stats_stagiaires["Commentaires, remarques, suggestions"]["Commentaires"].replace("_x000D_", "\n")
-            except:
-                pass
-            """
 
-            # Notes inférieures à 3
-            stats_sous_3 = {  # Dictionnaire pour les critères dont la moyenne est inférieure à 3 et non exclus (critères dans la liste self._CRITERES_A_ENLEVER)
-                critere: valeurs
-                for critere, valeurs in self._bilanSessions._stats_stagiaires.items()
-                if (
-                    critere not in self._bilanSessions._CRITERES_A_ENLEVER
-                    and valeurs["Moyenne"] is not None
-                    and valeurs["Moyenne"] < 3
-                )
-            }
-            self._champs["evalInf3_val"] = f"{len(stats_sous_3)}"
-            self._champs["evalInf3_com"] = "\n".join(
-                f"• {clef} ({valeurs['Moyenne']:.1f}) :{valeurs['Commentaires'].replace('•', '\n   -').replace('\n\n', '\n')}"
-                for clef, valeurs in stats_sous_3.items()
-                )
-            """
-            try:
-                self._evalInf3_val = f"{len(stats_sous_3)}"
-            except:
-                self._evalInf3_val = "Pas de donnée"
-            try:
-                self._evalInf3_com = "\n".join(f"• {clef} ({valeurs['Moyenne']:.1f}) :{valeurs['Commentaires'].replace('•', '\n   -').replace('\n\n', '\n')}"
-                    for clef, valeurs in stats_sous_3.items()
-                )
-
-                #self._evalInf3_com = "\n".join(
-                #    valeurs["Commentaires"]
-                #    for valeurs in stats_sous_3.values()
-                #    if valeurs["Commentaires"]
-                #).replace("_x000D_", "\n")
-            except:
-                pass
-            """
-
-            # Taux de retour
-            self._champs["tauxRetours_val"] = f"{(self._nb_stagiaires_retours/self._nb_apprenants)*100:.0f}%"
-            """
-            try:
-                self._tauxRetours_val = f"{(self._nb_stagiaires_retours/self._nb_apprenants)*100:.0f}%"
-            except:
-                self._tauxRetours_val = "Pas de donnée"
-            """
-
+            
+            # Qualité des moyens pédagogique
+            self._champs["qualiteMoyensPedagogiques_n"] = self._bilanFormation.eval_formation.get_stat_avec_format(
+                "Qualité des moyens pédagogique",
+                "Moyenne",
+                lambda v: f"{v:.1f}/5"
+            )
+            self._champs["qualiteMoyensPedagogiques_n_com"] = self._bilanFormation.eval_formation.get_stat_avec_format(
+                "Qualité des moyens pédagogique",
+                "Commentaires",
+                lambda v: v.replace("_x000D_", "\n"),
+                default=""
+            )
         else: # Cas : aucun CSV
             defaut = "Aucun CSV dispo"
-            self._champs["satisfactionGlobale_moy"] = defaut
-            self._champs["satisfactionGlobale_com"] = defaut
             
-            self._champs["recommandation_moy"] = defaut
-            self._champs["commentairesRemarquesSuggestions_com"] = defaut
+            self._champs["_satisfactionGlobale_n"] = defaut
+            self._champs["_satisfactionGlobale_n_com"] = defaut
+
+            self._champs["_qualiteAnimations_n"] = defaut
+            self._champs["_qualiteAnimations_n_com"] = defaut
+
+            self._champs["_qualiteMoyensPedagogiques_n"] = defaut
+            self._champs["_qualiteMoyensPedagogiques_n_com"] = defaut
+
+    def _construire_stats_eval_nm1(self):
+        """
+        Construit la partie statistiques des évaluations de l'année n moins 1 du bilan de formation
+        """
+        # === ANNEE N-1 DU BILAN ===
+        # 1) Récupérer la liste des codes IRIS de l'année n moins 1 depuis IRIS sessions (on demande à l'utilisateur les sessions qu'il souhaite exclure)
+        codes_IRIS_nm1 = get_iris(typeExport="Sessions").demande_sessions_a_exclure(
+            trigramme_formation=self._bilanFormation._formation.trigramme_formation,
+            annee=self._bilanFormation.annee_nm1
+        )
+
+        # Si la liste des codes IRIS est non vide, alors on a des EvalStat à màj et peut-être des stats à faire
+        if len(codes_IRIS_nm1) > 0:
+
+            # === MAJ EVALSTAT ===
+            # 2.1) On met à jour l'Excel evalstat de la formation si les sessions demandées par l'utilisateur ne s'y trouve pas
+            EvalStat_services.ouvrir_ou_traiter_evalStat_depuis_liste_codes_IRIS(codes_IRIS=codes_IRIS_nm1, formation=self._bilanFormation._formation)
+
+            # 2.2) On calcule les stats de eval formation selon les codes_IRIS à traiter (on écrase les valeurs qu'il y avait dans evalStat_formation._stats_stagiaires pour l'année n)
+            self._bilanFormation.eval_formation.calculer_stats_criteres(codes_IRIS=codes_IRIS_nm1)
+            #pprint(self.eval_formation.stats_stagiaires)
+
+
+            # === ON AFFECTE LES STATS === 
+            # 3.1) Evaluation de la liste des codes IRIS pour lesquels on peut calculer les stats à partir des CSV 
+            codes_IRIS_nm1_pour_stats = self._bilanFormation._formation.get_codesIRIS_par_statutBilan(
+                formation=self._bilanFormation._formation,
+                statut_pourBilan="Exploités pour les évaluations (CSV présents et non vides)",
+                codes_IRIS=codes_IRIS_nm1
+            )
+
+            # 3.2) Si des codes existes avec des stats, alors on affecte les stats de sortie avec celles-ci
+            if len(codes_IRIS_nm1_pour_stats) > 0 :
+                # Satisfaction globale
+                self._champs["satisfactionGlobale_nm1"] = self._bilanFormation.eval_formation.get_stat_avec_format(
+                    "Satisfaction globale",
+                    "Moyenne",
+                    lambda v: f"{v:.1f}/5"
+                )
+
+                
+                # Qualité des animations
+                self._champs["qualiteAnimations_nm1"] = self._bilanFormation.eval_formation.get_stat_avec_format(
+                    "Qualité des animations",
+                    "Moyenne",
+                    lambda v: f"{v:.1f}/5"
+                )
+
+                
+                # Qualité des moyens pédagogique
+                self._champs["qualiteMoyensPedagogiques_nm1"] = self._bilanFormation.eval_formation.get_stat_avec_format(
+                    "Qualité des moyens pédagogique",
+                    "Moyenne",
+                    lambda v: f"{v:.1f}/5"
+                )
+            else: # Cas : aucun CSV
+                defaut = "Aucun CSV dispo"
+                
+                self._champs["satisfactionGlobale_nm1"] = defaut
+                self._champs["qualiteAnimations_nm1"] = defaut
+                self._champs["qualiteMoyensPedagogiques_nm1"] = defaut
+
+
+
+        else:  # Si aucun code IRIS n'a été sélectionné, on print un warning
+            vlog.print("Info", f"⚠️  Toutes les sessions sont exclues : il n'y a plus de raison de faire les stats de l'année n-1")
+            defaut = "Aucun CSV dispo"
             
-            self._champs["evalInf3_val"] = defaut
-            self._champs["evalInf3_com"] = defaut
-            
-            self._champs["tauxRetours_val"] = defaut
+            self._champs["satisfactionGlobale_nm1"] = defaut
+            self._champs["qualiteAnimations_nm1"] = defaut
+            self._champs["qualiteMoyensPedagogiques_nm1"] = defaut
+            return None
+
+        
+
 
 
     # ====================
     # === MÉTHODES GET === 
     # ====================
-    def _get_stat(self, critere: str, champ: str, default=None) -> int|float|str|None:
-        """
-        Récupère une stat depuis le dictionnaire _stats_stagiaires
-
-        :param critere: Critère de la stat à récupérer
-        :type critere: str
-        :param champ: Champ de ce critère à récupérer (["Nombre", "Moyenne", "Commentaires"])
-        :type champ: str
-        :param default: Valeur retournée si ce critère n'existe pas. Défaut = None
-        :type default: _type_, optional
-        :return: la valeur du champ de ce critère (ex. _stats_stagiaires["Satisfaction globale"]["Moyenne"])
-        :rtype: int|float|str|None
-        """
-        stats = self._bilanSessions._stats_stagiaires.get(critere)
-        if not stats:
-            return default
-
-        valeur = stats.get(champ)
-        return valeur if valeur is not None else default
-
-    def _get_stat_avec_format(self, critere: str, champ: str, format:Callable[[Any], str], default:str="Pas de donnée") -> str:
-        """
-        Récupère et formatte une stat depuis le dictionnaire _stats_stagiaires
-
-        :param critere: Critère de la stat à récupérer
-        :type critere: str
-        :param champ: _descChamp de ce critère à récupérer (["Nombre", "Moyenne", "Commentaires"])ription_
-        :type champ: str
-        :param format: format à appliquer (ex. lambda v: f"{v:.1f}/5" ou lambda v: f"{v/5*100:.0f}%" ou lambda v: v.replace("_x000D_", "\n"))
-        :type format: Callable[[Any], str]
-        :param default: Valeur renvoyée si aucune donnée. Défaut = "Pas de donnée"
-        :type default: str, optional
-        :return: une statistique formatée en str
-        :rtype: str
-        """
-        valeur = self._get_stat(critere, champ)
-
-        if valeur is None:
-            return default
-
-        try:
-            return format(valeur)
-        except Exception:
-            return default
+    
 
 
 

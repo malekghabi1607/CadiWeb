@@ -10,7 +10,7 @@ from mailmerge import MailMerge
 
 from vte.core import config
 from vte.core.iris_referentiel import get_iris
-from vte.domain.evalStat import EvalStat, EvalStat_formation, EvalStat_session
+from vte.domain.evalStat import EvalStat_formation, EvalStat_session
 from vte.domain.session import Session
 from vte.domain.iris import IRIS, IRIS_sessions
 from vte.services.evalStat_services import EvalStat_services
@@ -53,24 +53,6 @@ class BilanSessions:
     """
     # === VARIABLES PARTAGÉES ENTRE TOUTES LES INSTANCES
 
-
-    # TODO : à adapter → Renvoi vers evalStat, changer com : ce sont les critères qui n'ont pas de valeur (bool ou str)
-    #_CRITERES_A_ENLEVER:list[str] = [  # Critères à ne pas retenir pour le calcul des moyennes < 3
-    #    "Comment avez-vous connu cette formation ?", "Avez-vous d'autres besoins de formation ?", "Commentaires, remarques, suggestions", "Recommanderiez-vous cette formation ?"]
-
-    # TODO : à adapter → Renvoi vers evalStat
-    # Dictionnaire pour mapper les statuts aux clés de self._statuts ["Exploités pour les évaluations (CSV présents)", "Exploités pour les évaluations (CSV présents)", "Exclus des évaluations (problème traitement CSV)", "Exclus des évaluations (CSV manquants)", "Exclus des évaluations (CSV vide / aucun retour)", "Exclus entièrement du bilan (non présent dans IRIS / mauvais code)"]
-    """
-    _mapping_statuts:dict[str, str] = {
-        "Traité": "Exploités pour les évaluations (CSV présents et non vides)",                                  # Exploités pour stats initiales → Dans _demande_sessions_a_exclure
-        #  "Traité - CSV déjà dans fichier global": "Exploités pour les évaluations (CSV présents et non vides)",   # Exploités pour les stats stagiaires → Dans _maj_evalstat_formation
-        "Exclu - Aucun CSV fourni": "Exclus des évaluations (CSV manquant)",                   # Exclus des évaluations car problème au traitement des CSV → Dans _maj_evalstat_formation
-        "Exclu - Code IRIS pas dans Extract IRIS sessions": "Exclus entièrement du bilan (non présent dans IRIS / mauvais code)",  # Exclus entièrement du bilan car sessions non réalisées ou mauvais RP (exclus par l'utilisateur) → Dans _maj_evalstat_formation
-        "Exclu - Problème lecture CSV": "Exclus des évaluations (problème traitement CSV)",         # Exclus des évaluations car CSV stagiaires manquants → Dans _maj_evalstat_formation
-        "Exclu - CSV vide / Aucun retour": "Exclus des évaluations (CSV vide / aucun retour)",      # Exclus des évaluations car le CSV est vide (i.e. aucun retour d'utilisateur)
-    }
-    """
-
     # TODO : à adapter → Renvoi vers evalStat ?
     # Dictionnaire pour mapper les statuts qui nécessitent de supprimer le code IRIS des stats générales
     _statut_exclus_entierement:tuple[str] = (
@@ -100,24 +82,13 @@ class BilanSessions:
         self._annee: int = annee
         self._periode: str = periode  # ["Année", "1er semestre", "2nd semestre"]
         self._periode_pour_titre:str = ""  # f"Session {numSession} uniquement ({moisSession} {instance._annee})", f"{self._periode} {self._annee}"
-        self._codes_IRIS:list[int] = []
-        self.codes_IRIS = codes_IRIS
+        self._codes_IRIS:list[int] = codes_IRIS
+        #self._codes_IRIS:list[int] = []
+        #self.codes_IRIS = codes_IRIS
 
         # --- Variables de traitement ---
-        #self._statuts:dict[str, list] = {clef: [] for clef in self._mapping_statuts.values()}  # Dictionnaire qui liste les codes IRIS selon chaque statut
         self._statuts:dict[str, list] = {clef: [] for clef in EvalStat_session.mapping_statuts.values()}  # Dictionnaire qui liste les codes IRIS selon chaque statut
-        #self._stats_stagiaires: dict[str, dict[str, int|float|str|None]] = {}  # Dictionnaire des stats des CSV
-        """
-        dictionnaire de la forme :
-        {
-            "Nom du critère": {
-                "Nombre": ...,
-                "Moyenne": ...,
-                "Commentaires": ...
-            },
-            ...
-        }
-        """
+
 
     @classmethod   
     def depuis_codesIRIS(cls, formation:Formation_protocol, codes_IRIS:int|Iterable[int], annee:Optional[int]=None, periode:str="Année") -> BilanSessions:
@@ -415,59 +386,6 @@ class BilanSessions:
             periode=periode_pour_titre, 
             unite=unite
         )
-
-    # === Méthodes get ===
-    # TODO : à adapter → Renvoi vers evalStat
-    def _get_codesIRIS_par_statut_pourBilan_BAK(self, statut_pourBilan: str) -> list[int]:
-        """
-        Retourne une liste des codes IRIS pour une clé de mapping donnée (statut pour bilan, i.e. mieux nommés).
-
-        :param statut_pourBilan: Statut "pour bilan" (i.e. mieux nommés) ["Exploités pour les évaluations (CSV présents)", "Exploités pour les évaluations (CSV présents)", "Exclus des évaluations (problème traitement CSV)", "Exclus des évaluations (CSV manquants)", "Exclus des évaluations (CSV vide / aucun retour)", "Exclus entièrement du bilan (non présent dans IRIS / mauvais code)"] 
-        :type statut_pourBilan: str
-        :return: une liste des codes IRIS avec ce statut
-        :rtype: list[int]
-        """
-        #pprint(self._mapping_statuts)
-
-        return EvalStat.get_codesIRIS_par_statut_evalStat(
-            formation=self._formation,
-            codes_IRIS=self._codes_IRIS,
-            statut_evalStat=statut_pourBilan
-        )
-    
-    # TODO : à adapter → Renvoi vers evalStat
-    def _get_codesIRIS_par_statut_evalStat_BAK(self, statut_evalStat: str) -> list[int]:
-        """
-        Retourne une liste des codes IRIS pour un statut donné.
-
-        :param statut_evalStat: statut EvalStat (["Traité", "Traité - Code IRIS déjà dans l'évaluation de la formation", "Traité - CSV déjà dans l'évaluation de la formation", "Exclu - Aucun CSV fourni", "Exclu - Code IRIS pas dans Extract IRIS sessions", "Exclu - Problème lecture CSV", "Exclu - CSV vide / Aucun retour"])
-        :type statut_evalStat: str
-        :return: une liste des codes IRIS avec ce statut
-        :rtype: list[int]
-        """
-        codes_IRIS = []
-        for code_IRIS in self._codes_IRIS:
-            session = self._formation.get_session_par_codeIRIS(code_IRIS)
-            if session.eval.statut == statut_evalStat:
-                codes_IRIS.append(code_IRIS)
-        return codes_IRIS
-
-    # TODO : à adapter → Renvoi vers evalStat
-    def _get_codesIRIS_par_statut_pourBilan_BAK(self, statut_pourBilan: str) -> list[int]:
-        """
-        Retourne une liste des codes IRIS pour une clé de mapping donnée (statut pour bilan, i.e. mieux nommés).
-
-        :param statut_pourBilan: Statut "pour bilan" (i.e. mieux nommés) ["Exploités pour les évaluations (CSV présents)", "Exploités pour les évaluations (CSV présents)", "Exclus des évaluations (problème traitement CSV)", "Exclus des évaluations (CSV manquants)", "Exclus des évaluations (CSV vide / aucun retour)", "Exclus entièrement du bilan (non présent dans IRIS / mauvais code)"] 
-        :type statut_pourBilan: str
-        :return: une liste des codes IRIS avec ce statut
-        :rtype: list[int]
-        """
-        #pprint(self._mapping_statuts)
-
-        statut_evalStat = next((clef for clef, valeur in self._mapping_statuts.items() if valeur == statut_pourBilan), None)
-        if statut_evalStat is None:
-            return []
-        return self._get_codesIRIS_par_statut_evalStat(statut_evalStat)
 
 
 
@@ -910,7 +828,6 @@ class Bilan_V3(BilanSessions_generateur_word):
             for statut_evalStat, statut_pourBilan in EvalStat_session.mapping_statuts.items():
                 if (statut_evalStat not in ["Traité", "Exclu - Code IRIS pas dans Extract IRIS sessions"]) :
                     # On filtre par statut
-                    #codes_statut = self._get_codesIRIS_par_statut_evalStat(statut_evalStat)
                     codes_statut = self._bilanSessions._formation.get_codesIRIS_par_statutBilan(
                         formation=self._bilanSessions._formation,
                         codes_IRIS=self._bilanSessions.codes_IRIS,

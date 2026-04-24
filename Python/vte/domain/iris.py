@@ -7,7 +7,6 @@ from functools import cached_property
 from pathlib import Path
 from tkinter.ttk import Style
 from typing import Iterable, List, Optional, Tuple, Any, Type
-from enum import Enum
 
 #import pandas as pd
 from pandas import *
@@ -1473,12 +1472,15 @@ class IRIS_traite(IRIS, ABC):
     # ============================
     # === METHODES LIEES AU DF ===
     # ============================
-    def affiche_df_colonnes_principales(self) -> None:
+    def affiche_df_colonnes_principales(self, df:DataFrame) -> None:
         """
         print le DataFrame avec filtre des colonnes pour affichage : ['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Présents', 'Statut Session', 'N° Session']
+
+        :param df: Dataframe dont on souhaite n'afficher que les colonnes principales
+        :type df: DataFrame
         """
         print(tabulate(
-            self.df[self._colonnes_principales], 
+            df[self._colonnes_principales], 
             headers='keys', 
             tablefmt='pretty', 
             showindex=False
@@ -1538,17 +1540,24 @@ class IRIS_traite(IRIS, ABC):
             #print(self.df)
 
         # Si données temporelles (année ou période ou les deux)
-        if periode is not None:
-            # Si période en argument, alors on filtre sur la période (plus restrictif que l'année)
-            date_debut, date_fin = debut_fin_periode(annee=annee, periode=periode)
-            df = df[
-                (df[self.nom_colonne_debut_session] >= date_debut) &
-                (df[self.nom_colonne_debut_session] <= date_fin)
-            ]   
-        elif annee is not None:
-            df = df[
-                (df[self.nom_colonne_debut_session] == annee)
-            ]
+        #if periode is not None:
+        #    # Si période en argument, alors on filtre sur la période (plus restrictif que l'année)
+        #    date_debut, date_fin = debut_fin_periode(annee=annee, periode=periode)
+        #    df = df[
+        #        (df[self.nom_colonne_debut_session] >= date_debut) &
+        #        (df[self.nom_colonne_debut_session] <= date_fin)
+        #    ]   
+        #elif annee is not None:
+        #    df = df[
+        #        (df[self.nom_colonne_debut_session] == annee)
+        #    ]
+        
+        # Si période en argument, alors on filtre sur la période (plus restrictif que l'année)
+        date_debut, date_fin = debut_fin_periode(annee=annee, periode=periode)
+        df = df[
+            (df[self.nom_colonne_debut_session] >= date_debut) &
+            (df[self.nom_colonne_debut_session] <= date_fin)
+        ]   
         #print(self.df)
 
 
@@ -1718,10 +1727,10 @@ class IRIS_sessions(IRIS_traite):
 
         # On affiche à l'utilisateur les sessions et dates et statuts 
         vlog.print("Info", f"\nListe des sessions {trigramme_formation} dans {self.chemin.name} - {periode} {annee}", style=["jaune"])
-        self.affiche_df_colonnes_principales()
+        self.affiche_df_colonnes_principales(df_filtre)
         
         # On demande à l'utilisateur les sessions qu'il veut exclure
-        sessionsRetenues = self.demander_liste_codes_IRIS()
+        sessionsRetenues = self.demander_liste_codes_IRIS(message="Pour retenir des sessions : entrez un ou plusieurs code IRIS (numéro à 5 chiffres) séparés par des espaces ou des virgules (ou rien pour passer) :")
 
         if sessionsRetenues:  # si la liste n'est pas vide
             # On met à jour _df_sessions_filtre en enlevant les sessions exclues
@@ -1732,13 +1741,14 @@ class IRIS_sessions(IRIS_traite):
 
         # On affiche à l'utilisateur les sessions finalement retenues
         vlog.print("Info", "\nSessions retenues pour le bilan :", style=["jaune"])
-        self.affiche_df_colonnes_principales()
+        self.affiche_df_colonnes_principales(df_filtre)
 
         return sessionsRetenues
 
-    # TODO : ce n'est plus utilisé / A adapter selon modèle demande_sessions_a_retenir si besoin
-    def demande_sessions_a_exclure(self, trigramme_formation:str = None, annee:Optional[int] = None, periode:Optional[str] = None) -> Tuple[DataFrame, List[int]]:
+    def demande_sessions_a_exclure(self, trigramme_formation:str = None, annee:Optional[int] = None, periode:Optional[str] = None) -> List[int]:  #Tuple[DataFrame, List[int]]:
         """
+        Retourne une liste de codes IRIS retenus après exclusions de certains éléments par l'utilisateur
+        
         Demande à l'utilisateur les sessions qu'il souhaite exclure de la période choisie :
            - on applique un filtre sur une période + trigramme au dataframe de l'extract IRIS
            - on affiche le résultat
@@ -1746,8 +1756,8 @@ class IRIS_sessions(IRIS_traite):
         
         On retourne :
            - un dataframe df_sessions_filtre à jour
-           - #la liste des codes IRIS retenus (plus maintenant : pour l'avoir on peut faire df_filtre["Code IRIS"].tolist())
-           - la liste des codes IRIS exclus
+           - la liste des codes IRIS retenus (plus maintenant : pour l'avoir on peut faire df_filtre["Code IRIS"].tolist())
+           - #la liste des codes IRIS exclus
         
         :param trigramme_formation: trigramme de la formation à filtrer
         :type trigramme_formation: str
@@ -1755,7 +1765,7 @@ class IRIS_sessions(IRIS_traite):
         :type annee: Optional[int]
         :param periode: période à filtrer
         :type periode: Optional[str]
-        :return: un dataframe df_sessions_filtre à jour, la liste des codes IRIS exclus
+        :return: la liste des codes IRIS retenus
         :rtype: Tuple[DataFrame, List[int]]
         """
 
@@ -1763,24 +1773,15 @@ class IRIS_sessions(IRIS_traite):
         codes_sessions_exclues_par_utilisateur = []
 
         # Renseigne les valeurs par défaut de période et année si None
-        annee, periode = periode(annee, periode)
+        annee, periode = utils_periode(annee, periode)
 
         # On filtre sur le trigramme et la période demandée
         df_filtre = self.df_filtre_periode(trigramme_formation=trigramme_formation, annee=annee, periode=periode)
 
         # On affiche à l'utilisateur les sessions et dates et statuts 
         vlog.print("Info", f"\nListe des sessions {trigramme_formation} dans {self.chemin.name} - {periode} {annee}", style=["jaune"])
+        self.affiche_df_colonnes_principales(df_filtre)
 
-        # Adaptation format date
-        df_filtre['Date début ses.'] = pd.to_datetime(df_filtre['Date début ses.']).dt.strftime("%d/%m/%Y")
-        df_filtre['Date fin ses.'] = pd.to_datetime(df_filtre['Date fin ses.']).dt.strftime("%d/%m/%Y")
-
-        print(tabulate(
-            df_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Nommés', 'Statut Session', 'N° Session']], 
-            headers='keys', 
-            tablefmt='pretty', 
-            showindex=False
-        ))
         
         # On demande à l'utilisateur les sessions qu'il veut exclure
         exclusionSessions = self.demander_liste_codes_IRIS()
@@ -1798,18 +1799,15 @@ class IRIS_sessions(IRIS_traite):
 
         # On affiche à l'utilisateur les sessions finalement retenues
         vlog.print("Info", "\nSessions retenues pour le bilan :", style=["jaune"])
-        print(tabulate(
-            df_filtre[['Code IRIS', 'Trigramme RP', 'Trigramme AF', 'Date début ses.', 'Date fin ses.', 'Durée réal. (J.)', 'Nb. Nommés', 'Statut Session', 'N° Session']], 
-            headers='keys', 
-            tablefmt='pretty', 
-            showindex=False
-        ))
+        self.affiche_df_colonnes_principales(df_filtre)
 
 
         # pour avoir la liste des codes IRIS retenus : df_filtre["Code IRIS"].tolist()
+        codes_IRIS_retenus = df_filtre["Code IRIS"].tolist()
 
         # On retourne les codes_IRIS des sessions retenues + exploitationBilan 
-        return df_filtre, codes_sessions_exclues_par_utilisateur
+        #return df_filtre, codes_sessions_exclues_par_utilisateur
+        return codes_IRIS_retenus
 
 
 
@@ -1894,6 +1892,7 @@ class IRIS_ventes(IRIS_traite):
     # =========================
     # === METHODES EXTERNES ===
     # =========================
+    # Forcer écriture unité
     def prix_formation_annee_str(self, trigramme_formation:str, annee:int) -> str:
         """
         Renvoie le ou les prix d'une formation pour une année donnée en argument.
@@ -1907,11 +1906,11 @@ class IRIS_ventes(IRIS_traite):
         :rtype: str
         """
 
-        # Dataframe avec les colonnes créées pour calculer le prix de la formation de l'année donnée en argument
+        # Création DataFrame avec les colonnes créées pour calculer le prix de la formation de l'année donnée en argument
         df_travail = self.df_prix_formation_annee(trigramme_formation=trigramme_formation, annee=annee)
 
         if len(df_travail["Prix HT EE"].unique()) == 1:  # Cas avec une seule valeur de prix
-            prix_annee = f"{df_travail.iloc[0]["Prix HT EE"]} {df_travail.iloc[0]["Unité prix"]}"
+            prix_annee = f"{int(df_travail.iloc[0]["Prix HT EE"])} {df_travail.iloc[0]["Unité prix"]}"  # Je convertis mon prix en int
         else :  # Cas avec plusieurs valeurs de prix
             # On affiche le tableau avec les différents prix
             print(df_travail[['Date de début', 'N° Session','Intitulé Client', 'CEA', 'Nb Inscriptions', 'Total HT', 'Type tarif', 'Prix HT EE', 'Unité prix']])

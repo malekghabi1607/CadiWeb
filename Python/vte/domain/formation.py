@@ -4,6 +4,7 @@ from typing import Optional
 from collections.abc import Iterable
 
 from vte.core.iris_referentiel import get_iris
+from vte.domain.bilanFormation import BilanFormation
 from vte.domain.bilanSessions import BilanSessions
 from vte.domain.evalStat import EvalStat_formation, EvalStat_session
 from vte.domain.fdc import FdC
@@ -14,6 +15,10 @@ from vte.utils.utils import convertir_collection, vlog
 # ======================================================================================
 # CLASSE FORMATION
 # ======================================================================================
+
+# TODO méthode pour relancer clients d'une formation avec sessions à venir + option désinscription
+
+
 class Formation:
     def __init__(self, trigramme_formation: str):
         """
@@ -40,7 +45,7 @@ class Formation:
         self._bilans_sessions:dict[int, dict[str, BilanSessions]] = {}  #bilans_session[2025]["Année"] : Index1 = année du bilan ; Index2 = période du bilan (1er semestre ; 2nd semestre ; Annuel)
 
         # Une formation a un ou plusieurs bilans de formation (annuel)
-        #self.bilans_formation:Optional[dict[int, BilanFormation]] = {}  # bilans_formation[2025] : Index = année du bilan
+        self._bilans_formation:dict[int, BilanFormation] = {}  # bilans_formation[2025] : Index = année du bilan
 
     # TODO : voir si ce n'est pas un constructeur de traitement finalement (déplacer plus bas et renommer)
     @classmethod
@@ -85,7 +90,7 @@ class Formation:
     # === CONSTRUCTEURS POUR TRAITEMENTS ===
     # ======================================
     
-    # Méthodes de traitement : on fera toutes les étapes intemédiaires si besoin (créer formation, ajouter sessions, ajouter FdC...)
+    # Méthodes de traitement : on fera toutes les étapes intermédiaires si besoin (créer formation, ajouter sessions, ajouter FdC...)
 
     @classmethod
     def pour_traitement_bilanSessions_depuis_codesIRIS(cls, codes_IRIS:int|Iterable[int], annee:Optional[int]=None, periode:str="Année") -> Formation:  # pytesté dans test_bilansSessions
@@ -125,6 +130,8 @@ class Formation:
 
         Ex : BilanSessions.bilanUnique_parPeriode("948", 2024, "Année")
 
+        :param trigramm_formation: Trigramme de la formation
+        :type trigramme_formation: str
         :param annee: Année du bilan
         :type annee: int
         :param periode: Période du bilan (appartient à ["Année", "1er semestre", "2nd semestre"]), defaut = "Année"
@@ -149,7 +156,33 @@ class Formation:
 
         return instance
 
-    
+
+    @classmethod
+    def pour_traitement_bilanFormation_depuis_annee(cls, trigramme_formation:str, annee:int) -> Formation:  # TODO : à pytester
+        """
+        Permet de générer un bilan de formation selon une année
+
+        :param trigramm_formation: Trigramme de la formation
+        :type trigramme_formation: str
+        :param annee: Année du bilan
+        :type annee: int
+        :return: le bilan de sessions est traité et l'objet formation est bien créé avec les sessions correspondantes.
+        :rtype: Formation
+        """
+        # On définit la formation 
+        instance = cls(trigramme_formation=trigramme_formation)
+
+        # On ajoute le bilan de sessions au dictionnaire et on le traite
+        instance.ajout_bilan_formation_avec_traitement(annee=annee)
+        
+        # On ajoute les sessions traitées à formation à partir des codes_IRIS ssi on a des codes IRIS qui ont été traités
+        if annee in instance._bilans_formation.keys():
+            if len(instance._bilans_formation[annee].codes_IRIS) > 0:
+                instance.ajout_sessions(codes_IRIS=instance._bilans_formation[annee].codes_IRIS)
+
+        return instance
+
+
     # TODO : non employé, vérifier besoin et adapter si besoin
     @classmethod
     def avec_creation_session_et_ouverture_ou_traitement_EvalStat(
@@ -195,9 +228,6 @@ class Formation:
         )
         
         return instance
-
-
-    # TODO méthode pour relancer clients d'une formation avec sessions à venir + option désinscription
 
 
     # =========================
@@ -318,6 +348,21 @@ class Formation:
         
         # On ajoute l'élément
         self._bilans_sessions[bilan.annee][bilan.periode] = bilan
+
+    def ajout_bilan_formation_avec_traitement(self, annee:int) -> None:  # TODO : à pytester
+        """
+        On ajoute un nouveau bilan de formation à self._bilans_formation[annee].
+
+        On traite ce bilan de formation (création du word).
+
+        :param annee: Année du bilan.
+        :type annee: int
+        """
+        # On traite le bilan
+        bilan = BilanFormation.depuis_annee(formation=self, annee=annee)
+
+        # On ajoute l'élément
+        self._bilans_formation[annee] = bilan
 
     # ====================
     # === METHODES GET ===

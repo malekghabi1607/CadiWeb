@@ -1119,9 +1119,10 @@ class EvalStat_session(EvalStat):
 
         # Si l'argument est à None, on récupère la valeur existante dans l'objet (i.e. priorité à l'argument devant self)
         if chemin_csv is None :
-            self._chemin_csv = EvalStat_session.filedialog_csv(
+            # TODO : enlever commentaire à la fin : pour test
+            """self._chemin_csv = EvalStat_session.filedialog_csv(
                     trigramme_formation=self.trigramme_formation, 
-                    code_IRIS=self.code_IRIS)
+                    code_IRIS=self.code_IRIS)"""
             
             #vlog.log_erreur("Aucun chemin CSV fourni pour le traitement.", continuer=True)
             print(f"⚠️  Aucun chemin CSV fourni pour le traitement.")

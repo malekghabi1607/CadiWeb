@@ -25,6 +25,7 @@ REPERTOIRE_FORMATION:Path = GED / "FORMATIONS_C/{trigramme_formation}"
 REPERTOIRE_BILANS:Path = REPERTOIRE_FORMATION / "P07-bilan-sessions-et-bilan-formation"
 REPERTOIRE_CSV_EVALUATIONS:Path = REPERTOIRE_BILANS / "rapports-sessions-CSV-evaluations"
 REPERTOIRE_BILANS_SESSIONS:Path = REPERTOIRE_BILANS / "{annee}"
+REPERTOIRE_BILANS_FORMATIONS:Path = REPERTOIRE_BILANS / "{annee}"
 
 REPERTOIRE_CONCEPTION:Path = REPERTOIRE_FORMATION / "P05-P06-dossier-conception-referentiel"
 REPERTOIRE_FDC:Path = REPERTOIRE_CONCEPTION / "fiche-de-cout-et-code-de-formation"
@@ -216,10 +217,10 @@ CORPS_MAIL_CHEF_UNITE:str = """
 ###
 # Modèle du bilan à remplir
 CHEMIN_MODELE_WORD_BILAN_FORMATION:Path = REPERTOIRES_MODELES / "P07-Pr05-F06-Bilan-formation-V3_VTE.docx"
-CHEMIN_WORD_BILAN_FORMATION_OUTPUT:Path = REPERTOIRE_BILANS / "P07-Pr05-F06-Bilan formation-Année {annee}.docx"
+CHEMIN_WORD_BILAN_FORMATION_OUTPUT:Path = REPERTOIRE_BILANS_FORMATIONS / "P07-Pr05-F06-Bilan formation-Année {annee}.docx"
 
 # Bilan en sortie après remplissage
-chemin_word_bilan_formation_output = r'C:\Users\vt238770\Documents\_CEA\Prog\Modèles\Bilan formation - output.docx'
+#chemin_word_bilan_formation_output = r'C:\Users\vt238770\Documents\_CEA\Prog\Modèles\Bilan formation - output.docx'
 
 
 

@@ -56,8 +56,8 @@ class EvalStat_services:
     # === TRAITEMENTS PLUSIEURS EVALSTAT ===
     # ======================================
     @staticmethod
-    #def ouvrir_ou_traiter_evalStat_depuis_liste_codes_IRIS(codes_IRIS:Iterable[int], formation:Optional[Formation]=None, ouvrirDossier:bool=False) -> dict[str, dict[str, str]]:
-    def ouvrir_ou_traiter_evalStat_depuis_liste_codes_IRIS(codes_IRIS:Iterable[int], formation:Optional[Formation_protocol]=None, ouvrirDossier:bool=False) -> None:
+    #def ouvrir_ou_traiter_evalStat_depuis_liste_codes_IRIS(codes_IRIS:Iterable[int], formation:Optional[Formation]=None, ouvrir_dossier:bool=False) -> dict[str, dict[str, str]]:
+    def ouvrir_ou_traiter_evalStat_depuis_liste_codes_IRIS(codes_IRIS:Iterable[int], formation:Optional[Formation_protocol]=None, ouvrir_dossier:bool=False) -> None:
         """
         A partir d'un itérable de codes IRIS
         Permet de :
@@ -68,8 +68,8 @@ class EvalStat_services:
         :type codes_IRIS: Iterable[int]
         :param formation: l'evalFormation pour vérifier si on doit traiter l'EvalStat + le trigramme de la formation qui sert à mieux pointer le répertoire pour sélectrionner le CSV.
         :type formation: Optional[Formation_protocol], Optional
-        :param ouvrirDossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
-        :type ouvrirDossier: bool, optional
+        :param ouvrir_dossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
+        :type ouvrir_dossier: bool, optional
         :return: Une liste de dictionnaires {codeIRIS,{"fichier": chemin_csv,"statut": statut_csv}}. Je pourrai accéder à la valeur par dico_csv[codeIRIS]["fichier"] ou nom_dico[codeIRIS]["statut"]
         :rtype: dict[str, dict[str, str]]
         """
@@ -85,7 +85,7 @@ class EvalStat_services:
             formation.ajout_sessions(codes_a_traiter)
             
             # On crée le dico                
-            dico_ouvrir_ou_traiter[formation] = [session for session in formation.sessions]
+            dico_ouvrir_ou_traiter[formation] = [session for session in formation.sessions if session.code_IRIS in codes_a_traiter]
             
         elif formation is None:  # Si formation n'est pas donné
             # On cherche les trigrammes dans IRIS sessions
@@ -97,7 +97,7 @@ class EvalStat_services:
                 formation = Formation_protocol.avec_ajout_sessions(trigramme_formation=trigramme_formation, codes_IRIS=tcodes_IRIS)
 
                 # On crée le dico                
-                dico_ouvrir_ou_traiter[formation] = [session for session in formation.sessions]
+                dico_ouvrir_ou_traiter[formation] = [session for session in formation.sessions if session.code_IRIS in codes_a_traiter]
 
                     
         # On boucle sur les formations
@@ -111,7 +111,7 @@ class EvalStat_services:
                 session.eval = EvalStat_session.avec_ouverture_ou_traitement(
                     session=session,
                     ecrire_eval_formation=False,  # On sauvegardera après la boucle de traitement
-                    ouvrirDossier=ouvrirDossier
+                    ouvrir_dossier=ouvrir_dossier
                 )
             
             # On sauvegarde l'évaluation de la formation
@@ -119,7 +119,7 @@ class EvalStat_services:
 
     # TODO : non fonctionnel en l'état -> à retravailler
     @staticmethod
-    def ouvrir_ou_traiter_evalStat_depuis_dico_csv(dico_csv:dict[str, dict[int, Path]], ouvrirDossier:bool=False) -> dict[int, dict[str, str]]:
+    def ouvrir_ou_traiter_evalStat_depuis_dico_csv(dico_csv:dict[str, dict[int, Path]], ouvrir_dossier:bool=False) -> dict[int, dict[str, str]]:
         """
         A partir d'un dictionnaire CSV stagiaire
         Permet de :
@@ -130,8 +130,8 @@ class EvalStat_services:
 
         :param dico_csv: dictionnaire CSV [trigramme_formation][code_IRIS]: chemin_csv généré par EvalStat_session.construire_dictionnaire_trigrammeFormation_codeIRIS_cheminsCSV_depuis_iterableCSV
         :type dico_csv: dict[str, dict[int, Path]]
-        :param ouvrirDossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
-        :type ouvrirDossier: bool, optional
+        :param ouvrir_dossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
+        :type ouvrir_dossier: bool, optional
         :return: Une liste de dictionnaires {codeIRIS,{"fichier": chemin_csv,"statut": statut_csv}}. Je pourrai accéder à la valeur par nom_dico[codeIRIS]["fichier"] ou nom_dico[codeIRIS]["statut"]
         :rtype: dict[int, dict[str, str]]
         """
@@ -151,7 +151,7 @@ class EvalStat_services:
                 session.eval = EvalStat_session.avec_ouverture_ou_traitement(
                     chemin_csv=chemin_csv,
                     ecrire_eval_formation=False,  # On sauvegardera après la boucle de traitement
-                    ouvrirDossier=ouvrirDossier
+                    ouvrir_dossier=ouvrir_dossier
                 )
 
                 # On met à jour le statut CSV de sortie
@@ -169,7 +169,7 @@ class EvalStat_services:
 
     # TODO : non fonctionnel en l'état -> à retravailler
     @staticmethod
-    def ouvrir_ou_traiter_evalStat_depuis_iterable_de_csv(tuple_csv_stagiaires:Iterable[Path|str], ouvrirDossier:bool=False) -> dict[str, dict[str, str]]:
+    def ouvrir_ou_traiter_evalStat_depuis_iterable_de_csv(tuple_csv_stagiaires:Iterable[Path|str], ouvrir_dossier:bool=False) -> dict[str, dict[str, str]]:
         """
         A partir d'un itérable de chemins de CSV stagiaire
         Permet de :
@@ -180,8 +180,8 @@ class EvalStat_services:
 
         :param tuple_csv_stagiaires: Itérable des CSV des évaluations à traiter.
         :type tuple_csv_stagiaires: Iterable[Path | str]
-        :param ouvrirDossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
-        :type ouvrirDossier: bool, optional
+        :param ouvrir_dossier: Ouvre le répertoire de l'EvalStat généré. Defaut = False.
+        :type ouvrir_dossier: bool, optional
         :return: Une liste de dictionnaires {codeIRIS,{"fichier": chemin_csv,"statut": statut_csv}}. Je pourrai accéder à la valeur par nom_dico[codeIRIS]["fichier"] ou nom_dico[codeIRIS]["statut"]
         :rtype: dict[str, dict[str, str]]
         """
@@ -189,7 +189,7 @@ class EvalStat_services:
         dico_csv = EvalStat_session.construire_dictionnaire_trigrammeFormation_codeIRIS_cheminsCSV_depuis_iterableCSV(tuple_csv_stagiaires)
 
         # Dictionnaire des retours du traitement
-        statuts_csv = EvalStat_services.ouvrir_ou_traiter_evalStat_depuis_dico_csv(dico_csv=dico_csv, ouvrirDossier=ouvrirDossier)
+        statuts_csv = EvalStat_services.ouvrir_ou_traiter_evalStat_depuis_dico_csv(dico_csv=dico_csv, ouvrir_dossier=ouvrir_dossier)
         
         return statuts_csv
 
