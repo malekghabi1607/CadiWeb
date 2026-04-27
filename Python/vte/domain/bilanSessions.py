@@ -82,9 +82,6 @@ class BilanSessions:
         self._annee: int = annee
         self._periode: str = periode  # ["Année", "1er semestre", "2nd semestre"]
         self._periode_pour_titre:str = ""  # f"Session {numSession} uniquement ({moisSession} {instance._annee})", f"{self._periode} {self._annee}"
-        self._codes_IRIS:list[int] = codes_IRIS
-        #self._codes_IRIS:list[int] = []
-        #self.codes_IRIS = codes_IRIS
 
         # --- Variables de traitement ---
         self._statuts:dict[str, list] = {clef: [] for clef in EvalStat_session.mapping_statuts.values()}  # Dictionnaire qui liste les codes IRIS selon chaque statut

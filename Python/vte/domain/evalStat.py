@@ -253,7 +253,7 @@ class EvalStat:
 # ======================================================================================
 class EvalStat_formation(EvalStat): 
     """
-    Classe evalStat Formation employée en parllèle du traitement des évaluations stagiaires individuelles.
+    Classe evalStat Formation employée en parallèle du traitement des évaluations stagiaires individuelles.
 
     Gère la création ou la mise à jour du fichier d'évaluation de la formation au format xlsx.
     """
@@ -1125,7 +1125,7 @@ class EvalStat_session(EvalStat):
                     code_IRIS=self.code_IRIS)"""
             
             #vlog.log_erreur("Aucun chemin CSV fourni pour le traitement.", continuer=True)
-            print(f"⚠️  Aucun chemin CSV fourni pour le traitement.")
+            print(f"⚠️  Aucun chemin CSV fourni pour le traitement des stats de la session {self.code_IRIS} → Exclu")
             self._statut = "Exclu - Aucun CSV fourni"
             return 
         else:

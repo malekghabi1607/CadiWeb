@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from functools import cached_property
 from pathlib import Path
 from pprint import pprint
-from typing import Any, Callable, Iterable, Optional, Protocol
+from typing import Iterable, Optional, Protocol
 from mailmerge import MailMerge
 import pandas as pd
 from pandas import DataFrame
