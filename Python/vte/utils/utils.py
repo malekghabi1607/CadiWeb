@@ -1403,6 +1403,67 @@ def convertir_liste_str(x: Any) -> list[str]:
     # Dernier fallback : on met dans une liste
     return [str(x)]
 
+def convertir_dateFormatIndefini_date(date_utilisateur:Any) -> date:
+    """
+    Convertit en format date une valeur de type indéfini (datetime, date, int, string...).
+
+    Employé notamment en lecture d'un champs date d'un fichier Excel pour lequel je ne sais pas comment l'utilisateur à écrit cette date (16/06/1983, juin 1983, 1983...)
+
+    :param date_utilisateur: Date que l'on souhaite convertir en format date
+    :type date_utilisateur: Any
+    :return: Date initiale convertie en format date
+    :rtype: date
+    """
+    if isinstance(date_utilisateur, datetime):
+        return date_utilisateur.date()
+
+    if isinstance(date_utilisateur, date):
+        return date_utilisateur
+
+    if hasattr(date_utilisateur, "year"):
+        return date(date_utilisateur.year, 1, 1)
+
+    if isinstance(date_utilisateur, int):
+        return date(date_utilisateur, 1, 1)
+
+    if isinstance(date_utilisateur, str):
+        try:
+            # tentative simple ISO (YYYY-MM-DD)
+            return datetime.fromisoformat(date_utilisateur).date()
+        except Exception:
+            try:
+                # tentative format FR courant
+                return datetime.strptime(date_utilisateur, "%d/%m/%Y").date()
+            except Exception:
+                try:
+                    # si c'est juste une année en string
+                    annee = int(date_utilisateur)
+                    return date(annee, 1, 1)
+                except Exception:
+                    pass
+
+    print(f"Valeur inattendue pour une date : {date_utilisateur} (type {type(date_utilisateur)})")
+    return date(1900, 1, 1)
+
+def convertir_dateFormatIndefini_annee(date_utilisateur:Any) -> int:
+    """
+    Convertit en année (format int) une valeur de type indéfini (datetime, date, int, string...).
+
+    Employé notamment en lecture d'un champs date d'un fichier Excel pour lequel je ne sais pas comment l'utilisateur à écrit cette date (16/06/1983, juin 1983, 1983...)
+
+    :param date_utilisateur: Date que l'on souhaite convertir en année
+    :type date_utilisateur: Any
+    :return: Date initiale convertie en année (format int)
+    :rtype: int
+    """
+    if isinstance(date_utilisateur, int):
+        date_utilisateur = date_utilisateur
+    elif hasattr(date_utilisateur, 'year'):
+        date_utilisateur = date_utilisateur.year
+    else:
+        print(f"Valeur inattendue pour une année : {date_utilisateur} (type {type(date_utilisateur)})")
+        date_utilisateur = 1900
+    return date_utilisateur
 
 ### --------------------------------------------------------------------
 #  Dates

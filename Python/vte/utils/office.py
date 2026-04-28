@@ -1092,6 +1092,34 @@ class FichierExcel:
 
         return instance
 
+
+
+
+    @staticmethod
+    def valeur_cellule_ouverture_rapide(chemin_fichier:Path, nom_onglet:str, cellule:str) -> Optional[Any]:
+        """
+        Ouvre et renvoie une valeur d'une cellule en ouverture minimale (rapide).
+
+        Par exemple je m'en sert pour lire la version de la fiche de coûts (A1) sans avoir à charger tout le tableau.
+
+        :param chemin_fichier: Chemin du fichier Excel
+        :type chemin_fichier: Path
+        :param nom_onglet: nom de l'onglet à employer
+        :type nom_onglet: str
+        :param cellule: cellule dont la valeur est à récupérer (ex. : "B5")
+        :type cellule: str
+        :return: La valeur de la cellule Excel demandée
+        :rtype: Any
+        """
+        instance = FichierExcel(chemin_fichier=chemin_fichier)
+        instance._wb = load_workbook(chemin_fichier, read_only=True, data_only=True)
+        #ws = instance._wb.active  # ou nom connu
+        ws = instance._wb[nom_onglet]
+        valeur = ws[cellule].value
+        instance.close()
+        return valeur
+
+
     # === Méthodes utilitaires : workbook ===
     def charger_wb(self) -> None:
         if not self._chemin_fichier:
