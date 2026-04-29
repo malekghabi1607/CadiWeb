@@ -1,7 +1,25 @@
+from __future__ import annotations
+from dataclasses import dataclass
+from datetime import date, datetime, time, timedelta
+from babel.dates import format_date
+import importlib
+from typing import Optional
+
+import extract_msg
+from pandas import DataFrame
+import win32com
+
+from vte.utils.utils import *
+from vte.utils.office import FichierExcel, Mail, RDV_Outlook
+
+
 
 # ======================================================================================
 # CLASSES GestionTutorat
 # ======================================================================================
+
+
+
 class Traiter_contactsApprentis:
     """
     Classe permettant de contacter les apprentis et tuteurs lors d'un suivi d'apprentissage :
@@ -80,7 +98,7 @@ class Traiter_contactsApprentis:
             case "LP3D":
                 cfg = importlib.import_module("user_config_LP3D")
             case _:
-                log_erreur("Code université faux")
+                vlog.log_erreur("Code université faux")
         
         # Initialisation de l'instance
         instance = cls()  
@@ -352,15 +370,28 @@ class Traiter_contactsApprentis:
         <body>
             <p>Bonjour,</p>
             <p>Dans le cadre du suivi de l'alternance il vous manque certaines actions.</p>
-            <p>S'il vous plaît, est-ce que vous pouvez <span style="color: red; font-weight: bold;">au plus tôt</span> :</p>
+            <p>S'il vous plaît, est-ce que vous pouvez au plus tôt :</p>
 
             <ul>
         """
+        # <p>S'il vous plaît, est-ce que vous pouvez <span style="color: red; font-weight: bold;">au plus tôt</span> :</p>
 
         len_corps_html_ini = len(corps_html)
         #for i, typeRelance in enumerate(self._relances):
         for i in range(ind):
-            if lettreInterlocuteur not in str(ligne.get(self._relances[i]) or "").strip():
+            #if lettreInterlocuteur not in str(ligne.get(self._relances[i]) or "").strip():
+            val = ligne.get(self._relances[i])
+            #print(val)
+
+            # Pour gestion des séries
+            if isinstance(val, pd.Series):
+                val = val.iloc[0] if not val.empty else ""
+            
+            # Remplacement du NaN par ""
+            val = "" if pd.isna(val) else str(val).strip()
+
+            #if not any(lettreInterlocuteur in str(val or "").strip() for val in ligne.get(self._relances[i], [])):
+            if lettreInterlocuteur not in val:
                 if "évaluation" in self._relances[i]: # Cas fiches d'évaluation
                     corps_html += f"<li>Compléter et nous renvoyer <span style=\"color: red; font-weight: bold;\">la fiche d'évaluation nécessaire pour la soutenance de {self.periode_scolaire_UGA()}</span></li>\n"
                 else: # Cas studea

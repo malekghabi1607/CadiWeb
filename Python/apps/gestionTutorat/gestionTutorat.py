@@ -1,4 +1,5 @@
-from vte.instn import *
+from vte.domain.gestionTutorat import Traiter_contactsApprentis
+from vte.utils.utils_instn import *
 from vte.ihm_console import IHM_console
 from vte.ihm_tkinter import IHMTkinter
 

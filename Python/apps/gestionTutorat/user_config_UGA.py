@@ -1,4 +1,5 @@
-from vte.instn import *
+from vte.utils.office import RDV_Outlook
+from vte.utils.utils_instn import *
 """
 Paramètres de chaque cursus à employer dans Gestion Tutorat.
 
