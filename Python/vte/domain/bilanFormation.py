@@ -15,7 +15,7 @@ from vte.domain.iris import IRIS, IRIS_sessions, IRIS_ventes
 from vte.domain.evalStat import EvalStat_formation, EvalStat_session
 from vte.domain.specs import Specs
 from vte.services.evalStat_services import EvalStat_services
-from vte.utils.office import FichierWord
+from vte.utils.office import FichierExcel, FichierWord
 from vte.utils.utils import *
 from vte.utils.utils import chemin_vers_unc
 from vte.utils.utils_instn import construire_chemin_config

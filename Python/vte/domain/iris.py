@@ -1236,8 +1236,14 @@ class IRIS_traite(IRIS, ABC):
         -------
         None
         """
-        from .iris_sessions import IRIS_sessions
-        from .iris_ventes import IRIS_ventes
+        
+        # Ca semblait marcher avant mais VSCode avait du mal avec l'import relatif même s'il marchait
+        #from .iris_sessions import IRIS_sessions
+        #from .iris_ventes import IRIS_ventes
+
+        # Chemins complet des modules (non testé)
+        from vte.domain.iris import IRIS_sessions
+        from vte.domain.iris import IRIS_ventes
 
 
     def __init__(self, chemin:Optional[Path]=None, fe:Optional[FichierExcel]=None, IRIS_plus_recent:Optional[bool]=True, **kwargs):
