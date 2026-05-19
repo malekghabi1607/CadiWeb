@@ -6,7 +6,8 @@ from vte.services.iris_services import *
 # ======================================================================================
 def traite_tous_extract_IRIS_depuis_config():
     IRIS_services.concatener_plusieursTypes(
-        typesExports=("Sessions", "Formations", "Ventes", "Inscriptions"),
+        #typesExports=("Sessions", "Formations", "Ventes", "Inscriptions"),
+        typesExports=("Sessions"),
         depuis_config=True
     )
 

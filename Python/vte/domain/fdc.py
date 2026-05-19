@@ -41,17 +41,17 @@ class FdC:
     Point d'entrée unique pour manipuler une FdC
     """
 
-    def __init__(self, lecteur: FdC_Lecteur):
+    def __init__(self, lecteur:Optional[FdC_Lecteur]=None):  # Pytesté
         """
         Initialise une instance FdC.
 
         :param lecteur:
             Implémentation concrète du lecteur de FdC correspondant à la version du fichier.
             Ce paramètre est interne et ne doit pas être fourni manuellement.
-        :type lecteur: Classe abstraite _FdCBase
+        :type lecteur: Optional[FdC_Lecteur], optional
         """
         # Implémentation concrète du lecteur de FdC correspondant à la version du fichier.
-        self._lecteur:FdC_Lecteur = lecteur
+        self._lecteur:Optional[FdC_Lecteur] = lecteur
 
     @classmethod
     def ouvrir(cls, chemin: Optional[Path] = None, formation: Optional[Formation_protocol] = None, fe: Optional[FichierExcel] = None) -> FdC:
@@ -69,6 +69,9 @@ class FdC:
         """
         #if chemin is None:
         #    chemin = cls._choisir_fdc(formation)
+
+        #if fe.wb is None:
+        #    fe.charger_wb()
         
         lecteur = FdC_Lecteur.ouvrir(
             chemin=chemin,
@@ -112,10 +115,23 @@ class FdC:
         return self.nb_participants_prevus + depassementAutorise
 
 
+    # =================
+    # === AFFICHAGE ===
+    # =================
+    def __str__(self) -> str:
+        if self._lecteur is not None:
+            return str(self._lecteur)
+        else:
+            return object.__str__(self)  # Si je fais print, ça fait une boucle récursive
 
-
-
-
+    @property
+    def chemin(self) -> Optional[Path]:
+        return self._lecteur._chemin
+    
+    #  Attention, le setter n'est pas dans l'objet fichier (ex. FdC), mais dans son lecteur. Si je fais fdc.chemin = Path("C:/aa.txt") ça ne marchera pas → Il faut déleguer le setter à l'objet (ici : FdC)
+    @chemin.setter
+    def chemin(self, valeur:Path) -> None:
+        self._lecteur._chemin = valeur
 
 # ======================================================================================
 # CLASSE FDC – CLASSE ABSTRAITE INTERNE
@@ -127,7 +143,7 @@ class FdC_Lecteur(FichierGenerique, ABC):
     
     _NOM_ONGLET_TABLEAU = "Fiche de coûts"  # Pour l'instant c'est toujours le même nom. Plus tard au besoin ce sera à surcharger dans les classes concrètes
 
-    def __init__(self, chemin:Optional[Path], formation: Optional[Formation_protocol] = None, fe: Optional[FichierExcel] = None):
+    def __init__(self, chemin:Optional[Path], formation: Optional[Formation_protocol] = None, fe: Optional[FichierExcel] = None):  # Pytesté (transparent) avec FdC.ouvrir()
         """
         Initialise et ouvre une instance FdC.
 
@@ -144,14 +160,20 @@ class FdC_Lecteur(FichierGenerique, ABC):
         self._formation:Optional[Formation_protocol] = formation  # Trigramme de la formation ; nécessaire uniquement pour facilite la sélection du fichier de FdC (pré-sélection répertoire)
         self._fe: Optional[FichierExcel] = fe  # Objet Excel contenant la fiche de coûts
 
-        # TODO : màj charger_fdc : ajouter méthode générique pour essayer d'aller chercher le fichier automatiquement et si non trouvé, alors l'utilisateur pointe
-        # TODO : màj charger_fdc : Il faudra que je prenne en compte que si chemin est donné, alors ça supplante le reste
-        #self._charger_fdc()  # chargement que si on en a besoin : mis dans self.fe
-        #self._fe = FichierExcel.depuis_fichier(chemin_fichier=chemin, nom_onglet=self._NOM_ONGLET_TABLEAU)
-
-
     @classmethod
-    def ouvrir(cls, chemin: Path, formation: Optional[Formation_protocol] = None, fe: Optional[FichierExcel] = None) -> FdC_Lecteur:
+    def ouvrir(cls, chemin: Path, formation: Optional[Formation_protocol] = None, fe: Optional[FichierExcel] = None) -> FdC_Lecteur:  # Pytesté (transparent) avec FdC.ouvrir()
+        """
+        Retourne le Lecteur à employer en fonction de la version du fichier ouvert
+
+        :param chemin: chemin à employer pour la fiche de coût (supplante le chemin par défaut de la config)
+        :type chemin: Path
+        :param formation: l'instance de Formation pour la fiche de coûts (nécessaire uniquement pour facilite la sélection du fichier de FdC (pré-sélection répertoire)), défaut = None
+        :type formation: Optional[Formation_protocol], optional
+        :param fe: Objet FichierExcel de la fiche de coûts (contient le chemin de la FdC), défaut = None
+        :type fe: Optional[FichierExcel], optional
+        :return: le Lecteur à employer en fonction de la version du fichier ouvert
+        :rtype: FdC_Lecteur
+        """
         for lecteur_cls in LECTEURS_FDC:
             if lecteur_cls.est_compatible(chemin):
                 return lecteur_cls(
@@ -166,7 +188,7 @@ class FdC_Lecteur(FichierGenerique, ABC):
     # =========================
     # === METHODES INTERNES ===
     # =========================
-    def _resoudre_chemin(self) -> Path:
+    def _resoudre_chemin(self) -> Path:  # Pytesté (transparent) avec premier appel de fe
         """
         Permet de savoir quel chemin employer pour la fiche de coûts. Ordre de priorité :
             - chemin donné par l'utilisateur ;
@@ -176,22 +198,39 @@ class FdC_Lecteur(FichierGenerique, ABC):
         :return: Le chemin de l'Excel de la FdC à employer
         :rtype: Path
         """
+        
+
+        
+        
         # 1) Cas prioritaire : si on a un chemin donné par l'utilisateur, alors c'est ce chemin qui fait foi
         if self.chemin:
-            return self.chemin
+            if self.chemin.exists():
+                return self.chemin
+            else:
+                vlog.log_erreur(f"Le chemin donné par l'utilisateur n'existe pas : {self.chemin}.\nSélection du fichier par une autre méthode.", continuer=True)
         
         # 2) Si on a un Excel, alors c'est ce chemin qui fait foi
-        if self._fe: # Attention : ne pas faire appel à self.chemin_fe car sinon on va lancer _charger_fdc or on est en train de résoudre le chemin là (antécédent)
+        if self._fe: # Attention : ne pas faire appel à self.chemin_fe car sinon on va lancer _charger_fdc or on est en train de résoudre le chemin là (antécédent)   
             return self._fe.chemin_fichier
 
-        # 3) On ouvre un filedialog
-        chemin = self._choisir_fdc()
+        # 3) On essaye d'aller le chercher automatiquement d'après le plan de classement
+        chemin = selectionner_fichier_dans_repertoire(
+            repertoire=self.chemin_plan_classement.parent,
+            regex_fichier=config.REGEX_FDC,  # ex: r".*FdC.*\.xlsx"
+            selectionAutoPlusRecent=True  # ou False selon ton besoin
+            )
+
+
+        # 4) On ouvre un filedialog
+        if chemin is None:
+            chemin = self._choisir_fdc()
+        
         if chemin is None:
             vlog.log_erreur("Le fichier FdC n'a pas été sélectionné")
         
         return chemin
     
-    def _charger_fdc(self):
+    def _charger_fdc(self):  # Pytesté (transparent) avec premier appel de fe
         """
         Charge l'Excel de la fiche de coûts dans l'instance.
         Si aucun fichier Excel n'est dans l'instance (i.e. pas de chemin pour la FdC), alors on ouvre un filedialog
@@ -208,23 +247,6 @@ class FdC_Lecteur(FichierGenerique, ABC):
     # =========================
     # === METHODES EXTERNES ===
     # =========================
-    @staticmethod
-    def construire_chemin_repertoire_fdc(trigramme_formation:Optional[str]=None) -> Path:
-        """
-        Construit le chemin du répertoire de la fiche de coûts de la formation (à partir des données de la config REPERTOIRE_FDC) :
-            - le chemin est transformé en unc (s'il y a un raccourci lecteur réseau sur le poste de l'utilisateur on transforme en chemin réseau complet) ;
-            - l'utilisateur peut optimiser le chemin (chemin le plus long entre l'attendu et ce qui existe).
-
-        :param trigramme_formation: Trigramme de la formation. Défaut = None
-        :type trigramme_formation: Optional[str], optional
-
-        :return: Le chemin de sortie du bilan de sessions.
-        :rtype: Path
-        """
-        return construire_chemin_config(
-            chemin_a_completer = config.REPERTOIRE_FDC,
-            trigramme_formation = trigramme_formation
-        )
 
 
 
@@ -338,8 +360,29 @@ class FdC_Lecteur(FichierGenerique, ABC):
         :return: Dossier de la FdC tel quel défini par le process qualité
         :rtype: Path
         """
-        return FdC_Lecteur.construire_chemin_repertoire_fdc(trigramme_formation=self.trigramme_formation)
+        return construire_chemin_config(
+            chemin_a_completer = config.REPERTOIRE_FDC,
+            trigramme_formation = self.trigramme_formation
+        )
 
+    @cached_property
+    def chemin_plan_classement(self) -> Path:
+        """
+        Retourne le chemin de la FdC tel quel défini par le process qualité (i.e. valeur dans le fichier config).
+
+        :return: Chemin de la FdC tel quel défini par le process qualité
+        :rtype: Path
+        """
+        date_aaaa_mm_jj = "aaaa.mm.jj"  # Date générique : on ne peut pas le savoir à l'avance
+        chemin_a_completer = self.dossier_plan_classement / config.FICHIER_FDC
+        chemin = construire_chemin_config(
+            chemin_a_completer = chemin_a_completer,
+            trigramme_formation = self.trigramme_formation,
+            unite = config.UNITE,
+            date_aaaa_mm_jj = date_aaaa_mm_jj
+        )
+        return chemin
+    
     @property
     def version(self) -> str | None:
         """
@@ -348,12 +391,13 @@ class FdC_Lecteur(FichierGenerique, ABC):
         Exemple attendu :
         "Fiche de coûts INSTN - V1.4 du 25/01/2019"
 
-        :return: version extraite (ex: "V1.4 du 25/01/2019") ou None si non trouvée
+        :return: version extraite (ex: "1.4") ou None si non trouvée
         :rtype: str | None
         """
         valeur = str(self.tableau["A1"])
 
-        match = re.search(r"(V\d+(?:\.\d+)?\s*du\s*\d{2}/\d{2}/\d{4})", valeur)
+        #match = re.search(r"(V\d+(?:\.\d+)?\s*du\s*\d{2}/\d{2}/\d{4})", valeur)  # V6.1 du 17/01/2025
+        match = re.search(r"V(\d+(?:\.\d+)?)\s*du\s*\d{2}/\d{2}/\d{4}", valeur)  #6.1
 
         return match.group(1) if match else None
     
@@ -442,8 +486,97 @@ class FdC_Lecteur(FichierGenerique, ABC):
         """
         pass
     
+    @property
+    @abstractmethod
+    def cout_T1(self) -> int:
+        """
+        Renvoie le coût T1 (coûts directs INSTN et sans marge) d'une session
+        
+        :return: le coût T1 (coûts directs INSTN et sans marge) d'une session
+        :rtype: int
+        """
+        pass
     
+    @property
+    @abstractmethod
+    def cout_T2(self) -> int:
+        """
+        Renvoie le coût T2 (coût environné INSTN et sans marge) d'une session
+        
+        :return: le coût T2 (coût environné INSTN et sans marge) d'une session
+        :rtype: int
+        """
+        pass
+    
+    
+    @property
+    @abstractmethod
+    def cout_T3(self) -> int:
+        """
+        Renvoie le coût T3 (coût environné INSTN et sans marge) d'une session
+        
+        :return: le coût T3 (coût environné INSTN et sans marge) d'une session
+        :rtype: int
+        """
+        pass
+    
+    @property
+    @abstractmethod
+    def prix_cea(self) -> int:
+        """
+        Renvoie le prix fixé d'session pour un agent CEA
+        
+        :return: le prix fixé d'une session pour un agent CEA
+        :rtype: int
+        """
+        pass
+    
+    @property
+    @abstractmethod
+    def prix_ee(self) -> int:
+        """
+        Renvoie le prix fixé d'une session pour une EE
+        
+        :return: le prix fixé d'une session pour une EE
+        :rtype: int
+        """
+        pass
+    
+    @property
+    @abstractmethod
+    def prix_min_cea(self) -> int:
+        """
+        Renvoie le prix minimum d'une session pour un agent CEA
+        
+        :return: le prix minimum d'une session pour un agent CEA
+        :rtype: int
+        """
+        pass
+    
+    @property
+    @abstractmethod
+    def prix_min_ee(self) -> int:
+        """
+        Renvoie le prix minimum d'une session pour une EE
+        
+        :return: le prix minimum d'une session pour une EE
+        :rtype: int
+        """
+        pass
 
+    @property
+    @abstractmethod
+    def prix_preconise_ee(self) -> int:
+        """
+        Renvoie le prix préconisé d'une session pour une EE
+        
+        :return: le prix préconisé d'une session pour une EE
+        :rtype: int
+        """
+        pass
+
+
+# TODO : attention, en cas d'ajout de version, rajouter le lecteur dans la variable LECTEURS_FDC en fin de module !!!
 # ======================================================================================
 # FDC VERSION 6.1 – IMPLEMENTATION DE LA CLASSE ABSTRAITE
 # ======================================================================================
@@ -453,7 +586,7 @@ class FdC_Lecteur_V6_1(FdC_Lecteur):
     # =========================
     # === METHODES EXTERNES ===
     # =========================
-    def est_compatible(cls, chemin: Path) -> bool:
+    def est_compatible(cls, chemin: Path) -> bool:  # Pytesté (transparent) avec FdC.ouvrir()
         """
         Permet de connaître la version du fichier
 
@@ -563,6 +696,270 @@ class FdC_Lecteur_V6_1(FdC_Lecteur):
         """
         return self.tableau["N23"]
 
+    @property
+    def cout_T1(self) -> int:
+        """
+        Renvoie le coût T1 (coûts directs INSTN et sans marge) d'une session (K35)
+        
+        :return: le coût T1 (coûts directs INSTN et sans marge) d'une session
+        :rtype: int
+        """
+        return self.tableau["K35"]
+    
+    @property
+    def cout_T2(self) -> int:
+        """
+        Renvoie le coût T2 (coût environné INSTN et sans marge) d'une session (M35)
+        
+        :return: le coût T2 (coût environné INSTN et sans marge) d'une session
+        :rtype: int
+        """
+        return self.tableau["M35"]
+    
+    @property
+    def cout_T3(self) -> int:
+        """
+        Renvoie le coût T3 (coût environné INSTN et sans marge) d'une session (L35)
+        
+        :return: le coût T3 (coût environné INSTN et sans marge) d'une session
+        :rtype: int
+        """
+        return self.tableau["L35"]
+    
+    @property
+    def prix_cea(self) -> int:
+        """
+        Renvoie le prix fixé d'session pour un agent CEA (J21)
+        
+        :return: le prix fixé d'une session pour un agent CEA
+        :rtype: int
+        """
+        return self.tableau["J21"]
+    
+    @property
+    def prix_ee(self) -> int:
+        """
+        Renvoie le prix fixé d'une session pour une EE (J22)
+        
+        :return: le prix fixé d'une session pour une EE
+        :rtype: int
+        """
+        return self.tableau["J22"]
+    
+    @property
+    def prix_min_cea(self) -> int:
+        """
+        Renvoie le prix minimum d'une session pour un agent CEA (K13)
+        
+        :return: le prix minimum d'une session pour un agent CEA
+        :rtype: int
+        """
+        return self.tableau["K13"]
+    
+    @property
+    def prix_min_ee(self) -> int:
+        """
+        Renvoie le prix minimum d'une session pour une EE (L13)
+        
+        :return: le prix minimum d'une session pour une EE
+        :rtype: int
+        """
+        return self.tableau["L13"]
+
+    @property
+    def prix_preconise_ee(self) -> int:
+        """
+        Renvoie le prix préconisé d'une session pour une EE (M13)
+        
+        :return: le prix préconisé d'une session pour une EE
+        :rtype: int
+        """
+        return self.tableau["M13"]
+
+
+# ======================================================================================
+# FDC VERSION 1.4 – IMPLEMENTATION DE LA CLASSE ABSTRAITE
+# ======================================================================================
+class FdC_Lecteur_V1_4(FdC_Lecteur):
+
+    @classmethod
+    # =========================
+    # === METHODES EXTERNES ===
+    # =========================
+    def est_compatible(cls, chemin: Path) -> bool:  # Pytesté (transparent) avec FdC.ouvrir()
+        """
+        Permet de connaître la version du fichier
+
+        :param chemin: _description_
+        :type chemin: Path
+        :return: _description_
+        :rtype: bool
+        """
+        
+        valeur = FichierExcel.valeur_cellule_ouverture_rapide(
+            chemin_fichier=chemin, 
+            nom_onglet=cls._NOM_ONGLET_TABLEAU, 
+            cellule="A1"
+            )
+        return isinstance(valeur, str) and "V1.4" in valeur
+    
+
+
+    # =========================
+    # === GETTERS / SETTERS ===
+    # =========================
+    @property
+    def nom_onglet(self) -> str:
+        return self._NOM_ONGLET_TABLEAU
+
+    @property
+    def nom_formation(self) -> str:
+        """
+        Renvoie le nom de la formation (C5)
+        
+        :return: le nom de la formation tel que donné dans la fiche de coûts
+        :rtype: str
+        """
+        return self.tableau["C5"]
+
+    @property
+    def annee_creationFormation(self) -> int:
+        """
+        Retourne l'année de conception de la formation (C7).
+        
+        :return: l'année de conception de la formation
+        :rtype: int
+        """
+        return convertir_dateFormatIndefini_annee(self.tableau["C7"])
+
+    @property
+    def date_creationFormation(self) -> date:
+        """
+        Retourne la date de conception de la formation (C7).
+        
+        Si la valeur est :
+        - une date/datetime → retourne la date
+        - un objet avec attribut year → retourne le 01/01/year
+        - un entier → considéré comme une année → retourne le 01/01/année
+        - une chaîne → tentative de conversion
+        - sinon → retourne le 01/01/1900
+        
+        :return: la date de conception de la formation
+        :rtype: date
+        """
+        return convertir_dateFormatIndefini_date(self.tableau["C7"])
+
+    @property
+    def nb_participants_prevus(self) -> int:
+        """
+        Renvoie le nombre de participants prévus (C14)
+        
+        :return: le nombre de participants prévus tel que donné dans la fiche de coûts
+        :rtype: int
+        """
+        return self.tableau["C14"]
+
+    @property
+    def nb_participants_min_cea(self) -> int:
+        """
+        Renvoie le nombre min de participants prévus pour les CEA (J14)
+        
+        :return: le nombre min de participants tel que donné dans la fiche de coûts
+        :rtype: int
+        """
+        return self.tableau["J14"]
+    
+    @property
+    def nb_participants_min_ee(self) -> int:
+        """
+        Renvoie le nombre min de participants prévus pour les EE (L14)
+        
+        :return: le nombre min de participants tel que donné dans la fiche de coûts
+        :rtype: int
+        """
+        return self.tableau["L14"]
+
+    @property
+    def cout_T1(self) -> int:
+        """
+        Renvoie le coût T1 (coûts directs INSTN et sans marge) d'une session (K29)
+        
+        :return: le coût T1 (coûts directs INSTN et sans marge) d'une session
+        :rtype: int
+        """
+        return self.tableau["K29"]
+    
+    @property
+    def cout_T2(self) -> int:
+        """
+        Renvoie le coût T2 (coût environné INSTN et sans marge) d'une session (M29)
+        
+        :return: le coût T2 (coût environné INSTN et sans marge) d'une session
+        :rtype: int
+        """
+        return self.tableau["M29"]
+    
+    @property
+    def cout_T3(self) -> int:
+        """
+        Renvoie le coût T3 (coût environné INSTN et sans marge) d'une session (L29)
+        
+        :return: le coût T3 (coût environné INSTN et sans marge) d'une session
+        :rtype: int
+        """
+        return self.tableau["L29"]
+    
+    @property
+    def prix_cea(self) -> int:
+        """
+        Renvoie le prix fixé d'session pour un agent CEA (J17)
+        
+        :return: le prix fixé d'une session pour un agent CEA
+        :rtype: int
+        """
+        return self.tableau["J17"]
+    
+    @property
+    def prix_ee(self) -> int:
+        """
+        Renvoie le prix fixé d'une session pour une EE (J18)
+        
+        :return: le prix fixé d'une session pour une EE
+        :rtype: int
+        """
+        return self.tableau["J18"]
+    
+    @property
+    def prix_min_cea(self) -> int:
+        """
+        Renvoie le prix minimum d'une session pour un agent CEA (J11)
+        
+        :return: le prix minimum d'une session pour un agent CEA
+        :rtype: int
+        """
+        return self.tableau["J11"]
+    
+    @property
+    def prix_min_ee(self) -> int:
+        """
+        Renvoie le prix minimum d'une session pour une EE (K11)
+        
+        :return: le prix minimum d'une session pour une EE
+        :rtype: int
+        """
+        return self.tableau["K11"]
+
+    @property
+    def prix_preconise_ee(self) -> int:
+        """
+        Renvoie le prix préconisé d'une session pour une EE (L11)
+        
+        :return: le prix préconisé d'une session pour une EE
+        :rtype: int
+        """
+        return self.tableau["L11"]
+
+
 # ======================================================================================
 # FDC VERSION DEFAUT – IMPLEMENTATION DE LA CLASSE ABSTRAITE
 # ======================================================================================
@@ -615,6 +1012,7 @@ class FdC_Lecteur_Defaut(FdC_Lecteur):
 # ======================================================================================
 LECTEURS_FDC = [
     FdC_Lecteur_V6_1,
+    FdC_Lecteur_V1_4,
     FdC_Lecteur_Defaut,  # toujours en dernier
 ]
 

@@ -530,6 +530,234 @@ def ouvrir_dossier(path) -> str:
         subprocess.run(["xdg-open", path])
 
 def lister_fichiers_repertoire(
+    dossier: Path,
+    delai: timedelta | None = None,
+    inclure_sous_dossiers: bool = False,
+    extensions: Union[str, list[str], None] = None,
+    trier_par_date: bool = False,
+    regex_fichier: str | None = None
+) -> list[tuple[Path, float]]:
+    """
+    Liste les fichiers d'un répertoire selon certains critères de date, d'extension,
+    de regex, et optionnellement les trie.
+
+    Args:
+        dossier (Path): Répertoire à analyser.
+        delai (timedelta | None): Durée limite depuis maintenant.
+            Si None : tous les fichiers sont listés
+            Exemple : `timedelta(days=30)` pour les fichiers modifiés depuis 30 jours.
+        inclure_sous_dossiers (bool): Parcours récursif si True.
+        extensions (str | list[str] | None): Extension(s) autorisée(s) (ex: ".txt", "txt", [".txt", ".csv"], ["txt", "csv"] ou mélange des formats)
+            Si None, aucun filtrage d'extension n'est appliqué.
+        trier_par_date (bool): Tri par date décroissante si True, sinon alphabétique.
+            Si True, trie les fichiers du plus récent au plus ancien (par défaut False).
+        regex_fichier (str | None): Regex sur le nom du fichier.
+
+    Returns:
+        list[tuple[Path, float]]: Liste de tuples (chemin, date_modification).
+    
+    Exemple:
+        >>> fichiers = lister_fichiers_repertoire(
+        ...     dossier="/chemin/vers/dossier",
+        ...     delai=timedelta(days=30),
+        ...     inclure_sous_dossiers=True,
+        ...     extensions=[".py", ".txt"],
+        ...     trier_par_date=True
+        ... )
+        >>> for f in fichiers:
+        ...     print(f)
+        /chemin/vers/dossier/script.py
+        /chemin/vers/dossier/notes.txt
+    """
+
+    if not dossier.exists() or not dossier.is_dir():
+        raise ValueError(f"Répertoire invalide : {dossier}")
+
+    maintenant = time_module.time()
+    limite_secondes = delai.total_seconds() if delai else None
+    pattern = re.compile(regex_fichier) if regex_fichier else None
+
+    # Normalisation des extensions
+    extensions_normalisees: list[str] | None = None
+    if extensions is not None:
+        if isinstance(extensions, str):
+            extensions = [extensions]
+
+        extensions_normalisees = [
+            ext.lower() if ext.startswith(".") else f".{ext.lower()}"
+            for ext in extensions
+        ]
+
+    fichiers: list[tuple[Path, float]] = []
+
+    def fichier_valide(fichier: Path) -> bool:
+        # Extension
+        if extensions_normalisees:
+            if fichier.suffix.lower() not in extensions_normalisees:
+                return False
+
+        # Regex
+        if pattern:
+            if not pattern.match(fichier.name):
+                return False
+
+        # Date
+        if limite_secondes is not None:
+            date_modif = fichier.stat().st_mtime
+            if (maintenant - date_modif) > limite_secondes:
+                return False
+
+        return True
+
+    # Parcours
+    fichiers_iter = dossier.rglob("*") if inclure_sous_dossiers else dossier.iterdir()
+
+    for fichier in fichiers_iter:
+        if fichier.is_file() and fichier_valide(fichier):
+            date_modif = fichier.stat().st_mtime
+            fichiers.append((fichier, date_modif))
+
+    # Tri
+    if trier_par_date:
+        fichiers.sort(key=lambda x: x[1], reverse=True)
+    else:
+        fichiers.sort(key=lambda x: x[0].name.lower())
+
+    return fichiers
+
+def selectionner_fichier_par_utilisateur(
+    fichiers: list[tuple[Path, float]]
+) -> Optional[Path]:
+    """
+    Permet à l'utilisateur de sélectionner un fichier dans une liste.
+
+    Args:
+        fichiers (list[tuple[Path, float]]): Liste (chemin, date_modif) (issu de lister_fichiers_repertoire)
+
+    Returns:
+        Optional[Path]: Fichier choisi ou None (filedialog)
+    """
+
+    while True:
+        print("\nFichiers disponibles :")
+        afficher_fichiers_tabules(fichiers)
+
+        print("\n0 - Ouvrir un sélecteur de fichier")
+        print("-1 - Quitter")
+
+        saisie = input("Votre choix : ")
+
+        try:
+            choix = int(saisie)
+        except ValueError:
+            choix = None
+
+        if choix == -1:
+            vlog.log_erreur("L'utilisateur n'a pas sélectionné de fichier et souhaite quitter l'application")
+            exit()
+
+        elif choix == 0:
+            return None
+
+        elif choix and 1 <= choix <= len(fichiers):
+            return fichiers[choix - 1][0]
+
+        else:
+            print("\nChoix invalide.")
+            print("1 - Recommencer")
+            print("0 - Filedialog")
+            print("-1 - Quitter")
+
+            try:
+                action = int(input("Votre choix : "))
+            except ValueError:
+                action = None
+
+            if action == -1:
+                vlog.log_erreur("L'utilisateur n'a pas sélectionné de fichier et souhaite quitter l'application")
+                exit()
+            elif action == 0:
+                return None
+
+def afficher_fichiers_tabules(fichiers: list[tuple[Path, float]]) -> None:
+    """
+    Affiche une liste de fichiers avec index, nom, date et répertoire
+    sous forme tabulée lisible.
+
+    :param fichiers: Liste de tuples (chemin, date_modification)
+    :type fichiers: list[tuple[Path, float]]
+    """
+
+    if not fichiers:
+        print("Aucun fichier disponible.")
+        return
+
+    # Préparation des données
+    lignes = []
+    for i, (fichier, date_modif) in enumerate(fichiers, start=1):
+        date_str = datetime.fromtimestamp(date_modif).strftime("%d/%m/%Y %H:%M")
+        lignes.append((i, fichier.name, date_str, str(fichier.parent)))
+
+    # Calcul des largeurs max pour alignement
+    largeur_index = max(len(str(l[0])) for l in lignes)
+    largeur_nom = max(len(l[1]) for l in lignes)
+    largeur_date = max(len(l[2]) for l in lignes)
+    largeur_rep = max(len(l[3]) for l in lignes)
+
+    # Header
+    print(
+        f"{'Idx'.ljust(largeur_index)} | "
+        f"{'Nom'.ljust(largeur_nom)} | "
+        f"{'Date modif'.ljust(largeur_date)} | "
+        f"{'Répertoire'.ljust(largeur_rep)}"
+    )
+    print("-" * (largeur_index + largeur_nom + largeur_date + largeur_rep + 9))
+
+    # Lignes
+    for idx, nom, date_str, rep in lignes:
+        print(
+            f"{str(idx).ljust(largeur_index)} | "
+            f"{nom.ljust(largeur_nom)} | "
+            f"{date_str.ljust(largeur_date)} | "
+            f"{rep.ljust(largeur_rep)}"
+        )
+
+def selectionner_fichier_dans_repertoire(
+    repertoire: Path,
+    regex_fichier: str,
+    selectionAutoPlusRecent: bool = True
+) -> Optional[Path]:
+    """
+    Sélectionne un fichier dans un répertoire selon un regex.
+
+    - Liste les fichiers correspondants
+    - Trie par date décroissante
+    - Retourne le plus récent ou propose une sélection utilisateur
+
+    Args:
+        repertoire (Path): Répertoire cible
+        regex_fichier (str): Regex de filtrage
+        selectionAutoPlusRecent (bool): Auto sélection du plus récent
+
+    Returns:
+        Optional[Path]: Fichier choisi ou None
+    """
+
+    fichiers = lister_fichiers_repertoire(
+        dossier=repertoire,
+        regex_fichier=regex_fichier,
+        trier_par_date=True
+    )
+
+    if not fichiers:
+        return None
+
+    if selectionAutoPlusRecent:
+        return fichiers[0][0]
+
+    return selectionner_fichier_par_utilisateur(fichiers)
+
+def lister_fichiers_repertoire_bak(
     dossier: str,
     delai: timedelta | None = None,
     inclure_sous_dossiers: bool = False,
@@ -604,7 +832,7 @@ def lister_fichiers_repertoire(
 
     return fichiers
 
-def obtenir_fichier_plus_recent_repertoire(repertoire: str, motif: str):
+def obtenir_fichier_plus_recent_repertoire_bak(repertoire: str, motif: str):
     """
     Retourne le fichier le plus récent d'un répertoire correspondant à une expression régulière.
 

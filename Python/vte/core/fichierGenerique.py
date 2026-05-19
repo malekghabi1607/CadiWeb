@@ -22,6 +22,16 @@ class FichierGenerique(ABC):
     @property
     def chemin(self) -> Optional[Path]:
         return self._chemin
+    
+    @chemin.setter
+    def chemin(self, valeur:Path) -> None:
+        """
+        Attention, le setter n'est pas dans l'objet fichier (ex. FdC), mais dans son lecteur. Si je fais fdc.chemin = Path("C:/aa.txt") ça ne marchera pas → Il faut déleguer le setter à l'objet (ici : FdC)
+
+        :param valeur: _description_
+        :type valeur: Path
+        """
+        self._chemin = valeur
 
     # TODO : rajouter les date et version dans classmethod ; peut-être faire cached property et renseigner la variable d'instance au 1er appel ; au second on lit cette variable
 
@@ -36,6 +46,24 @@ class FichierGenerique(ABC):
                 return sous_classe(chemin)
 
         raise ValueError(f"Aucune version compatible pour : {chemin}")
+
+
+
+
+
+    # === Affichage ===
+    def __str__(self) -> str:
+        str = (
+            f"\n📁 Propriétés du fichier :\n"
+            f"  Fichier : {self.chemin.name or 'non défini'}\n"
+            f"  Répertoire : {self.chemin.parent or 'non défini'}\n"
+            f"  Version : {self.version or 'non défini'}\n"
+            f"  Date dernière modif windows : {(self.date_derniere_modification_windows or 'non défini') if self.chemin.exists() else "FICHIER N'EXISTE PAS"}\n"
+        )
+
+        return str
+
+
 
 
     # === GETTERS ===

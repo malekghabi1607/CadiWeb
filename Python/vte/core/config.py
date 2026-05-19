@@ -16,7 +16,7 @@ REPERTOIRES_MODELES = Path("//harmonie/instn/uem/_Echanges/VTE/Prog/Modèles")
 
 
 ###
-# === REPERTOIRES GED ===
+# === REPERTOIRES GED - PLAN DE CLASSEMENT ===
 ###
 
 GED:Path = Path("//instnt/partage")
@@ -32,7 +32,8 @@ REPERTOIRE_FDC:Path = REPERTOIRE_CONCEPTION / "fiche-de-cout-et-code-de-formatio
 REPERTOIRE_SPECS:Path = REPERTOIRE_CONCEPTION / "specifications-pedagogiques-et-referentiel"
 
 
-
+FICHIER_FDC:Path = "Fiche de coûts INSTN - {trigramme_formation} - {unite} - {date_aaaa_mm_jj}.xlsx"
+REGEX_FDC:str = "Fiche de coûts INSTN - .*"
 
 
 
