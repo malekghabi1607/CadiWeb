@@ -8,8 +8,12 @@ import os, json, copy, re
 from datetime import datetime
 from typing import List, Tuple
 
+from vte.services import evalStat_services
+from vte.utils.office import FichierExcel
+from vte.utils.utils import *
+
 #import INSTN
-from vte.instn import *
+#from vte.instn import *
 #from INSTN import Traiter_evalStat, FichierExcel, chemin_vers_unc, vlog
 
 
@@ -311,7 +315,15 @@ class ApplicationCADI(tk.Tk):
         try:
             # On lance le traitement
             # TODO : faire un truc pour voir la progression
-            evalstat = Traiter_evalStat.depuis_tuple_csv_stagiaires(
+            """evalstat = Traiter_evalStat.depuis_tuple_csv_stagiaires(
+                tuple_csv_stagiaires=tuple(self.fichiers_evalstat.keys()),
+                chemin_excel_evaluations_defaut=self.config["EvalStat"]["Sauvegarde des évaluations d'une formation"],
+                chemin_modeleExcel_stagiaires=self.config["EvalStat"]["Modèle Excel des évaluations"],
+                #chemin_excel_sessions=self.config["Extractions d'IRIS"]["Fichier sessions R04110"],
+                fe_sessions=self.fe_sessions,
+                ouvrirDossier=False
+            )"""
+            evalstat = evalStat_services.ouvrir_ou_traiter_evalStat_depuis_iterable_de_csv(
                 tuple_csv_stagiaires=tuple(self.fichiers_evalstat.keys()),
                 chemin_excel_evaluations_defaut=self.config["EvalStat"]["Sauvegarde des évaluations d'une formation"],
                 chemin_modeleExcel_stagiaires=self.config["EvalStat"]["Modèle Excel des évaluations"],
