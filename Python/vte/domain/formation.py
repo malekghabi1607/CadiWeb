@@ -256,7 +256,7 @@ class Formation:
         :param chemin_fdc: Chemin de la fiche de coûts. Défaut = None
         :type chemin_fdc: Optional[Path | str], optional
         """
-        self._fdc = FdC.depuis_chemin(formation=self, chemin_fdc=chemin_fdc)
+        self._fdc = FdC.ouvrir(formation=self, chemin=chemin_fdc)
 
     def ouvrir_specs(self, chemin_specs:Optional[Path|str] = None) -> None:  # pytesté
         """

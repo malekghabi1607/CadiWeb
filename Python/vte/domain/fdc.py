@@ -80,6 +80,10 @@ class FdC:
             formation=formation,
             fe=fe
         )
+
+        # Si FichierExcel n'est pas donné par l'utilisateur, alors on le charge en lazy loading par premier appel de self.fe
+        
+
         return cls(lecteur)
 
     def __getattr__(self, item):
@@ -367,6 +371,10 @@ class FdC_Lecteur(FichierGenerique, ABC):
             return recupere_trig_formation_depuis_chemin(self.chemin_fe)
         else :
             return None
+
+    @property
+    def formation(self) -> Formation_protocol|None:
+        return self._formation
 
     @property
     def fe(self) -> FichierExcel :

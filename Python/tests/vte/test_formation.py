@@ -122,8 +122,8 @@ def test_ouvrir_fdc(tel):
     # Ce qui est sensé avoir été affecté
     assert formation.trigramme_formation == tel["trigramme_formation"]
     assert isinstance(formation._fdc, FdC)
-    assert formation.fdc._formation.trigramme_formation == tel["trigramme_formation"]
-    assert formation.fdc._fe.chemin_fichier == tel["chemin_fdc"]
+    assert formation.fdc.formation.trigramme_formation == tel["trigramme_formation"]
+    assert formation.fdc.fe.chemin_fichier == tel["chemin_fdc"]
     assert len(formation.sessions) == 1
 
 
