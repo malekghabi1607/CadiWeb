@@ -102,6 +102,7 @@ class FdC:
     # =========================
     # === METHODES INTERNES ===
     # =========================
+    
     @staticmethod
     def _resoudre_chemin(
         chemin: Optional[Path] = None,
