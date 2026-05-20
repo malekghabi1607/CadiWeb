@@ -256,7 +256,7 @@ def AAAtest_resoudre_chemin_BAK(monkeypatch, tel, nom_cas, cas):
     DATASETS_RESOUDRE_CHEMIN.values(),
     ids=DATASETS_RESOUDRE_CHEMIN.keys()
 )
-def test_resoudre_chemin(monkeypatch, tel, caplog, cas):
+def test_resoudre_chemin(monkeypatch, tel, capsys, cas):
 
     formation = Formation(tel["trigramme_formation"])
 
@@ -305,13 +305,13 @@ def test_resoudre_chemin(monkeypatch, tel, caplog, cas):
     # Action
     # ---------------------------------------------------------
 
-    chemin = fdc._resoudre_chemin()
+    #chemin = fdc._resoudre_chemin()
 
     # ---------------------------------------------------------
     # Assertions
     # ---------------------------------------------------------
 
-    assert chemin == cas["attendu"]
+    assert fdc.chemin == cas["attendu"]
 
     # ---------------------------------------------------------
     # Vérification logs
@@ -319,9 +319,10 @@ def test_resoudre_chemin(monkeypatch, tel, caplog, cas):
 
     if cas["erreur_attendue"]:
 
+        captured = capsys.readouterr()  # Pour récupérer ce qui est print
         assert (
             "Le chemin donné par l'utilisateur n'existe pas"
-            in caplog.text
+            in captured.out
         )
 
 

@@ -102,7 +102,7 @@ class FdC:
     # =========================
     # === METHODES INTERNES ===
     # =========================
-    
+
     @staticmethod
     def _resoudre_chemin(
         chemin: Optional[Path] = None,
@@ -110,7 +110,20 @@ class FdC:
         fe: Optional[FichierExcel] = None
     ) -> Path:
         """
-        Détermine le chemin réel de la FdC à utiliser.
+        Permet de savoir quel chemin employer pour la fiche de coûts. Ordre de priorité :
+            - chemin donné par l'utilisateur ;
+            - fichier Excel ;
+            - on ouvre un filedialog
+
+
+        :param chemin: chemin de la FdC, defaults to None
+        :type chemin: Optional[Path], optional
+        :param formation: objet Formation, defaults to None
+        :type formation: Optional[Formation_protocol], optional
+        :param fe: Objet FichierExcel de la FdC, defaults to None
+        :type fe: Optional[FichierExcel], optional
+        :return: Le chemin de l'Excel de la FdC à employer
+        :rtype: Path
         """
 
         # 1) Cas prioritaire : si on a un chemin donné par l'utilisateur, alors c'est ce chemin qui fait foi
@@ -120,7 +133,7 @@ class FdC:
             if chemin.exists():
                 return chemin
             else:
-                vlog.log_erreur(f"Le chemin donné par l'utilisateur n'existe pas : {self.chemin}.\nSélection du fichier par une autre méthode.", continuer=True)
+                vlog.log_erreur(f"Le chemin donné par l'utilisateur n'existe pas : {chemin}.\nDétermination du chemin par une autre méthode.", continuer=True)
 
         # 2) chemin depuis FichierExcel
         if fe: # Attention : ne pas faire appel à self.chemin_fe car sinon on va lancer _charger_fdc or on est en train de résoudre le chemin là (antécédent)   
