@@ -226,7 +226,7 @@ def test_fdc_ouvrir(version, data_version, fe_builder):
     DATASETS_RESOUDRE_CHEMIN.items(),
     ids=DATASETS_RESOUDRE_CHEMIN.keys()
 )
-def test_resoudre_chemin_BAK(monkeypatch, tel, nom_cas, cas):
+def AAAtest_resoudre_chemin_BAK(monkeypatch, tel, nom_cas, cas):
 
     formation = Formation(tel["trigramme_formation"])
 

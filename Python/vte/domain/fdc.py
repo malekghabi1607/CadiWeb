@@ -67,14 +67,16 @@ class FdC:
         :param fe: Objet FichierExcel de la fiche de coûts (contient le chemin de la FdC).
         :type fe: Optional[FichierExcel], optional
         """
-        #if chemin is None:
-        #    chemin = cls._choisir_fdc(formation)
-
-        #if fe.wb is None:
-        #    fe.charger_wb()
-        
-        lecteur = FdC_Lecteur.ouvrir(
+        # Recherche parmi les arguments quel chemin employer
+        chemin_resolu = cls._resoudre_chemin(
             chemin=chemin,
+            formation=formation,
+            fe=fe
+        )
+        
+        # Ouvre la FdC avec le bon lecteur
+        lecteur = FdC_Lecteur.ouvrir(
+            chemin=chemin_resolu,
             formation=formation,
             fe=fe
         )
@@ -96,6 +98,62 @@ class FdC:
         """
         return getattr(self._lecteur, item)
 
+
+    # =========================
+    # === METHODES INTERNES ===
+    # =========================
+    @staticmethod
+    def _resoudre_chemin(
+        chemin: Optional[Path] = None,
+        formation: Optional[Formation_protocol] = None,
+        fe: Optional[FichierExcel] = None
+    ) -> Path:
+        """
+        Détermine le chemin réel de la FdC à utiliser.
+        """
+
+        # 1) Cas prioritaire : si on a un chemin donné par l'utilisateur, alors c'est ce chemin qui fait foi
+        if chemin:
+            chemin = Path(chemin)
+
+            if chemin.exists():
+                return chemin
+            else:
+                vlog.log_erreur(f"Le chemin donné par l'utilisateur n'existe pas : {self.chemin}.\nSélection du fichier par une autre méthode.", continuer=True)
+
+        # 2) chemin depuis FichierExcel
+        if fe: # Attention : ne pas faire appel à self.chemin_fe car sinon on va lancer _charger_fdc or on est en train de résoudre le chemin là (antécédent)   
+            return fe.chemin_fichier
+
+        # 3) recherche auto d'après le plan de classement
+        trigramme = formation.trigramme_formation if formation else None
+
+        dossier = construire_chemin_config(
+            chemin_a_completer=config.REPERTOIRE_FDC,
+            trigramme_formation=trigramme
+        )
+
+        chemin_auto = selectionner_fichier_dans_repertoire(
+            repertoire=dossier.parent,
+            regex_fichier=config.REGEX_FDC,
+            selectionAutoPlusRecent=True
+        )
+
+        if chemin_auto:
+            return chemin_auto
+
+        # 4) filedialog
+        chemin_dialog = choisir_fichier(
+            titre="Sélectionner la fiche de coûts à employer.",
+            types_fichiers=[("Fichiers Excel", "*.xlsx")],
+            dossier_initial=dossier,
+            texte_bouton_choisir="Choisir FdC à nouveau"
+        )
+
+        if chemin_dialog:
+            return chemin_dialog
+
+        vlog.log_erreur("Le fichier FdC n'a pas été sélectionné")
 
 
     # =========================
@@ -188,7 +246,8 @@ class FdC_Lecteur(FichierGenerique, ABC):
     # =========================
     # === METHODES INTERNES ===
     # =========================
-    def _resoudre_chemin(self) -> Path:  # Pytesté (transparent) avec premier appel de fe
+    # TODO j'ai mis ça dans FDC : à virer après tests
+    def _resoudre_chemin_BAK(self) -> Path:  # Pytesté (transparent) avec premier appel de fe
         """
         Permet de savoir quel chemin employer pour la fiche de coûts. Ordre de priorité :
             - chemin donné par l'utilisateur ;
@@ -235,11 +294,10 @@ class FdC_Lecteur(FichierGenerique, ABC):
         Charge l'Excel de la fiche de coûts dans l'instance.
         Si aucun fichier Excel n'est dans l'instance (i.e. pas de chemin pour la FdC), alors on ouvre un filedialog
         """
-        chemin_fdc = self._resoudre_chemin()
 
         # On ouvre le fichier Excel avec le chemin
         timer.debut("Chargement fiche de coûts")
-        self._fe = FichierExcel.depuis_fichier(chemin_fichier=chemin_fdc, nom_onglet=self.nom_onglet)
+        self._fe = FichierExcel.depuis_fichier(chemin_fichier=self.chemin, nom_onglet=self.nom_onglet)
         timer.fin()
 
 
