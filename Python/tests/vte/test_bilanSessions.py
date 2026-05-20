@@ -159,7 +159,7 @@ def apply_mocks(monkeypatch, dataset):
 """
 # Pour faire tous les cas
 @pytest.mark.parametrize("nom_cas, dataset", DATASETS_CODES_IRIS.items())
-def test_bilanSession_depuis_codesIRIS(nom_cas, dataset, monkeypatch):
+def test_bilanSessions_depuis_codesIRIS(nom_cas, dataset, monkeypatch):
 #def verif_bilanSession_depuis_codesIRIS():
 
     # MODE FONCTION
@@ -189,7 +189,7 @@ def test_bilanSession_depuis_codesIRIS(nom_cas, dataset, monkeypatch):
 
 
 @pytest.mark.parametrize("nom_cas, dataset", DATASETS_PERIODE.items())
-def test_bilanSession_depuis_periode(nom_cas, dataset, monkeypatch):
+def test_bilanSessions_depuis_periode(nom_cas, dataset, monkeypatch):
 #def verif_bilanSession_periode():
     # MODE FONCTION
     #dataset = DATASETS_PERIODE["Bilan TEL année 2024 (3 sessions, 2 CSV seulement)"]

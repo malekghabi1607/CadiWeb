@@ -73,19 +73,21 @@ class EvalStat_services:
         :return: Une liste de dictionnaires {codeIRIS,{"fichier": chemin_csv,"statut": statut_csv}}. Je pourrai accéder à la valeur par dico_csv[codeIRIS]["fichier"] ou nom_dico[codeIRIS]["statut"]
         :rtype: dict[str, dict[str, str]]
         """
+
+        # TODO : je pourrai faire une fonction pour générer le dico dico_ouvrir_ou_traiter : ce sera plus facile à lire
         # A partir de codes_IRIS, je dois :
-        # créer un dico dico_ouvrir_ou_traiter{formation: sessions} (liste toutes les sessions où je dois soit ouvrir soit traiter)
-        # dico_ouvrir_ou_traiter{formation: sessions} (liste toutes les sessions où je dois soit ouvrir soit traiter)        
+        # créer un dico dico_ouvrir_ou_traiter{formation: sessions} (liste toutes les sessions que je dois soit ouvrir soit traiter)     
         dico_ouvrir_ou_traiter:dict[Formation_protocol, list[Session]] = {}
 
         # On crée le dictionnaire dico_ouvrir_ou_traiter
         if formation is not None:
             # On vérifie que les sessions sont créées dans formation sinon on les crée
-            codes_a_traiter = [code_IRIS for code_IRIS in codes_IRIS if code_IRIS not in formation.tuple_codesIRIS_de_sessions]
-            formation.ajout_sessions(codes_a_traiter)
+            codes_inexistants_dans_formation = [code_IRIS for code_IRIS in codes_IRIS if code_IRIS not in formation.tuple_codesIRIS_de_sessions]
+            formation.ajout_sessions(codes_inexistants_dans_formation)
             
-            # On crée le dico                
-            dico_ouvrir_ou_traiter[formation] = [session for session in formation.sessions if session.code_IRIS in codes_a_traiter]
+            # On crée le dico (liste toutes les sessions que je dois soit ouvrir soit traiter) 
+            #dico_ouvrir_ou_traiter[formation] = [session for session in formation.sessions if session.code_IRIS in codes_a_traiter]
+            dico_ouvrir_ou_traiter[formation] = [session for session in formation.sessions if session.code_IRIS]
             
         elif formation is None:  # Si formation n'est pas donné
             # On cherche les trigrammes dans IRIS sessions
@@ -97,7 +99,7 @@ class EvalStat_services:
                 formation = Formation_protocol.avec_ajout_sessions(trigramme_formation=trigramme_formation, codes_IRIS=tcodes_IRIS)
 
                 # On crée le dico                
-                dico_ouvrir_ou_traiter[formation] = [session for session in formation.sessions if session.code_IRIS in codes_a_traiter]
+                dico_ouvrir_ou_traiter[formation] = [session for session in formation.sessions if session.code_IRIS]
 
                     
         # On boucle sur les formations

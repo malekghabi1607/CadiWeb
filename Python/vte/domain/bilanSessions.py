@@ -82,6 +82,7 @@ class BilanSessions:
         self._annee: int = annee
         self._periode: str = periode  # ["Année", "1er semestre", "2nd semestre"]
         self._periode_pour_titre:str = ""  # f"Session {numSession} uniquement ({moisSession} {instance._annee})", f"{self._periode} {self._annee}"
+        self._codes_IRIS:Optional[int|Iterable[int]] = convertir_collection(codes_IRIS)
 
         # --- Variables de traitement ---
         self._statuts:dict[str, list] = {clef: [] for clef in EvalStat_session.mapping_statuts.values()}  # Dictionnaire qui liste les codes IRIS selon chaque statut
@@ -107,7 +108,7 @@ class BilanSessions:
         """
         # On évalue l'année et la période à partir des codes IRIS si besoin (sinon aucune vérification : on fait confiance à l'utilisateur)
         if annee is None:
-            annee, periode = get_iris(typeExport="Sessions").get_periode_depuis_codes_IRIS(codes_IRIS=codes_IRIS)
+            annee, periode = get_iris(typeExport="Sessions").get_periode_depuis_codes_IRIS(codes_IRIS=convertir_collection(codes_IRIS))
         
         # On initialise l'instance 
         instance = cls(formation=formation, annee=annee, periode=periode, codes_IRIS=codes_IRIS)
