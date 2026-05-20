@@ -1762,7 +1762,7 @@ class IRIS_sessions(IRIS_traite):
         
         On retourne :
            - un dataframe df_sessions_filtre à jour
-           - la liste des codes IRIS retenus (plus maintenant : pour l'avoir on peut faire df_filtre["Code IRIS"].tolist())
+           - la liste des codes IRIS retenus. (Sinon pour l'avoir on peut aussi faire df_filtre["Code IRIS"].tolist())
            - #la liste des codes IRIS exclus
         
         :param trigramme_formation: trigramme de la formation à filtrer

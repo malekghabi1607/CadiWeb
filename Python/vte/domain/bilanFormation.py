@@ -70,7 +70,7 @@ class BilanFormation:
         self._statuts:dict[str, list] = {clef: [] for clef in EvalStat_session.mapping_statuts.values()}  # Dictionnaire qui liste les codes IRIS selon chaque statut
 
     @classmethod   
-    def depuis_codesIRIS(cls, formation:Formation_protocol, codes_IRIS:int|Iterable[int], annee:Optional[int]=None, periode:str="Année") -> BilanFormation:
+    def depuis_codesIRIS(cls, formation:Formation_protocol, codes_IRIS:int|Iterable[int], annee:Optional[int]=None) -> BilanFormation:
         """
         Génère un bilan de formation à partir d'un ou plusieurs codes IRIS.
 
@@ -85,7 +85,7 @@ class BilanFormation:
         :return: Un objet bilan de formation de ce ou ces code(s) IRIS
         :rtype: BilanFormation
         """
-        # On évalue l'année et la période à partir des codes IRIS si besoin (sinon aucune vérification : on fait confiance à l'utilisateur)
+        # On évalue l'année à partir des codes IRIS si besoin (sinon aucune vérification : on fait confiance à l'utilisateur)
         if annee is None:
             annee, _ = get_iris(typeExport="Sessions").get_periode_depuis_codes_IRIS(codes_IRIS=codes_IRIS)
         
@@ -613,7 +613,7 @@ class BilanFormation_generateur_word(ABC):
         ligne_fdc = pd.DataFrame({
             'Source': ['FdC'],
             'Titre formation': [self._bilanFormation._formation.fdc.nom_formation], 
-            'Min participants': [self._bilanFormation._formation.fdc.min_participants], 
+            'Min participants': [self._bilanFormation._formation.fdc.nb_participants_min], 
             'Cible participants': [self._bilanFormation._formation.fdc.nb_participants_prevus], 
             'Max participants': "", #[self._bilanFormation.max_participants_fdc],
             'Dépassement autorisé': ""
@@ -727,7 +727,7 @@ class Bilan_V3(BilanFormation_generateur_word):
         
         #self._champs["min_participants_cea"] = self._bilanFormation._formation.fdc.min_participants_cea
         #self._champs["min_participants_ee"] = self._bilanFormation._formation.fdc.min_participants_ee
-        self._champs["min_participants"] = self._bilanFormation._formation.fdc.min_participants
+        self._champs["min_participants"] = self._bilanFormation._formation.fdc.nb_participants_min
 
         self._champs["prevus_participants"] = f"{self._bilanFormation._formation.fdc.nb_participants_prevus} pers."
         self._champs["max_participants"] = f"{self._bilanFormation.max_participants_fdc} pers."  # Prévu + dépass autorisé sur IRIS ou IRIS Sessions (Max. + Dépass. autorisé)
