@@ -1,5 +1,6 @@
-from vte.instn import *
+from vte.domain.bilanSessions import BilanSessions
 from vte.ihm_console import IHM_console
+from vte.utils import *
 
 from colorama import init
 init(autoreset=True)
@@ -10,19 +11,19 @@ MODE = "console"
 MENUS = {
     "Traiter bilans pour des sessions uniques (une seule session par bilan)": {
         "Un seul bilan à traiter par code IRIS (manuel)": {
-            "action": BilanSession.bilanUnique_parCodeIRIS,
+            "action": BilanSessions.bilanUnique_parCodeIRIS,
             "kwargs": {},
             "demander": []
         },
         "Plusieurs bilans à traiter par codes IRIS (manuel)": {
-            "action": BilanSession.plusieursBilans_parCodeIRIS,
+            "action": BilanSessions.plusieursBilans_parCodeIRIS,
             "kwargs": {},
             "demander": [],
             "indications":"Entrez les codes IRIS séparés par des virgules (ex. : 16411, 17343)"
         },
         "Plusieurs bilans à traiter par codes IRIS (depuis user_config.py)": {
             "action": chargement_config_demander_verif_utilisateur,
-            "kwargs": {"nom_variable": "liste_codes_IRIS", 'fonction_execution':BilanSession.plusieursBilans_parCodeIRIS_fichierConfig},
+            "kwargs": {"nom_variable": "liste_codes_IRIS", 'fonction_execution':BilanSessions.plusieursBilans_parCodeIRIS_fichierConfig},
             "demander": []
             #"indications":"Entrez les codes IRIS séparés par des virgules (ex. : 16411, 17343)"
         },
@@ -30,7 +31,7 @@ MENUS = {
 
     "Traiter pour une période entière (possiblement plusieurs sessions sur un bilan)": {
         "Période unique (manuel)": {
-            "action": BilanSession.bilanUnique_parPeriode,  # BilanSession.bilanUnique_parPeriode("948", 2024, "Année")
+            "action": BilanSessions.bilanUnique_parPeriode,  # BilanSession.bilanUnique_parPeriode("948", 2024, "Année")
             "kwargs": {},
             "demander": [],
             "indications":"codeFormation = trigramme IRIS en majuscule si besoin (ex. : TEL)\n"
@@ -39,7 +40,7 @@ MENUS = {
         },
         "Plusieurs périodes (depuis user_config.py)": {
             "action": chargement_config_demander_verif_utilisateur,
-            "kwargs": {"nom_variable": "liste_periodes", 'fonction_execution':BilanSession.plusieursBilans_parPeriode},
+            "kwargs": {"nom_variable": "liste_periodes", 'fonction_execution':BilanSessions.plusieursBilans_parPeriode},
             "demander": [],
             "indications":"Entrez les codes IRIS séparés par des virgules (ex. : 16411, 17343)"
         },
