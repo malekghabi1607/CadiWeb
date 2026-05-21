@@ -1,7 +1,9 @@
-from vte.instn import *
+from vte.services.iris_services import IRIS_services
 from vte.ihm_console import IHM_console
+from vte.utils.utils import *
 
 from colorama import init
+
 init(autoreset=True)
 
     
@@ -18,32 +20,32 @@ MODE = "console"
 depuis_config:bool = False
 MENUS = {
     "Tout traiter": {
-        "action": IRIS.concatener_exportsIRIS_plusieursTypes,
+        "action": IRIS_services.concatener_plusieursTypes,
         "kwargs": {"typesExports":("Sessions", "Formations", "Ventes", "Inscriptions")},
         "demander": ["depuis_config"],
         "indications":"Entrez :\n   - 0 pour sélection manuelle des fichiers (filedialog)\n   - 1 pour sélection automatique (emploi de config_extractsIRIS)"
     },
     
     "Traiter sessions (R04110)": {
-        "action": IRIS.concatener_exportsIRIS_plusieursTypes,
+        "action": IRIS_services.concatener_plusieursTypes,
         "kwargs": {"typesExports":"Sessions"},
         "demander": ["depuis_config"],
         "indications":"Entrez :\n   - 0 pour sélection manuelle des fichiers (filedialog)\n   - 1 pour sélection automatique (emploi de config_extractsIRIS)"
     },
     "Traiter Formations (R0304)": {
-        "action": IRIS.concatener_exportsIRIS_plusieursTypes,
+        "action": IRIS_services.concatener_plusieursTypes,
         "kwargs": {"typesExports":"Formations"},
         "demander": ["depuis_config"],
         "indications":"Entrez :\n   - 0 pour sélection manuelle des fichiers (filedialog)\n   - 1 pour sélection automatique (emploi de config_extractsIRIS)"
     },
     "Traiter Ventes (R04301)": {
-        "action": IRIS.concatener_exportsIRIS_plusieursTypes,
+        "action": IRIS_services.concatener_plusieursTypes,
         "kwargs": {"typesExports":"Ventes"},
         "demander": ["depuis_config"],
         "indications":"Entrez :\n   - 0 pour sélection manuelle des fichiers (filedialog)\n   - 1 pour sélection automatique (emploi de config_extractsIRIS)"
     },
     "Traiter Inscriptions (R04500)": {
-        "action": IRIS.concatener_exportsIRIS_plusieursTypes,
+        "action": IRIS_services.concatener_plusieursTypes,
         "kwargs": {"typesExports":"Inscriptions"},
         "demander": ["depuis_config"],
         "indications":"Entrez :\n   - 0 pour sélection manuelle des fichiers (filedialog)\n   - 1 pour sélection automatique (emploi de config_extractsIRIS)"
@@ -74,58 +76,6 @@ def main():
     ihm = IHM_console(MENUS)
     ihm.afficher_menu()
 
-
-
-
-
-
-### --------------------------------------------------------------------
-#  1 seul type d'export
-### --------------------------------------------------------------------
-# Test ConfigExportIRIS
-def test01():
-    print(IRIS._SESSIONS)  # OK
-
-# Concatener_exportsIRIS_typeUnique — chemin = str
-def test02():
-    IRIS.concatener_exportsIRIS_typeUnique(typeExport="Sessions", chemins_fichiersInput=r"R:\_Echanges\VTE\Prog\IRIS\Extracts originaux\R04110_Sessions-2025 au 2025.11.29.xlsx")
-
-# Concatener_exportsIRIS_typeUnique — Sans fichier input # TODO : faire avec 1 et plusieurs fichiers
-def test03():
-    IRIS.concatener_exportsIRIS_typeUnique(typeExport="Sessions")
-  
-# Concaténer avec changement colonnes dans le modèle 
-def test04():
-    IRIS.concatener_exportsIRIS_typeUnique(typeExport="Inscriptions", chemins_fichiersInput=r"H:\REFERENC\IRIS - rapports de synthese\R04500_Sessions-Inscriptions-filtre sur FC-2025 au 2025-11-03.xlsx")
-
-
-
-
-### --------------------------------------------------------------------
-#  Plusieurs types d'export
-### --------------------------------------------------------------------
-
-# Cas 1 seul demandé + filedialog
-def test05():
-    IRIS.concatener_exportsIRIS_plusieursTypes(typesExports="Sessions")
-
-# Cas 2 seul demandé + auto
-def test06():
-    IRIS.concatener_exportsIRIS_plusieursTypes(typesExports="Sessions", depuis_config=True)
-
-# Cas 3 demandés + filedialog
-def test07():
-    IRIS.concatener_exportsIRIS_plusieursTypes(typesExports=("Sessions", "Formations"))
-
-    # === Lancer TravauxFichiersIRIS pour plusieurs types d'export ===
-    #mettreAJourTousLesExportsIRIS_auto(("Sessions", "Formations", "Ventes", "Inscriptions"))
-    #mettreAJourTousLesExportsIRIS_auto(("Sessions", "Formations"))
-    #IRIS.mettreAJourTousLesExportsIRIS_fileDialog(("Sessions", "Inscriptions"))  # OK
-
-
-
-
-    
 
 if __name__ == "__main__":
     #test07()
