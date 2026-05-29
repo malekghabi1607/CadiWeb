@@ -1,0 +1,42 @@
+@startuml
+left to right direction
+
+actor "Agent INSTN" as Agent
+actor "Responsable pedagogique" as Responsable
+
+rectangle "Module Bilans" {
+  usecase "Saisir le trigramme\nde formation" as UC_TRIG
+  usecase "Saisir l'annee\net la periode" as UC_PERIOD
+  usecase "Choisir le type\nde bilan" as UC_TYPE
+  usecase "Verifier les donnees\nnecessaires" as UC_CHECK
+  usecase "Traiter les evaluations\nassociees" as UC_EVAL
+  usecase "Charger les donnees\nIRIS" as UC_IRIS
+  usecase "Charger FdC\net Specs" as UC_DOCS
+  usecase "Generer le document\nWord" as UC_WORD
+  usecase "Telecharger ou ouvrir\nle bilan" as UC_DOWNLOAD
+  usecase "Afficher un message\nde resultat" as UC_STATUS
+}
+
+Agent --> UC_TRIG
+Agent --> UC_PERIOD
+Agent --> UC_TYPE
+Responsable --> UC_TRIG
+Responsable --> UC_PERIOD
+Responsable --> UC_TYPE
+
+UC_TRIG ..> UC_CHECK : <<include>>
+UC_PERIOD ..> UC_CHECK : <<include>>
+UC_TYPE ..> UC_CHECK : <<include>>
+
+UC_CHECK ..> UC_EVAL : <<include>>
+UC_CHECK ..> UC_IRIS : <<include>>
+UC_CHECK ..> UC_DOCS : <<include>>
+
+UC_EVAL ..> UC_WORD : <<include>>
+UC_IRIS ..> UC_WORD : <<include>>
+UC_DOCS ..> UC_WORD : <<include>>
+
+UC_WORD ..> UC_DOWNLOAD : <<include>>
+UC_WORD ..> UC_STATUS : <<include>>
+
+@enduml

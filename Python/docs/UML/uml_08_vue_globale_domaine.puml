@@ -1,0 +1,67 @@
+@startuml
+title Diagramme 8 - Vue globale du domaine
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+top to bottom direction
+
+class Formation
+class Session
+class EvalStat
+class EvalStat_formation
+class EvalStat_session
+class FdC
+class FdC_Lecteur
+class FdC_Lecteur_V6_1
+class FdC_Lecteur_V1_4
+class FdC_Lecteur_Defaut
+class Specs
+class BilanSessions
+class BilanFormation
+class BilanSessions_generateur_word
+class BilanFormation_generateur_word
+class Bilan_V3_Sessions
+class Bilan_V3_Formation
+class FichierExcel
+class FichierWord
+class IRIS
+class IRIS_natif
+class IRIS_traite
+class IRIS_sessions
+class IRIS_ventes
+
+Formation *-- Session
+Formation *-- EvalStat_formation
+Formation *-- FdC
+Formation *-- Specs
+Formation *-- BilanSessions
+Formation *-- BilanFormation
+
+Session *-- EvalStat_session
+EvalStat_formation --|> EvalStat
+EvalStat_session --|> EvalStat
+
+EvalStat --> FichierExcel
+BilanSessions --> FichierWord
+BilanFormation --> FichierWord
+
+FdC *-- FdC_Lecteur
+FdC_Lecteur_V6_1 --|> FdC_Lecteur
+FdC_Lecteur_V1_4 --|> FdC_Lecteur
+FdC_Lecteur_Defaut --|> FdC_Lecteur
+
+Bilan_V3_Sessions --|> BilanSessions_generateur_word
+Bilan_V3_Formation --|> BilanFormation_generateur_word
+BilanSessions --> BilanSessions_generateur_word
+BilanFormation --> BilanFormation_generateur_word
+
+IRIS_natif --|> IRIS
+IRIS_traite --|> IRIS
+IRIS_sessions --|> IRIS_traite
+IRIS_ventes --|> IRIS_traite
+
+EvalStat --> IRIS_sessions : lit sessions
+BilanSessions --> IRIS_sessions : lit sessions
+BilanFormation --> IRIS_sessions : lit sessions
+BilanFormation --> IRIS_ventes : lit ventes
+
+@enduml

@@ -1,0 +1,37 @@
+@startuml
+left to right direction
+
+actor "Agent INSTN" as Agent
+actor "Responsable pedagogique" as Responsable
+actor "Administrateur fonctionnel" as Admin
+
+rectangle "Application CADI Web" {
+  usecase "Traiter les evaluations\nEvalStat" as UC_EVAL
+  usecase "Traiter les exports\nIRIS" as UC_IRIS
+  usecase "Generer un bilan" as UC_BILAN
+  usecase "Gerer les comptes\net parametres" as UC_PARAM
+  usecase "Utiliser la\nmessagerie" as UC_MAIL
+  usecase "Telecharger les\nfichiers produits" as UC_DOWNLOAD
+  usecase "Consulter les messages\nde succes ou d'erreur" as UC_STATUS
+}
+
+Agent --> UC_EVAL
+Agent --> UC_IRIS
+Agent --> UC_BILAN
+Agent --> UC_MAIL
+
+Responsable --> UC_BILAN
+
+Admin --> UC_PARAM
+Admin --> UC_MAIL
+
+UC_EVAL ..> UC_DOWNLOAD : <<include>>
+UC_BILAN ..> UC_DOWNLOAD : <<include>>
+
+UC_EVAL ..> UC_STATUS : <<include>>
+UC_IRIS ..> UC_STATUS : <<include>>
+UC_BILAN ..> UC_STATUS : <<include>>
+UC_PARAM ..> UC_STATUS : <<include>>
+UC_MAIL ..> UC_STATUS : <<include>>
+
+@enduml

@@ -1,0 +1,232 @@
+@startuml
+title Diagramme 1 - Classes du domaine
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+
+class Formation {
+  - _trigramme_formation : str
+  - _eval : EvalStat_formation
+  - _fdc : FdC
+  - _specs : Specs
+  - _sessions : list<Session>
+  - _bilans_sessions : dict
+  - _bilans_formation : dict
+  --
+  + __init__(trigramme_formation)
+  + avec_ajout_sessions() : Formation
+  + avec_ouverture_ou_creation_evalStat_formation() : Formation
+  + pour_traitement_bilanSessions_depuis_codesIRIS() : Formation
+  + pour_traitement_bilanSessions_depuis_periode() : Formation
+  + pour_traitement_bilanFormation_depuis_annee() : Formation
+  + avec_creation_session_et_ouverture_ou_traitement_EvalStat() : Formation
+  + ajout_sessions()
+  + ouvrir_ou_creer_eval_formation()
+  + ouvrir_ou_traiter_eval_sessions()
+  + ouvrir_fdc()
+  + ouvrir_specs()
+  + ajout_bilan_sessions_avec_traitement()
+  + ajout_bilan_formation_avec_traitement()
+  + get_session_par_codeIRIS() : Session
+  + get_codesIRIS_par_statutBilan() : list
+  + get_codesIRIS_par_statutEvalStat() : list
+  + trigramme_formation : str
+  + sessions : list<Session>
+  + tuple_codesIRIS_de_sessions : tuple
+  + eval : EvalStat_formation
+  + fdc : FdC
+  + specs : Specs
+}
+
+class Session {
+  - _formation : Formation_protocol
+  - _code_IRIS : int
+  - _eval : EvalStat_session
+  --
+  + __init__(formation, code_IRIS)
+  + code_IRIS : int
+  + trigramme_formation : str
+  + eval : EvalStat_session
+  + eval_formation : EvalStat_formation
+  + avec_ouverture_ou_traitement_evalStat() : Session
+}
+
+class EvalStat {
+  - _fe : FichierExcel
+  --
+  + __init__()
+  + df_csv : DataFrame
+  + df_stagiaires : DataFrame
+  + criteres_sans_note_standard : list
+  + fe : FichierExcel
+  + chemin_fe : Path
+  + iris_sessions : IRIS_sessions
+  + df_IRIS_sessions : DataFrame
+  # _ecrit_df_et_sauve()
+}
+
+class EvalStat_formation {
+  - _formation : Formation_protocol
+  - _df_initial_hash : str
+  - _stats_stagiaires : dict
+  --
+  + __init__(formation)
+  + avec_ouverture_ou_creation() : EvalStat_formation
+  - _ouvrir_ou_creer_eval_formation()
+  + ecrit_et_sauve_df_siModif()
+  + verifier_presence_code_IRIS_dans_eval() : bool
+  + calculer_stats_criteres()
+  + chemin_csv_depuis_code_IRIS() : Path
+  + liste_codesIRIS_avec_CSV_presents_et_non_vides() : list
+  + df_stagiaires_filtre_statsCSV() : DataFrame
+  + construire_chemin_eval_formation() : Path
+  + get_stat()
+  + get_stat_avec_format() : str
+  + verifier_traitement_evalStat_session()
+  + trigramme_formation : str
+  + stats_stagiaires : dict
+  + chemin_eval_formation : Path
+}
+
+class EvalStat_session {
+  - _session : Session_protocol
+  - _chemin_csv : Path
+  - _statut : str
+  - mapping_statuts : dict
+  --
+  + __init__(session, statut)
+  + avec_ouverture_ou_traitement() : EvalStat_session
+  + avec_traitement() : EvalStat_session
+  - _charger_csv_stagiaire() : DataFrame
+  - _traiter_df_csv()
+  - _traiter_df_stagiaires()
+  - _maj_dataframes_eval_formation()
+  + verification_traitement_eval() : tuple
+  + traiter_eval()
+  + ouvrir_eval()
+  + ouvrir_ou_traiter_eval()
+  + construire_dictionnaire_trigrammeFormation_codeIRIS_cheminsCSV_depuis_iterableCSV() : dict
+  + construire_dictionnaire_trigrammeFormation_codeIRIS_cheminsCSV_depuis_iterableCodesIRIS() : dict
+  + construire_chemin_repertoire_csv() : Path
+  + filedialog_csv() : Path
+  + statut : str
+  + chemin_csv : Path
+  + chemin_excel : Path
+  + chemin_repertoire_csv : Path
+  + trigramme_formation : str
+  + code_IRIS : int
+  + eval_formation : EvalStat_formation
+}
+
+class BilanSessions {
+  - _formation : Formation_protocol
+  - _annee : int
+  - _periode : str
+  - _periode_pour_titre : str
+  - _statuts : dict
+  - _codes_IRIS : list
+  --
+  + __init__(formation, annee, periode, codes_IRIS)
+  + depuis_codesIRIS() : BilanSessions
+  + depuis_periode() : BilanSessions
+  + verifier_traitement_bilan() : bool
+  + construire_chemin_word_bilan_sessions_output() : Path
+  + annee : int
+  + periode : str
+  + periode_pour_titre : str
+  + codes_IRIS : list
+  + code_IRIS : int
+  + chemin_word_bilan_sessions_output : Path
+  + liste_codesIRIS_exclus_totalement : list
+  + liste_codesIRIS_pour_enTete : list
+  + liste_codesIRIS_pour_statsCSV : list
+  + liste_codesIRIS_avec_pb_CSV : list
+  + trigramme_formation : str
+  + eval_formation : EvalStat_formation
+  + iris_sessions : IRIS_sessions
+  + intitule_formation : str
+  - _traiter()
+  - _construire_word()
+  - _envoyer_mail_chef_unite()
+  - _get_generateur_word()
+}
+
+class BilanFormation {
+  - _formation : Formation_protocol
+  - _annee : int
+  - _codes_IRIS : list
+  - _statuts : dict
+  --
+  + __init__(formation, annee, codes_IRIS)
+  + depuis_codesIRIS() : BilanFormation
+  + depuis_annee() : BilanFormation
+  + verifier_traitement_bilan() : bool
+  + construire_chemin_word_bilan_formation_output() : Path
+  + creer_texte_rp() : str
+  + creer_texte_nb_sessions() : str
+  + creer_texte_nb_apprenants() : str
+  + annee : int
+  + annee_nm1 : int
+  + annee_np1 : int
+  + codes_IRIS : list
+  + chemin_word_bilan_formation_output : Path
+  + trigramme_formation : str
+  + eval_formation : EvalStat_formation
+  + iris_sessions : IRIS_sessions
+  + iris_ventes : IRIS_ventes
+  + intitule_formation : str
+  + prix_n_str : str
+  + prix_nm1_str : str
+  - _traiter()
+  - _construire_word()
+  - _get_generateur_word()
+}
+
+class FdC {
+  - _lecteur : FdC_Lecteur
+  --
+  + __init__(lecteur)
+  + ouvrir() : FdC
+  + __str__() : str
+  + max_participants() : int
+  + chemin : Path
+  + __getattr__()
+  - _resoudre_chemin() : Path
+}
+
+class Specs {
+  - _formation : Formation_protocol
+  - _chemin : Path
+  --
+  + __init__(formation, chemin)
+  + depuis_chemin() : Specs
+  - _choisir_specs() : Path
+  + construire_chemin_repertoire_specs() : Path
+  + trigramme_formation : str
+  + chemin : Path
+  + date_derniere_modification : datetime
+  + date_derniere_modification_str : str
+  + dossier_plan_classement() : Path
+}
+
+Formation "1" *-- "0..*" Session : _sessions
+Formation "1" *-- "0..1" EvalStat_formation : _eval
+Formation "1" *-- "0..1" FdC : _fdc
+Formation "1" *-- "0..1" Specs : _specs
+Formation "1" *-- "0..*" BilanSessions : _bilans_sessions
+Formation "1" *-- "0..*" BilanFormation : _bilans_formation
+
+Session "1" *-- "0..1" EvalStat_session : _eval
+Session --> Formation : protocol
+
+EvalStat_formation --|> EvalStat
+EvalStat_session --|> EvalStat
+
+EvalStat_session --> EvalStat_formation : eval_formation
+EvalStat_formation --> Formation : protocol
+EvalStat_session --> Session : protocol
+BilanSessions --> Formation : protocol
+BilanFormation --> Formation : protocol
+FdC --> FdC_Lecteur : facade
+Specs --> Formation : protocol
+
+@enduml

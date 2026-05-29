@@ -1,0 +1,46 @@
+@startuml
+title Diagramme 3 - Sequence EvalStat
+
+actor Utilisateur as U
+participant "Interface Web\nEvalStat" as UI
+participant "API / Service\nEvalStat" as API
+participant Formation as F
+participant Session as S
+participant EvalStat_session as ES
+participant EvalStat_formation as EF
+participant FichierExcel as FE
+database "Fiches CSV" as CSV
+
+U -> UI : saisir trigramme formation
+U -> UI : saisir code IRIS
+U -> UI : selectionner fiches d'evaluation
+U -> UI : lancer le traitement
+UI -> API : POST /api/evalstat/traiter
+API -> F : avec_ajout_sessions(trig, codes_IRIS)
+F -> S : new Session(formation, code_IRIS)
+API -> F : ouvrir_ou_creer_eval_formation()
+F -> EF : avec_ouverture_ou_creation(formation)
+EF -> FE : depuis_fichier() ou depuis_modele()
+
+loop pour chaque session
+  API -> CSV : recuperer chemin CSV
+  F -> S : get_session_par_codeIRIS(code_IRIS)
+  S -> ES : avec_ouverture_ou_traitement(chemin_csv)
+  alt evaluation deja traitee
+    ES -> ES : ouvrir_eval()
+  else evaluation non traitee
+    ES -> ES : traiter_eval(chemin_csv)
+    ES -> FE : depuis_modele()
+    ES -> ES : _traiter_df_csv()
+    ES -> ES : _traiter_df_stagiaires()
+    ES -> EF : _maj_dataframes_eval_formation()
+  end
+end
+
+API -> EF : calculer_stats_criteres()
+API -> EF : ecrit_et_sauve_df_siModif()
+EF -> FE : save() + close()
+API --> UI : fichier Excel + message resultat
+UI --> U : afficher resultat
+
+@enduml

@@ -1,0 +1,27 @@
+@startuml
+left to right direction
+
+actor "Agent INSTN" as Agent
+actor "Responsable pedagogique" as Responsable
+
+rectangle "Module FdC" {
+  usecase "Selectionner une fiche\nde couts Excel" as UC_SELECT
+  usecase "Extraire les donnees\nprincipales" as UC_EXTRACT
+  usecase "Afficher les informations\nde la formation" as UC_DISPLAY
+  usecase "Signaler les champs\nmanquants" as UC_ERROR
+}
+
+Agent --> UC_SELECT
+Responsable --> UC_SELECT
+
+UC_SELECT ..> UC_EXTRACT : <<include>>
+UC_EXTRACT ..> UC_DISPLAY : <<include>>
+UC_EXTRACT ..> UC_ERROR : <<extend>>
+
+note right of UC_EXTRACT
+  La detection de la version
+  et le choix du lecteur
+  sont automatiques.
+end note
+
+@enduml

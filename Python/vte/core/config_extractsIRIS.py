@@ -1,9 +1,16 @@
 """
 Mode op
 
-Permet de lister les chemins des CSV à concaténer dans le fichier global
+Permet de lister les chemins des fichiers IRIS à concaténer dans le fichier global.
+Les sessions et formations restent renseignées manuellement.
+Les ventes et inscriptions peuvent être générées automatiquement depuis le dossier
+des extracts originaux après la mise à jour GED.
 
 """
+
+from vte.core.config import REPERTOIRE_EXTRACT_IRIS_LOCAL
+from vte.services.iris_dumps_services import construire_liste_fichiers_type
+
 
 _tSessions = (
     'R04110_Sessions-2011 à 2014 FINAL.xlsx',
@@ -19,30 +26,23 @@ _tSessions = (
     'R04110_Sessions-2024 FINAL.xlsx',
     'R04110_Sessions-2025 FINAL.xlsx',
     'R04110_Sessions-2026 au 2026.05.20.xlsx',
-    )
+)
 
 _tFormations = (
-    "R0304_Ref_Formation-Listedesformations-2026.05.20.xlsx", )
+    "R0304_Ref_Formation-Listedesformations-2026.05.20.xlsx",
+)
 
-_tVentes = (
-    'R04301_Sessions-Ventes-FC2020 FINAL.xlsx',
-    'R04301_Sessions-Ventes-FC2021 FINAL.xlsx',
-    'R04301_Sessions-Ventes-FC2022 FINAL.xlsx',
-    'R04301_Sessions-Ventes-FC2023 FINAL.xlsx',
-    'R04301_Sessions-Ventes-FC2024 FINAL.xlsx',
-    'R04301_Sessions-Ventes-FC2025 FINAL.xlsx',
-    'R04301_Sessions-Ventes-filtre sur FC2026 au 2026-04-01 LG.xlsx',
-    )
-    
-_tInscriptions = (
-    'R04500_Sessions-Inscriptions-FC2020 FINAL.xlsx',
-    'R04500_Sessions-Inscriptions-FC2021 FINAL.xlsx',
-    'R04500_Sessions-Inscriptions-FC2022 FINAL.xlsx',
-    'R04500_Sessions-Inscriptions-FC2023 FINAL.xlsx',
-    'R04500_Sessions-Inscriptions-FC2024 FINAL.xlsx',
-    'R04500_Sessions-Inscriptions-FC2025 FINAL.xlsx',
-    'R04500_Sessions-Inscriptions-filtre sur FC2026 au 2026-04-01.xlsx',
-    )
+_tVentes = construire_liste_fichiers_type(
+    REPERTOIRE_EXTRACT_IRIS_LOCAL,
+    "R04301",
+)
+
+_tInscriptions = construire_liste_fichiers_type(
+    REPERTOIRE_EXTRACT_IRIS_LOCAL,
+    "R04500",
+)
+
+
 
 _colonnes_modele_inscriptions = [
     "N° Session", 

@@ -1,0 +1,55 @@
+@startsalt
+title Wireframe 02 - Module EvalStat
+
+{
+{+
+  CADI Web > EvalStat | Agent INSTN | Pret
+}
+{
+  {T
+  + Accueil
+  + EvalStat
+  + IRIS
+  + Bilans
+  + Fiches de couts
+  + Messagerie
+  + Parametres
+  }
+  |
+  {
+    {^"Traitement des evaluations stagiaires"}
+    {
+      {+
+        "Informations session"
+        Trigramme formation : [ ACI        ]
+        Code IRIS : [ 948       ]
+        [Selectionner les fiches d'evaluation]
+      }
+      |
+      {+
+        "Fichiers selectionnes"
+        Evaluation-Stagiaires-Global-948.xlsx
+        Evaluation-Stagiaires-S1-948.xlsx
+        [Verifier les fichiers]
+      }
+    }
+    {
+      {+
+        "Traitement"
+        [Lancer EvalStat] [Reinitialiser]
+      }
+      |
+      {+
+        "Resultat"
+        Statut : succes
+        Fichiers lus : 2
+        Fiches traitees : 38
+        Excel mis a jour : ACI_Evaluation.xlsx
+        [Ouvrir le fichier resultat]
+      }
+    }
+  }
+}
+}
+
+@endsalt

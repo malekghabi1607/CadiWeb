@@ -1,0 +1,31 @@
+@startuml
+left to right direction
+
+actor "Agent INSTN" as Agent
+
+rectangle "Module EvalStat" {
+  usecase "Saisir le trigramme\nde formation" as UC_TRIG
+  usecase "Saisir le code\nIRIS" as UC_IRIS
+  usecase "Selectionner les\nfiches d'evaluation" as UC_SELECT
+  usecase "Verifier le format\ndes fichiers" as UC_CHECK
+  usecase "Lancer le traitement\nEvalStat" as UC_RUN
+  usecase "Creer ou mettre a jour\nle fichier Excel formation" as UC_EXCEL
+  usecase "Telecharger le fichier\nExcel genere" as UC_DOWNLOAD
+  usecase "Afficher un message\nde resultat" as UC_STATUS
+}
+
+Agent --> UC_TRIG
+Agent --> UC_IRIS
+Agent --> UC_SELECT
+Agent --> UC_RUN
+Agent --> UC_DOWNLOAD
+
+UC_TRIG ..> UC_RUN : <<include>>
+UC_IRIS ..> UC_RUN : <<include>>
+UC_SELECT ..> UC_CHECK : <<include>>
+UC_RUN ..> UC_CHECK : <<include>>
+UC_RUN ..> UC_EXCEL : <<include>>
+UC_EXCEL ..> UC_DOWNLOAD : <<include>>
+UC_RUN ..> UC_STATUS : <<include>>
+
+@enduml

@@ -1,0 +1,59 @@
+@startsalt
+title Wireframe 04 - Fiches de couts et Parametres
+
+{
+{+
+  CADI Web > Fiches de couts | Administrateur fonctionnel | Pret
+}
+{
+  {T
+  + Accueil
+  + EvalStat
+  + IRIS
+  + Bilans
+  + Fiches de couts
+  + Messagerie
+  + Parametres
+  }
+  |
+  {
+    {^"Fiche de couts"}
+    {
+      {+
+        "Lecture"
+        [Selectionner une fiche de couts Excel]
+        Fichier : FDC_ACI_2026.xlsx
+        [Lire la fiche]
+      }
+      |
+      {+
+        "Resume"
+        Formation : ACI
+        Prix : 1 250 EUR
+        Duree : 3 jours
+        Avertissements : 0
+      }
+    }
+    --
+    {^"Parametres"}
+    {
+      {+
+        "Chemins et modeles"
+        Repertoire IRIS : [ C:/.../IRIS ]
+        Repertoire bilans : [ C:/.../Bilans ]
+        Modele Word bilan : disponible
+        [Tester les chemins] [Enregistrer]
+      }
+      |
+      {+
+        "Comptes et roles"
+        Agent INSTN : actif
+        Responsable pedagogique : actif
+        Administrateur fonctionnel : actif
+      }
+    }
+  }
+}
+}
+
+@endsalt

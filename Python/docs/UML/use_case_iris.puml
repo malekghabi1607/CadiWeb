@@ -1,0 +1,25 @@
+@startuml
+left to right direction
+
+actor "Agent INSTN" as Agent
+
+rectangle "Module IRIS" {
+  usecase "Importer un export\nIRIS natif" as UC_IMPORT
+  usecase "Choisir le type\nd'export" as UC_TYPE
+  usecase "Verifier la structure\ndu fichier" as UC_CHECK
+  usecase "Lancer le traitement\nIRIS" as UC_RUN
+  usecase "Produire un fichier\nIRIS traite" as UC_OUTPUT
+  usecase "Afficher un message\nde resultat" as UC_STATUS
+}
+
+Agent --> UC_IMPORT
+Agent --> UC_TYPE
+Agent --> UC_RUN
+
+UC_IMPORT ..> UC_CHECK : <<include>>
+UC_TYPE ..> UC_RUN : <<include>>
+UC_RUN ..> UC_CHECK : <<include>>
+UC_RUN ..> UC_OUTPUT : <<include>>
+UC_RUN ..> UC_STATUS : <<include>>
+
+@enduml

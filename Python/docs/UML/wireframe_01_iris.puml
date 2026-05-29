@@ -1,0 +1,61 @@
+@startsalt
+title Wireframe 01 - Module IRIS
+
+{
+{+
+  CADI Web > IRIS | Agent INSTN | Aucun traitement en cours
+}
+{
+  {T
+  + Accueil
+  + EvalStat
+  + IRIS
+  + Bilans
+  + Fiches de couts
+  + Messagerie
+  + Parametres
+  }
+  |
+  {
+    {^"Traitement des exports IRIS"}
+    {
+      {+
+        "Parametres de l'export"
+        Type d'export
+        ( ) Sessions
+        ( ) Formations
+        ( ) Ventes
+        ( ) Inscriptions
+        [Selectionner un fichier IRIS natif]
+        Fichier : R04110_Sessions-2026.xlsx
+      }
+      |
+      {+
+        "Verification"
+        Structure du fichier : en attente
+        Onglet attendu : Data
+        Modele Excel : detecte
+        Colonnes obligatoires : en attente
+        [Verifier la structure]
+      }
+    }
+    {
+      {+
+        "Execution"
+        [Lancer le traitement IRIS] [Reinitialiser]
+        Progression : [==========          ] 50%
+      }
+      |
+      {+
+        "Resultat"
+        Statut : fichier traite pret
+        Lignes lues : 12 430
+        Lignes conservees : 12 410
+        Sortie : Extracts complets/R04110_COMplet.xlsx
+      }
+    }
+  }
+}
+}
+
+@endsalt

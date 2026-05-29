@@ -1,0 +1,50 @@
+@startsalt
+title Wireframe 00 - Tableau de bord CADI Web
+
+{
+{+
+  CADI Web | Agent INSTN | Traitement pret
+}
+{
+  {T
+  + Accueil
+  + EvalStat
+  + IRIS
+  + Bilans
+  + Fiches de couts
+  + Messagerie
+  + Parametres
+  }
+  |
+  {
+    {^"Accueil"}
+    {
+      {+
+        "Derniers traitements"
+        [Succes] EvalStat - ACI / 948
+        [Avertissement] IRIS - Inscriptions
+        [Succes] Bilan sessions - FC2025
+      }
+      |
+      {+
+        "Raccourcis metier"
+        [Traiter evaluations]
+        [Traiter exports IRIS]
+        [Generer un bilan]
+        [Lire fiche de couts]
+      }
+    }
+    {
+      {+
+        "Etat des sources"
+        EvalStat : disponible
+        IRIS : fichier recent detecte
+        Modeles Word : disponibles
+        Chemins reseau : a verifier
+      }
+    }
+  }
+}
+}
+
+@endsalt

@@ -1,0 +1,277 @@
+\documentclass[11pt,a4paper]{report}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\usepackage[table]{xcolor}
+\usepackage{graphicx}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{tocloft}
+\usepackage{lastpage}
+\usepackage[hidelinks]{hyperref}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+
+\geometry{margin=2.5cm}
+\definecolor{orangeil}{RGB}{230,120,20}
+\definecolor{tablehead}{RGB}{245,226,204}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\renewcommand{\arraystretch}{1.18}
+\setlist[itemize]{leftmargin=1.2cm}
+\setlist[enumerate]{leftmargin=1.2cm}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[C]{\textcolor{orangeil}{Rapport de stage CADI}}
+\fancyfoot[C]{\thepage\ /\ \pageref{LastPage}}
+\titleformat{\chapter}[block]{\Huge\bfseries\color{orangeil}}{\thechapter.}{10pt}{}
+\titleformat{\section}{\Large\bfseries\color{orangeil}}{\thesection}{8pt}{}
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{8pt}{}
+
+\begin{document}
+
+\begin{titlepage}
+\begin{center}
+\vspace*{0.5cm}
+\begin{minipage}{0.45\textwidth}
+\IfFileExists{logo-cea.png}{\includegraphics[height=1.5cm]{logo-cea.png}}{}
+\end{minipage}
+\hfill
+\begin{minipage}{0.45\textwidth}
+\raggedleft
+\IfFileExists{logo-instn.png}{\includegraphics[height=1.5cm]{logo-instn.png}}{}
+\end{minipage}
+
+\vspace{2cm}
+{\Huge \bfseries Rapport de stage \par}
+\vspace{0.4cm}
+{\Large Refonte et documentation de l'application CADI Web \par}
+\vspace{1cm}
+{\large CEA / INSTN \par}
+{\large \today \par}
+\vspace{2cm}
+\begin{tabular}{L{6cm} L{6cm}}
+\textbf{Stagiaire} & \textbf{Encadrant} \\
+Malek GHABI & TESTARD Vincent \\
+\end{tabular}
+\vfill
+{\small Rapport de synthese du travail realise autour de CADI et de sa documentation.}
+\end{center}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\chapter{Introduction}
+
+Ce rapport presente le travail realise dans le cadre de la refonte et de la documentation de l'application CADI. Le projet concerne un outil interne utilise pour faciliter le suivi des formations, le traitement des evaluations, l'exploitation d'exports IRIS, la lecture des fiches de couts et la generation de bilans.
+
+Le besoin principal etait de rendre plus clair un existant technique deja riche, puis de preparer une interface web permettant d'utiliser les traitements sans passer directement par des scripts Python ou des manipulations manuelles complexes.
+
+\chapter{Contexte du stage}
+
+\section{Environnement}
+
+Le stage s'est deroule dans le contexte du CEA / INSTN. L'INSTN gere des activites de formation et doit produire plusieurs documents de suivi : evaluations stagiaires, bilans de sessions, bilans de formation, documents issus de fiches de couts et informations provenant d'exports IRIS.
+
+Ces documents reposent sur des fichiers Excel, Word, CSV et sur des donnees provenant d'outils internes. La qualite du traitement depend donc fortement de la structure des fichiers, de la fiabilite des chemins reseau et de la coherence des donnees.
+
+\section{Application CADI}
+
+CADI est une application interne dont le coeur metier est developpe en Python. Le code existant contient une librairie \texttt{vte/} qui regroupe les principales classes et services :
+
+\begin{itemize}
+  \item \texttt{Formation} et \texttt{Session} pour representer les formations et les sessions ;
+  \item \texttt{EvalStat} pour le traitement des evaluations ;
+  \item \texttt{IRIS} pour la preparation des exports ;
+  \item \texttt{BilanSessions} et \texttt{BilanFormation} pour la production de documents ;
+  \item \texttt{FdC} pour la lecture des fiches de couts ;
+  \item des classes techniques pour Excel, Word et la configuration.
+\end{itemize}
+
+\section{Problematique}
+
+Le projet posait plusieurs questions :
+
+\begin{itemize}
+  \item comment comprendre rapidement une base Python existante ;
+  \item comment documenter les modules sans modifier leur logique metier ;
+  \item comment transformer des traitements locaux en fonctionnalites web ;
+  \item comment presenter les cas d'utilisation et les flux de maniere claire ;
+  \item comment produire des documents PDF propres et exploitables.
+\end{itemize}
+
+\chapter{Objectifs du travail}
+
+\section{Objectif general}
+
+L'objectif general etait de preparer la modernisation de CADI en produisant une documentation claire et une vision fonctionnelle de l'application web cible. Il fallait identifier les modules existants, comprendre leurs responsabilites, formaliser les usages et decrire les scenarios attendus.
+
+\section{Objectifs detailles}
+
+\begin{itemize}
+  \item analyser les fichiers Python du domaine metier ;
+  \item identifier les classes, les attributs et les methodes importantes ;
+  \item produire des diagrammes de classes, de sequence et de cas d'utilisation ;
+  \item rediger un cahier des charges ;
+  \item rediger des specifications fonctionnelles ;
+  \item produire un rapport de stage coherent ;
+  \item compiler les documents en PDF.
+\end{itemize}
+
+\chapter{Analyse de l'existant}
+
+\section{Structure metier}
+
+L'analyse du code a montre une separation entre le domaine, les services et l'infrastructure. Les classes du domaine portent les concepts principaux : formation, session, evaluation, bilan, fiche de couts et export IRIS. Les services orchestrent certains traitements, tandis que l'infrastructure gere les fichiers Excel, Word et les chemins de configuration.
+
+\section{Module EvalStat}
+
+Le module EvalStat traite les evaluations de stagiaires. Il s'appuie sur un trigramme de formation, un code IRIS et des fichiers d'evaluation. Le systeme distingue l'evaluation d'une session et l'evaluation globale de la formation. Une session peut donc etre traitee individuellement, puis ses resultats sont consolides dans le fichier de formation.
+
+\section{Module IRIS}
+
+Le module IRIS transforme des exports natifs en fichiers exploitables. Il gere plusieurs types d'exports : sessions, formations, ventes et inscriptions. Chaque type possede sa propre configuration, ce qui permet d'adapter les colonnes, les onglets, les modeles et les fichiers produits.
+
+\section{Module Bilans}
+
+Le module Bilans produit des documents de synthese. Le bilan de sessions s'interesse a une periode ou a une liste de codes IRIS. Le bilan de formation se concentre sur une annee et rassemble davantage d'informations : evaluations, ventes IRIS, fiche de couts et specifications.
+
+\section{Module Fiches de couts}
+
+Le module FdC lit une fiche de couts Excel. La logique du code repose sur un principe de facade et de lecteurs specialises. La classe principale masque la complexite et delegue la lecture a un lecteur compatible avec la version de la fiche.
+
+\chapter{Travail realise}
+
+\section{Documentation fonctionnelle}
+
+Un cahier des charges et des specifications fonctionnelles ont ete rediges. Ces documents decrivent les besoins, les acteurs, les modules et les comportements attendus de l'application web. Un effort particulier a ete fait pour distinguer les actions utilisateur des traitements automatiques.
+
+Par exemple, dans le module Fiches de couts, l'utilisateur selectionne seulement la fiche. La detection de version et le choix du lecteur sont automatiques. De meme, dans le module Bilans, le trigramme, l'annee ou la periode et le type de bilan sont places au meme niveau, car ce sont les informations de depart du traitement.
+
+\section{Diagrammes UML}
+
+Des diagrammes UML ont ete produits avec PlantUML. Ils couvrent :
+
+\begin{itemize}
+  \item les cas d'utilisation generaux ;
+  \item les cas d'utilisation par scenario ;
+  \item les classes du domaine ;
+  \item les classes d'infrastructure ;
+  \item les sequences de traitement EvalStat, IRIS et Bilans ;
+  \item l'architecture globale de l'application.
+\end{itemize}
+
+Ces diagrammes facilitent la lecture du projet pour une personne qui ne connait pas encore le code. Ils permettent aussi de verifier que les modules sont bien separes et que les responsabilites principales sont identifiees.
+
+\section{Reformulation des scenarios}
+
+Les scenarios ont ete reformules pour etre plus proches de l'usage reel. Le vocabulaire a ete simplifie et les actions inutiles ont ete retirees. Par exemple, l'action "telecharger le fichier traite" n'est plus consideree comme une action principale du module IRIS. Le systeme doit surtout indiquer que le fichier traite est disponible.
+
+\section{Preparation de l'application web}
+
+L'application cible repose sur une interface web et une API. L'interface doit permettre de saisir les informations, selectionner les fichiers et afficher les resultats. L'API doit controler les donnees, appeler le coeur metier Python et retourner un statut clair.
+
+Cette organisation permet de conserver la logique existante tout en proposant une interface plus accessible. Le coeur metier n'est pas reecrit inutilement : il est reutilise et expose progressivement.
+
+\chapter{Specifications des modules}
+
+\section{EvalStat}
+
+L'utilisateur doit pouvoir saisir un trigramme de formation, taper un code IRIS et selectionner les fiches d'evaluation. Le systeme controle les donnees puis lance le traitement. Le resultat attendu est la mise a jour des donnees d'evaluation et l'affichage d'un statut clair.
+
+\section{IRIS}
+
+L'utilisateur selectionne un export natif et choisit son type. Le traitement produit un fichier propre et exploitable. Les informations importantes sont le type d'export, le nombre de lignes traitees et l'emplacement du fichier resultat.
+
+\section{Bilans}
+
+Le module Bilans doit permettre de generer un bilan de sessions ou un bilan de formation. Les informations initiales sont saisies ensemble : trigramme, annee ou periode et type de bilan. Le systeme recupere ensuite les donnees necessaires et produit un document Word.
+
+\section{Fiches de couts}
+
+La fiche de couts est selectionnee par l'utilisateur. Le systeme detecte automatiquement la version du fichier et utilise le lecteur adapte. Les donnees extraites servent ensuite a alimenter les bilans ou a afficher les informations principales de la formation.
+
+\section{Parametres et messagerie}
+
+Le module Parametres regroupe la connexion, l'inscription, le mot de passe oublie, les profils utilisateurs, les droits administrateur et la messagerie. La messagerie est limitee a l'envoi d'un mail au chef d'unite. Un message par defaut est propose et peut etre modifie avant l'envoi.
+
+\chapter{Choix techniques}
+
+\section{Python}
+
+Python reste le langage du coeur metier. Ce choix est logique car les traitements existants sont deja developpes dans ce langage et utilisent des librairies adaptees a la manipulation de fichiers.
+
+\section{FastAPI}
+
+FastAPI est adapte pour exposer les traitements sous forme de routes web. Il permet de recevoir les formulaires, les fichiers, les parametres et de retourner des reponses structurees a l'interface.
+
+\section{React}
+
+React permet de construire une interface utilisateur moderne avec des composants reutilisables. Chaque module peut etre represente par une page ou un composant specialise.
+
+\section{PlantUML}
+
+PlantUML a ete utilise pour produire les diagrammes. Son avantage est de permettre une documentation textuelle, versionnable et facile a corriger.
+
+\section{LaTeX}
+
+LaTeX a ete utilise pour produire les documents PDF. Il garantit une mise en page stable, une table des matieres propre et une presentation adaptee aux documents de stage.
+
+\chapter{Difficultes rencontrees}
+
+\section{Complexite de l'existant}
+
+Le code existant contient plusieurs modules lies entre eux. Certaines classes ne sont pas seulement des structures de donnees : elles orchestrent aussi des traitements, ouvrent des fichiers et declenchent des generations de documents. Il a donc fallu analyser les relations avant de produire les diagrammes.
+
+\section{Fichiers et formats}
+
+CADI manipule plusieurs formats : Excel, Word, CSV, PDF et exports IRIS. Chaque format possede ses contraintes. Les fichiers peuvent aussi etre verrouilles, absents ou mal structures, ce qui oblige a prevoir des controles.
+
+\section{Caracteres et encodage}
+
+Des problemes d'affichage peuvent apparaitre dans les PDF lorsque l'encodage ou certaines polices ne sont pas bien prises en charge. Pour limiter ces erreurs, les documents ont ete reecrits avec une syntaxe simple et compilee proprement.
+
+\section{Alignement fonctionnel}
+
+Une autre difficulte a ete de distinguer ce que fait l'utilisateur et ce que fait automatiquement le systeme. Cette distinction est importante pour les diagrammes de cas d'utilisation : un cas d'utilisation ne doit pas transformer chaque operation interne en action utilisateur.
+
+\chapter{Bilan personnel}
+
+Ce travail m'a permis de progresser sur plusieurs aspects :
+
+\begin{itemize}
+  \item lecture et comprehension d'un projet Python existant ;
+  \item analyse de classes, methodes et relations ;
+  \item redaction de documents techniques ;
+  \item production de diagrammes UML ;
+  \item structuration de specifications fonctionnelles ;
+  \item compilation et correction de documents PDF.
+\end{itemize}
+
+Le projet m'a aussi montre l'importance de la documentation dans une application metier. Un code peut etre fonctionnel, mais difficile a reprendre si ses modules, ses entrees et ses sorties ne sont pas clairement expliques.
+
+\chapter{Perspectives}
+
+Plusieurs evolutions peuvent etre envisagees :
+
+\begin{itemize}
+  \item finaliser l'interface React des modules principaux ;
+  \item connecter chaque page a une route FastAPI ;
+  \item ajouter une authentification complete ;
+  \item journaliser les traitements ;
+  \item securiser l'acces aux fichiers reseau ;
+  \item ajouter des tests sur les traitements critiques ;
+  \item enrichir les messages d'erreur et les retours utilisateur.
+\end{itemize}
+
+\chapter{Conclusion}
+
+Le travail realise a permis de clarifier le fonctionnement de CADI et de preparer sa transformation en application web. Les documents produits structurent les besoins, les modules, les scenarios et les diagrammes. Ils constituent une base pour poursuivre le developpement avec une vision plus claire de l'existant et des objectifs.
+
+La prochaine etape consiste a relier progressivement l'interface web aux traitements Python, en commencant par les modules les plus importants : EvalStat, IRIS, Bilans et Fiches de couts.
+
+\end{document}

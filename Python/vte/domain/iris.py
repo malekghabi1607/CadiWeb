@@ -114,13 +114,6 @@ class ConfigExportIRIS:
             f"{afficher_infos('Output', self._output)}"
         )
 
-# TODO : _typeExport est fragile : mettre enum
-"""
-class TypeExport(Enum):
-    SESSIONS = "Sessions"
-    VENTES = "Ventes"
-"""
-# TODO : ensuite, remplacer avec get_iris(TypeExport.SESSIONS)
 # ======================================================================================
 # CLASSE IRIS (objet fichier)
 # ======================================================================================
@@ -208,9 +201,9 @@ class IRIS:
         }
         """
 
-    # ================================================
-    # === Méthodes statiques de traitement d'infos ===
-    # ================================================   
+    # # ================================================
+    # # === Méthodes statiques de traitement d'infos ===
+    # # ================================================   
     @staticmethod
     def extraire_infos_numSessionIRIS(numSession: str) -> pd.Series:
         """
@@ -226,7 +219,7 @@ class IRIS:
         
         S-00754-FC12-TDA BCDE-JVI-MLR
 
-        S-05672FC17-894-MCG-CCO
+        # S-05672FC17-894-MCG-CCO
         S08125-FC18-ACI-OCR-MBO
 
         S-00674-FC12-ACT-2-1-JV-MLR
@@ -532,6 +525,11 @@ class IRIS:
             - Les valeurs numériques flottantes représentant un entier à 5 chiffres (ex: "12345.0") sont acceptées.
             - Si la valeur ne correspond pas à 5 chiffres, la fonction renvoie (False, None).
         """
+
+
+
+
+
         # Conversion en chaîne pour analyse initiale
         if isinstance(valeur, str):
             str_val = valeur.strip()
@@ -1066,7 +1064,7 @@ class IRIS_traite(IRIS, ABC):
         
             # On charge les modules des sous-classes (astuce pour initialiser IRIS_traite._registry)
             if not cls._registry:
-                _load_subclasses()
+                cls._load_subclasses()
 
             # Sélection de la sous-classe
             try:
@@ -1168,6 +1166,7 @@ class IRIS_traite(IRIS, ABC):
         if hasattr(cls, "_typeExport"):
             IRIS_traite._registry[cls._typeExport] = cls
 
+    @staticmethod
     def _load_subclasses():
         """
         Charge explicitement les sous-classes concrètes de IRIS_traite afin de déclencher

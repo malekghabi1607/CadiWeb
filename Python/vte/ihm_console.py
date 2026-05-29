@@ -276,6 +276,8 @@ class IHM_console:
         for nom, param in sig.parameters.items():
             if nom == "cls":  # ignorer cls dans les classmethods
                 continue
+            if param.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
+                continue
             if nom not in kwargs and param.default == inspect.Parameter.empty:
                 # Type attendu (par annotation si dispo)
                 type_attendu = (

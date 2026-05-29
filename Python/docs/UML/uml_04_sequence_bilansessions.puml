@@ -1,0 +1,46 @@
+@startuml
+title Diagramme 4 - Sequence BilanSessions
+
+actor Utilisateur as U
+participant "Interface Web\nBilans" as UI
+participant "API / Service\nBilans" as API
+participant Formation as F
+participant BilanSessions as BS
+participant EvalStat_services as ES
+participant EvalStat_formation as EF
+participant IRIS_sessions as IRIS
+participant BilanSessions_generateur_word as G
+participant FichierWord as W
+
+U -> UI : saisir trigramme
+U -> UI : saisir annee / periode
+U -> UI : choisir type de bilan
+U -> UI : lancer generation
+UI -> API : POST /api/bilans/generer
+API -> F : pour_traitement_bilanSessions_depuis_periode(trig, annee, periode)
+F -> BS : depuis_periode(formation, annee, periode)
+BS -> BS : verifier_traitement_bilan()
+
+alt bilan non traite ou donnees incompletes
+  BS -> BS : _traiter()
+  BS -> IRIS : df_filtre_periode()
+  BS -> ES : ouvrir_ou_traiter_evalStat_depuis_liste_codes_IRIS()
+  BS -> EF : calculer_stats_criteres(codes_IRIS)
+else bilan deja pret
+  BS -> BS : conserver les donnees existantes
+end
+
+BS -> G : _get_generateur_word("V3")
+BS -> G : construire()
+G -> G : _construire_champs()
+G -> G : _construire_entete()
+G -> G : _construire_commentaires()
+G -> G : _construire_stats()
+G -> G : _fusionner_word()
+G -> W : depuisFichier()
+G -> G : _post_traitement()
+BS -> BS : _envoyer_mail_chef_unite(pj)
+API --> UI : document Word + message resultat
+UI --> U : telecharger ou ouvrir le bilan
+
+@enduml

@@ -309,18 +309,18 @@ def archiver_anciens_dumps(
     Regle appliquee :
         - les fichiers contenant "FINAL" sont conserves ;
         - le fichier courant le plus recent est conserve ;
-        - les autres fichiers courants dates sont deplaces dans Archives ;
+        - les autres fichiers courants dates sont deplaces dans BAK ;
         - les fichiers sans date sont laisses en place par securite.
 
     Exemple :
         >>> archiver_anciens_dumps("R04301")
-        [Path("R:/_Echanges/VTE/Prog/IRIS/Extracts originaux/Archives/R04301_...xlsx")]
+        [Path("R:/_Echanges/VTE/Prog/IRIS/Extracts originaux/BAK/R04301_...xlsx")]
 
     :param code_export: code export IRIS a nettoyer, par exemple R04301.
     :type code_export: str
     :param repertoire: dossier contenant les dumps IRIS originaux.
     :type repertoire: Path | str
-    :param repertoire_archives: dossier d'archive. Par defaut : repertoire / "Archives".
+    :param repertoire_archives: dossier d'archive. Par defaut : repertoire / "BAK".
     :type repertoire_archives: Path | str | None
     :return: liste des chemins des fichiers archives.
     :rtype: list[Path]
@@ -353,7 +353,7 @@ def archiver_anciens_dumps(
     if not fichiers_a_archiver:
         return []
 
-    chemin_archives = Path(repertoire_archives) if repertoire_archives else chemin_repertoire / "Archives"
+    chemin_archives = Path(repertoire_archives) if repertoire_archives else chemin_repertoire / "BAK"
     chemin_archives.mkdir(exist_ok=True)
 
     fichiers_archives: list[Path] = []
@@ -370,17 +370,24 @@ def archiver_anciens_dumps(
 # ================================================
 def mettre_a_jour_dumps_depuis_ged(
     codes_exports: tuple[str, ...] = ("R04301", "R04500"),
+    codes_exports_a_archiver: tuple[str, ...] = ("R04110", "R0304", "R04301", "R04500"),
     repertoire_source: Path | str = config.REPERTOIRE_EXTRACT_IRIS_GED,
     repertoire_destination: Path | str = config.REPERTOIRE_EXTRACT_IRIS_LOCAL,
 ) -> dict[str, dict[str, Path | list[Path] | None]]:
     """
     Met a jour les dumps IRIS recuperes depuis la GED.
 
-    Pour chaque code export :
-        - copie le dernier dump disponible depuis la GED ;
-        - archive les anciens dumps courants dans le dossier local.
+    Pour les codes GED, la fonction copie le dernier dump disponible.
+    Pour tous les codes a archiver, elle deplace les anciens dumps courants
+    dans le dossier BAK.
 
-    Par defaut, cette fonction traite :
+    Par defaut, la copie GED traite :
+        - R04301 : ventes ;
+        - R04500 : inscriptions.
+
+    Par defaut, l'archivage traite :
+        - R04110 : sessions ;
+        - R0304  : referentiel formations ;
         - R04301 : ventes ;
         - R04500 : inscriptions.
 
@@ -393,6 +400,8 @@ def mettre_a_jour_dumps_depuis_ged(
 
     :param codes_exports: codes IRIS a mettre a jour.
     :type codes_exports: tuple[str, ...]
+    :param codes_exports_a_archiver: codes IRIS pour lesquels archiver les anciens dumps.
+    :type codes_exports_a_archiver: tuple[str, ...]
     :param repertoire_source: dossier GED contenant les dumps source.
     :type repertoire_source: Path | str
     :param repertoire_destination: dossier local des extracts originaux.
@@ -400,7 +409,10 @@ def mettre_a_jour_dumps_depuis_ged(
     :return: bilan des fichiers copies et archives par code export.
     :rtype: dict[str, dict[str, Path | list[Path] | None]]
     """
-    bilan: dict[str, dict[str, Path | list[Path] | None]] = {}
+    bilan: dict[str, dict[str, Path | list[Path] | None]] = {
+        code_export: {"copie": None, "archives": []}
+        for code_export in codes_exports_a_archiver
+    }
 
     for code_export in codes_exports:
         # Copie le dernier fichier disponible dans la GED.
@@ -409,16 +421,17 @@ def mettre_a_jour_dumps_depuis_ged(
             repertoire_source=repertoire_source,
             repertoire_destination=repertoire_destination,
         )
+        bilan.setdefault(code_export, {"copie": None, "archives": []})
+        bilan[code_export]["copie"] = fichier_copie
 
+    for code_export in codes_exports_a_archiver:
         # Archive les anciens fichiers courants du dossier local.
         fichiers_archives = archiver_anciens_dumps(
             code_export=code_export,
             repertoire=repertoire_destination,
         )
 
-        bilan[code_export] = {
-            "copie": fichier_copie,
-            "archives": fichiers_archives,
-        }
+        bilan.setdefault(code_export, {"copie": None, "archives": []})
+        bilan[code_export]["archives"] = fichiers_archives
 
     return bilan

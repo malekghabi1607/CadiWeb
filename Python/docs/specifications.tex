@@ -1,0 +1,447 @@
+\documentclass[11pt,a4paper]{report}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\usepackage[table]{xcolor}
+\usepackage{graphicx}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{tocloft}
+\usepackage{lastpage}
+\usepackage[hidelinks]{hyperref}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+
+\geometry{margin=2.5cm}
+\definecolor{orangeil}{RGB}{230,120,20}
+\definecolor{tablehead}{RGB}{245,226,204}
+\definecolor{tablerow}{RGB}{252,246,239}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\renewcommand{\arraystretch}{1.18}
+\setlist[itemize]{leftmargin=1.2cm}
+\setlist[enumerate]{leftmargin=1.2cm}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[C]{\textcolor{orangeil}{Specifications fonctionnelles CADI Web}}
+\fancyfoot[C]{\thepage\ /\ \pageref{LastPage}}
+\titleformat{\chapter}[block]{\Huge\bfseries\color{orangeil}}{\thechapter.}{10pt}{}
+\titleformat{\section}{\Large\bfseries\color{orangeil}}{\thesection}{8pt}{}
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{8pt}{}
+
+\begin{document}
+
+\begin{titlepage}
+\begin{center}
+\vspace*{0.5cm}
+\begin{minipage}{0.45\textwidth}
+\IfFileExists{logo-cea.png}{\includegraphics[height=1.5cm]{logo-cea.png}}{}
+\end{minipage}
+\hfill
+\begin{minipage}{0.45\textwidth}
+\raggedleft
+\IfFileExists{logo-instn.png}{\includegraphics[height=1.5cm]{logo-instn.png}}{}
+\end{minipage}
+
+\vspace{2cm}
+{\Huge \bfseries Specifications fonctionnelles \par}
+\vspace{0.4cm}
+{\Large Application CADI Web \par}
+\vspace{1cm}
+{\large CEA / INSTN \par}
+{\large \today \par}
+\vspace{2cm}
+\begin{tabular}{L{6cm} L{6cm}}
+\textbf{Stagiaire} & \textbf{Encadrant} \\
+Malek GHABI & TESTARD Vincent \\
+\end{tabular}
+\vfill
+{\small Document de specification des besoins fonctionnels et des comportements attendus.}
+\end{center}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\chapter{Objet du document}
+
+Ce document precise les fonctionnalites attendues pour l'application CADI Web. Il complete le cahier des charges en decrivant les modules, les donnees saisies par l'utilisateur, les traitements automatiques, les sorties attendues et les criteres d'acceptation.
+
+L'objectif n'est pas de remplacer le code metier existant, mais de definir clairement comment ce code doit etre expose dans une application web simple, controlee et utilisable par les agents concernes.
+
+\section{Perimetre}
+
+Le perimetre fonctionnel retenu couvre les modules suivants :
+
+\begin{itemize}
+  \item traitement des evaluations stagiaires avec le module EvalStat ;
+  \item traitement des exports IRIS ;
+  \item generation des bilans de sessions et des bilans de formation ;
+  \item lecture et exploitation des fiches de couts ;
+  \item gestion des comptes, des profils, des parametres et de la messagerie ;
+  \item consultation des resultats et des messages d'execution.
+\end{itemize}
+
+\section{Objectifs principaux}
+
+L'application doit permettre de remplacer progressivement les manipulations manuelles et les lancements locaux par une interface unique. Elle doit guider l'utilisateur, limiter les erreurs de saisie, afficher des messages comprehensibles et conserver une coherence avec la logique metier deja presente dans la librairie Python \texttt{vte/}.
+
+\chapter{Architecture fonctionnelle}
+
+\section{Organisation generale}
+
+La solution cible repose sur trois niveaux :
+
+\begin{longtable}{L{4cm} L{10cm}}
+\toprule
+\rowcolor{tablehead}
+\textbf{Niveau} & \textbf{Role attendu} \\
+\midrule
+Interface web & Affiche les pages, les formulaires, les boutons, les tableaux de resultats et les messages d'erreur. \\
+API applicative & Recoit les demandes de l'interface, controle les donnees, lance les traitements et retourne un resultat structure. \\
+Coeur metier Python & Execute les traitements existants : EvalStat, IRIS, bilans, fiches de couts et specifications. \\
+\bottomrule
+\end{longtable}
+
+\section{Flux general}
+
+Le flux standard d'un traitement est le suivant :
+
+\begin{enumerate}
+  \item l'utilisateur ouvre le module correspondant ;
+  \item il renseigne les informations demandees ou selectionne un fichier ;
+  \item l'application controle les champs obligatoires ;
+  \item l'API appelle la classe ou le service metier adapte ;
+  \item le resultat est affiche avec un statut clair ;
+  \item le fichier produit ou mis a jour est signale a l'utilisateur.
+\end{enumerate}
+
+\section{Regles communes}
+
+Toutes les pages doivent respecter les regles suivantes :
+
+\begin{itemize}
+  \item les champs obligatoires doivent etre visibles ;
+  \item une action ne doit pas etre lancee si les donnees minimum sont absentes ;
+  \item les erreurs techniques doivent etre transformees en messages lisibles ;
+  \item un traitement long doit afficher un etat en cours ;
+  \item l'utilisateur doit savoir si le traitement a reussi, echoue ou produit un avertissement ;
+  \item les fichiers generes doivent etre identifies par leur nom et leur emplacement logique.
+\end{itemize}
+
+\chapter{Acteurs et droits}
+
+\section{Acteurs}
+
+\begin{longtable}{L{4cm} L{10cm}}
+\toprule
+\rowcolor{tablehead}
+\textbf{Acteur} & \textbf{Description} \\
+\midrule
+Utilisateur & Agent qui lance les traitements CADI : evaluations, IRIS, bilans et fiches de couts. \\
+Administrateur & Utilisateur autorise a gerer les comptes, les droits, les chemins de configuration et certains parametres globaux. \\
+Chef d'unite & Destinataire principal de certains messages produits par le module de messagerie. \\
+Systeme CADI & Ensemble application web, API et librairie metier Python. \\
+\bottomrule
+\end{longtable}
+
+\section{Droits fonctionnels}
+
+Un utilisateur standard peut lancer les traitements et consulter ses resultats. L'administrateur peut en plus gerer les comptes, modifier les parametres globaux et controler les informations utilisateurs. Le chef d'unite n'intervient pas directement dans l'application : il recoit les mails envoyes depuis le module messagerie.
+
+\chapter{Module EvalStat}
+
+\section{Objectif}
+
+Le module EvalStat sert a traiter les fiches d'evaluation des stagiaires et a mettre a jour les donnees d'evaluation d'une formation. Il s'appuie principalement sur les objets Formation, Session, evaluation de session et evaluation de formation.
+
+\section{Donnees saisies}
+
+\begin{longtable}{L{5cm} L{9cm}}
+\toprule
+\rowcolor{tablehead}
+\textbf{Champ} & \textbf{Regle attendue} \\
+\midrule
+Trigramme de formation & Champ obligatoire. Il identifie la formation concernee. \\
+Code IRIS & Champ obligatoire pour rattacher l'evaluation a la bonne session. \\
+Fiches d'evaluation & Fichiers selectionnes par l'utilisateur. Les formats autorises doivent etre controles. \\
+Mode de traitement & Ouvrir une evaluation existante ou traiter une nouvelle evaluation selon la situation. \\
+\bottomrule
+\end{longtable}
+
+\section{Comportement attendu}
+
+L'utilisateur commence par taper le trigramme de formation. Il saisit ensuite le code IRIS de la session, puis selectionne les fiches d'evaluation a traiter. Le systeme controle que les champs sont presents, que le code IRIS est conforme et que les fichiers sont accessibles.
+
+Si l'evaluation est deja traitee, l'application propose l'ouverture ou l'affichage du statut existant. Si elle n'est pas traitee, l'application lance le traitement, cree ou met a jour le fichier Excel de session, puis met a jour l'evaluation globale de formation.
+
+\section{Sorties attendues}
+
+\begin{itemize}
+  \item statut du traitement : reussi, deja traite, erreur ou avertissement ;
+  \item chemin du fichier produit ou mis a jour ;
+  \item nombre de reponses traitees si l'information est disponible ;
+  \item message indiquant si le fichier de formation a ete sauvegarde.
+\end{itemize}
+
+\section{Scenario nominal}
+
+\begin{enumerate}
+  \item l'utilisateur ouvre le module EvalStat ;
+  \item il tape le trigramme de formation ;
+  \item il tape le code IRIS ;
+  \item il selectionne les fiches d'evaluation ;
+  \item il lance le traitement ;
+  \item le systeme traite les fichiers et met a jour les donnees ;
+  \item l'application affiche un resultat clair.
+\end{enumerate}
+
+\section{Cas d'erreur}
+
+\begin{itemize}
+  \item trigramme absent ;
+  \item code IRIS absent ou invalide ;
+  \item fichier manquant, illisible ou au mauvais format ;
+  \item fichier Excel verrouille ;
+  \item donnees incoherentes dans la fiche d'evaluation.
+\end{itemize}
+
+\chapter{Module IRIS}
+
+\section{Objectif}
+
+Le module IRIS sert a transformer les exports natifs issus d'IRIS en fichiers propres et exploitables par CADI. Il permet notamment d'alimenter les traitements de sessions, de formations, de ventes ou d'inscriptions.
+
+\section{Donnees saisies}
+
+\begin{longtable}{L{5cm} L{9cm}}
+\toprule
+\rowcolor{tablehead}
+\textbf{Champ} & \textbf{Regle attendue} \\
+\midrule
+Type d'export & Sessions, formations, ventes ou inscriptions. \\
+Fichier source & Export natif selectionne par l'utilisateur. \\
+Parametres de lecture & Utilises automatiquement depuis la configuration du type d'export. \\
+\bottomrule
+\end{longtable}
+
+\section{Comportement attendu}
+
+L'utilisateur selectionne un fichier IRIS natif et choisit le type d'export. Le systeme applique la configuration correspondante, nettoie les donnees, reorganise les colonnes, controle les codes IRIS et produit le fichier traite. L'action de telecharger le fichier traite n'est pas consideree comme une action principale du cas d'utilisation : le systeme indique surtout que le fichier est pret et ou il se trouve.
+
+\section{Sorties attendues}
+
+\begin{itemize}
+  \item statut du traitement IRIS ;
+  \item nombre de lignes lues et conservees ;
+  \item type d'export traite ;
+  \item emplacement du fichier traite.
+\end{itemize}
+
+\chapter{Module Bilans}
+
+\section{Objectif}
+
+Le module Bilans permet de produire des documents de synthese a partir des evaluations, des donnees IRIS, des fiches de couts et des specifications. Il couvre deux usages : le bilan de sessions et le bilan de formation.
+
+\section{Actions principales}
+
+Les trois premieres actions doivent etre presentees au meme niveau dans l'interface :
+
+\begin{itemize}
+  \item saisir le trigramme de formation ;
+  \item saisir l'annee et, si necessaire, la periode ;
+  \item choisir le type de bilan a produire.
+\end{itemize}
+
+Ces trois informations constituent le point de depart du traitement. Elles ne doivent pas etre presentees comme une suite artificielle d'etapes dependantes : l'utilisateur les renseigne ensemble avant de lancer la verification.
+
+\section{Bilan de sessions}
+
+Pour un bilan de sessions, l'application doit recuperer les sessions concernees, verifier les donnees EvalStat, exploiter les exports IRIS et produire un document Word. Le systeme peut etre lance depuis une periode ou depuis une liste de codes IRIS selon le besoin.
+
+\section{Bilan de formation}
+
+Pour un bilan de formation, l'application doit combiner les donnees de l'annee, les informations issues des ventes IRIS, les evaluations, la fiche de couts et les specifications de la formation. Le document final doit presenter une synthese utilisable pour le suivi de la formation.
+
+\section{Sorties attendues}
+
+\begin{itemize}
+  \item document Word genere ;
+  \item statut de verification des donnees ;
+  \item liste des sessions prises en compte ;
+  \item avertissements si certaines donnees sont absentes ;
+  \item message indiquant si le mail au chef d'unite peut etre prepare.
+\end{itemize}
+
+\chapter{Module Fiches de couts}
+
+\section{Objectif}
+
+Le module Fiches de couts permet de lire une fiche de couts Excel et d'en extraire les informations utiles a CADI : nom de formation, nombre de participants, duree, couts et intervenants.
+
+\section{Comportement attendu}
+
+L'utilisateur selectionne uniquement la fiche de couts. La detection de la version de la fiche et le choix du lecteur compatible sont automatiques. Les actions de detection et de choix du lecteur ne doivent donc pas apparaitre comme des actions utilisateur.
+
+\section{Informations extraites}
+
+\begin{itemize}
+  \item nom de la formation ;
+  \item nombre de participants prevus ;
+  \item nombre de jours ;
+  \item cout total ;
+  \item liste des intervenants lorsque disponible ;
+  \item chemin du fichier source.
+\end{itemize}
+
+\chapter{Application CADI Web}
+
+\section{Objectif}
+
+L'application web regroupe les modules metier dans une interface commune. Elle doit permettre de lancer les traitements sans demander a l'utilisateur de manipuler directement les scripts Python.
+
+\section{Pages principales}
+
+\begin{longtable}{L{4cm} L{10cm}}
+\toprule
+\rowcolor{tablehead}
+\textbf{Page} & \textbf{Contenu attendu} \\
+\midrule
+Accueil & Acces rapide aux modules et rappel des derniers traitements. \\
+EvalStat & Formulaire trigramme, code IRIS et fiches d'evaluation. \\
+IRIS & Selection du type d'export et du fichier source. \\
+Bilans & Choix du type de bilan, trigramme, annee, periode et generation. \\
+Fiches de couts & Selection d'une fiche et affichage des champs extraits. \\
+Parametres & Profil, comptes, chemins, droits et messagerie. \\
+\bottomrule
+\end{longtable}
+
+Dans l'application CADI Web, l'action "lire une fiche" n'est pas conservee comme action generale. La lecture d'une fiche est rattachee au module Fiches de couts ou a un traitement metier precis.
+
+\chapter{Comptes, parametres et messagerie}
+
+\section{Comptes}
+
+Le module doit couvrir les fonctions classiques d'acces :
+
+\begin{itemize}
+  \item connexion ;
+  \item inscription ;
+  \item mot de passe oublie ;
+  \item modification du profil ;
+  \item gestion des utilisateurs par l'administrateur.
+\end{itemize}
+
+\section{Profil utilisateur}
+
+Le profil doit contenir au minimum :
+
+\begin{itemize}
+  \item nom ;
+  \item prenom ;
+  \item adresse mail ;
+  \item unite ;
+  \item site ou localisation : Marcoule, Grenoble, Saclay ou autre site defini ;
+  \item genre ou civilite si cette information est retenue ;
+  \item role : utilisateur ou administrateur.
+\end{itemize}
+
+\section{Messagerie}
+
+La messagerie permet d'envoyer un mail au chef d'unite uniquement. Le systeme propose un message par defaut unique, modifiable par l'utilisateur avant l'envoi. L'utilisateur peut aussi modifier l'objet, le titre du message et ajouter une piece jointe si necessaire.
+
+\section{Parametres administrateur}
+
+L'administrateur peut gerer :
+
+\begin{itemize}
+  \item les comptes utilisateurs ;
+  \item les roles ;
+  \item les chemins des repertoires de travail ;
+  \item les modeles de documents ;
+  \item le message par defaut utilise par la messagerie.
+\end{itemize}
+
+\chapter{Exigences non fonctionnelles}
+
+\section{Lisibilite}
+
+Les pages doivent rester simples et directes. Chaque module doit contenir uniquement les champs utiles a son traitement. Les libelles doivent reprendre le vocabulaire metier : trigramme, code IRIS, fiche de couts, bilan de sessions, bilan de formation.
+
+\section{Fiabilite}
+
+Les traitements manipulent des fichiers importants. L'application doit donc eviter les ecrasements non controles, signaler les fichiers verrouilles et conserver des messages d'erreur exploitables.
+
+\section{Securite}
+
+Les droits d'administration doivent etre reserves aux utilisateurs autorises. Les chemins reseau, les fichiers internes et les informations personnelles ne doivent pas etre exposes inutilement.
+
+\section{Tracabilite}
+
+Chaque traitement doit pouvoir produire une trace minimale :
+
+\begin{itemize}
+  \item utilisateur ayant lance le traitement ;
+  \item date et heure ;
+  \item module concerne ;
+  \item parametres principaux ;
+  \item statut final.
+\end{itemize}
+
+\chapter{Criteres d'acceptation}
+
+\section{Criteres generaux}
+
+\begin{itemize}
+  \item l'utilisateur peut acceder aux modules depuis l'interface ;
+  \item les champs obligatoires sont controles ;
+  \item les erreurs sont comprehensibles ;
+  \item les traitements appellent bien le coeur metier Python ;
+  \item les resultats produits sont exploitables ;
+  \item les PDF, Word ou Excel generes sont signales clairement.
+\end{itemize}
+
+\section{Criteres par module}
+
+\begin{longtable}{L{4cm} L{10cm}}
+\toprule
+\rowcolor{tablehead}
+\textbf{Module} & \textbf{Validation attendue} \\
+\midrule
+EvalStat & Un trigramme, un code IRIS et des fiches selectionnees permettent de traiter une evaluation. \\
+IRIS & Un export natif est transforme en export propre sans action inutile de telechargement. \\
+Bilans & Les trois donnees de depart sont au meme niveau et permettent de generer le bilan demande. \\
+Fiches de couts & L'utilisateur selectionne la fiche, le reste est automatique. \\
+Parametres & Les comptes, profils, roles et chemins peuvent etre administres. \\
+Messagerie & Un mail peut etre prepare pour le chef d'unite avec message par defaut modifiable. \\
+\bottomrule
+\end{longtable}
+
+\chapter{Scenarios de validation}
+
+\section{Scenario 1 : traitement EvalStat}
+
+Un utilisateur ouvre EvalStat, saisit le trigramme, saisit le code IRIS, selectionne les fiches d'evaluation et lance le traitement. Le systeme met a jour les fichiers utiles et affiche un message de succes.
+
+\section{Scenario 2 : traitement IRIS}
+
+Un utilisateur ouvre IRIS, choisit le type d'export, selectionne le fichier source et lance le traitement. Le systeme nettoie les donnees et indique que le fichier traite est disponible.
+
+\section{Scenario 3 : bilan de sessions}
+
+Un utilisateur saisit le trigramme, l'annee, la periode et choisit le bilan de sessions. Le systeme verifie les donnees, traite les evaluations manquantes si necessaire et produit le document Word.
+
+\section{Scenario 4 : bilan de formation}
+
+Un utilisateur saisit le trigramme et l'annee, choisit le bilan de formation puis lance le traitement. Le systeme exploite EvalStat, IRIS, FdC et Specs pour produire la synthese.
+
+\section{Scenario 5 : messagerie}
+
+Un utilisateur ouvre la messagerie, le chef d'unite est le destinataire, le message par defaut est charge, l'utilisateur modifie l'objet ou le contenu, ajoute eventuellement un fichier, puis prepare l'envoi.
+
+\end{document}

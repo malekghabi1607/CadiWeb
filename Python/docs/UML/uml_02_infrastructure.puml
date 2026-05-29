@@ -1,0 +1,81 @@
+@startuml
+title Diagramme 2 - Infrastructure utils / core
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+
+class FichierExcel {
+  - _chemin_fichier : Path
+  - _wb : Workbook
+  - _tableaux : dict
+  --
+  + depuis_fichier() : FichierExcel
+  + depuis_modele() : FichierExcel
+  + get_tableau()
+  + get_df_tableau()
+  + set_df_tableau()
+  + save()
+  + close()
+  + actualiser_TCD()
+}
+
+class FichierWord {
+  - _chemin : Path
+  --
+  + depuisFichier() : FichierWord
+  + mail_merge()
+  + save()
+  + close()
+}
+
+abstract class FichierGenerique {
+  - _chemin : Path
+  --
+  + chemin : Path
+  + ouvrir()
+}
+
+class IRIS {
+  + verifier_code_IRIS()
+  + extraire_code_IRIS_depuis_chemin()
+}
+
+class IRIS_natif {
+  + avec_traitement() : IRIS_natif
+}
+
+abstract class IRIS_traite {
+  - _df : DataFrame
+  --
+  + df : DataFrame
+  + get_champ_depuis_codes_IRIS()
+  + get_periode_depuis_codes_IRIS()
+}
+
+class IRIS_sessions {
+  + depuis_fichier() : IRIS_sessions
+}
+
+class IRIS_ventes {
+  + depuis_fichier() : IRIS_ventes
+  + prix_formation_annee_str() : str
+  + df_prix_formation_annee() : DataFrame
+}
+
+class Config {
+  + CHEMIN_MODELE_EXCEL_EVALUATIONS_STAGIAIRES
+  + CHEMIN_EXCEL_EVALUATIONS_FORMATION
+  + REPERTOIRE_CSV_EVALUATIONS
+}
+
+IRIS_natif --|> IRIS
+IRIS_traite --|> IRIS
+IRIS_sessions --|> IRIS_traite
+IRIS_ventes --|> IRIS_traite
+
+EvalStat --> FichierExcel : _fe
+BilanSessions --> FichierWord : genere
+BilanFormation --> FichierWord : genere
+IRIS --> FichierExcel : _fe
+FdC_Lecteur --|> FichierGenerique
+
+@enduml

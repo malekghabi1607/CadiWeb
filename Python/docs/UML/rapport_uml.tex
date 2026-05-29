@@ -1,0 +1,237 @@
+﻿\documentclass[11pt,a4paper]{report}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage[table]{xcolor}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{tocloft}
+\usepackage{lastpage}
+\usepackage[hidelinks]{hyperref}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{enumitem}
+
+\geometry{margin=2.2cm}
+\definecolor{orangeil}{RGB}{230,120,20}
+\definecolor{tablehead}{RGB}{245,226,204}
+\definecolor{tablerow}{RGB}{252,246,239}
+\definecolor{softgray}{RGB}{246,246,246}
+
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\renewcommand{\arraystretch}{1.15}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[C]{\textcolor{orangeil}{Diagrammes UML et cas d'utilisation CADI}}
+\fancyfoot[C]{\thepage\ /\ \pageref{LastPage}}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+\fancypagestyle{plain}{
+  \fancyhf{}
+  \fancyhead[C]{\textcolor{orangeil}{Diagrammes UML et cas d'utilisation CADI}}
+  \fancyfoot[C]{\thepage\ /\ \pageref{LastPage}}
+  \renewcommand{\headrulewidth}{0.4pt}
+  \renewcommand{\footrulewidth}{0.4pt}
+}
+\setlength{\headheight}{15pt}
+
+\titleformat{\chapter}[block]{\Huge\bfseries\color{orangeil}}{\thechapter.}{10pt}{}
+\titleformat{\section}{\Large\bfseries\color{orangeil}}{\thesection}{8pt}{}
+\titleformat{\subsection}{\large\bfseries\color{orangeil}}{\thesubsection}{6pt}{}
+\titlespacing*{\chapter}{0pt}{0pt}{18pt}
+\titlespacing*{\section}{0pt}{10pt}{8pt}
+\titlespacing*{\subsection}{0pt}{8pt}{6pt}
+
+\renewcommand{\contentsname}{\textcolor{orangeil}{Sommaire}}
+\renewcommand{\cftchapfont}{\color{orangeil}\bfseries}
+\renewcommand{\cftchappagefont}{\color{orangeil}\bfseries}
+\renewcommand{\cftsecfont}{\color{orangeil}}
+\renewcommand{\cftsecpagefont}{\color{orangeil}}
+
+\newcommand{\diagram}[3]{
+\begin{figure}[htbp]
+\centering
+\IfFileExists{#1}{
+  \includegraphics[width=\textwidth,height=0.72\textheight,keepaspectratio]{#1}
+}{
+  \fbox{\parbox{0.9\textwidth}{\centering Image manquante : #1}}
+}
+\caption{#2}
+\end{figure}
+\noindent\fcolorbox{orangeil}{softgray}{
+\begin{minipage}{0.96\textwidth}
+#3
+\end{minipage}
+}
+\vspace{0.5cm}
+}
+
+\begin{document}
+
+\begin{titlepage}
+\begin{center}
+\vspace*{1cm}
+
+{\Huge \bfseries Diagrammes UML et cas d'utilisation \par}
+\vspace{0.4cm}
+{\Large Projet CADI Web --- INSTN / CEA \par}
+\vspace{0.8cm}
+{\LARGE \textbf{Architecture metier, scenarios et modules} \par}
+
+\vspace{1.5cm}
+{\large Document genere a partir des diagrammes PlantUML \par}
+{\large \today \par}
+
+\vspace{2cm}
+\begin{tabular}{p{6cm} p{6cm}}
+\textbf{Stagiaire :} & \textbf{Encadrant :} \\
+Malek GHABI & TESTARD Vincent \\
+\\[-2pt]
+\textbf{Projet :} & \textbf{Version :} \\
+CADI Web & 1.0 \\
+\end{tabular}
+
+\vfill
+{\small CEA / INSTN --- Saclay}
+\end{center}
+\end{titlepage}
+
+\setcounter{page}{1}
+\tableofcontents
+\newpage
+
+\chapter{Introduction}
+
+Ce document regroupe les diagrammes UML et les cas d'utilisation du projet CADI Web.
+Il sert a expliquer l'organisation du code existant, les principaux scenarios metier et la future interface web.
+
+Les diagrammes sont separes en deux familles :
+
+\begin{itemize}
+  \item les \textbf{diagrammes techniques}, qui decrivent les classes, les relations et les sequences d'appel ;
+  \item les \textbf{cas d'utilisation}, qui decrivent les interactions entre les utilisateurs et l'application.
+\end{itemize}
+
+\chapter{Vue generale}
+
+\section{Vue globale du domaine}
+
+\diagram{uml_08_vue_globale_domaine.png}{Vue globale du domaine}{
+Ce diagramme donne une vue synthetique de l'architecture metier. La classe \texttt{Formation} est le point central : elle est reliee aux sessions, aux evaluations, aux fiches de couts, aux specifications et aux bilans. Cette vue permet de comprendre rapidement comment les grands blocs du domaine communiquent.
+}
+
+\chapter{Diagrammes de classes}
+
+\section{Classes principales du domaine}
+
+\diagram{uml_01_classes_domaine.png}{Classes principales du domaine}{
+Ce diagramme detaille les classes metier principales. Une \texttt{Formation} possede plusieurs \texttt{Session}. Les classes \texttt{EvalStat\_formation} et \texttt{EvalStat\_session} heritent de \texttt{EvalStat}. Les bilans utilisent les donnees de formation et d'evaluation. La classe \texttt{FdC} est une facade qui delegue la lecture a un \texttt{FdC\_Lecteur}.
+}
+
+\section{Infrastructure}
+
+\diagram{uml_02_infrastructure.png}{Infrastructure utils / core}{
+Ce diagramme montre les classes techniques utilisees par le domaine. \texttt{FichierExcel} gere les classeurs Excel, \texttt{FichierWord} gere les documents Word, et les classes IRIS permettent de lire ou traiter les exports. Cette couche evite de melanger la logique metier avec les details d'acces aux fichiers.
+}
+
+\section{IRIS detaille}
+
+\diagram{uml_05_iris_detail.png}{Detail du module IRIS}{
+Ce diagramme explique le sous-systeme IRIS. \texttt{IRIS\_natif} correspond aux exports bruts a traiter. \texttt{IRIS\_traite} represente les fichiers deja exploitables. \texttt{IRIS\_sessions} et \texttt{IRIS\_ventes} sont des specialisations utiles aux bilans. Les exports Formations et Inscriptions sont geres via \texttt{IRIS\_traite}, sans classe dediee dans le code actuel.
+}
+
+\section{Bilans detaille}
+
+\diagram{uml_06_bilans_detail.png}{Detail des classes de bilans}{
+Ce diagramme presente les classes de generation des bilans. \texttt{BilanSessions} produit les bilans de sessions, tandis que \texttt{BilanFormation} produit les bilans annuels de formation. Les generateurs Word abstraits construisent les champs, fusionnent le modele Word et realisent le post-traitement. Les noms \texttt{Bilan\_V3\_Sessions} et \texttt{Bilan\_V3\_Formation} clarifient le diagramme, meme si dans le code les deux classes concretes s'appellent \texttt{Bilan\_V3} dans deux fichiers differents.
+}
+
+\section{FdC : facade et strategie}
+
+\diagram{uml_07_fdc_facade_strategie.png}{FdC facade et strategie}{
+Ce diagramme montre le mecanisme de lecture des fiches de couts. \texttt{FdC} fournit une interface simple au reste de l'application. Elle choisit ensuite un lecteur compatible selon la version du fichier Excel : \texttt{FdC\_Lecteur\_V6\_1}, \texttt{FdC\_Lecteur\_V1\_4} ou \texttt{FdC\_Lecteur\_Defaut}. Ce fonctionnement correspond au patron de conception facade + strategie.
+}
+
+\chapter{Diagrammes de sequence}
+
+\section{Scenario EvalStat}
+
+\diagram{uml_03_sequence_evalstat.png}{Sequence EvalStat}{
+Ce diagramme montre le deroulement d'un traitement EvalStat. L'utilisateur selectionne une formation et des codes IRIS. La formation cree les sessions, ouvre ou cree le fichier d'evaluation de formation, puis chaque session ouvre ou traite son evaluation. A la fin, le fichier Excel est sauvegarde.
+}
+
+\section{Scenario BilanSessions}
+
+\diagram{uml_04_sequence_bilansessions.png}{Sequence BilanSessions}{
+Ce diagramme montre le scenario de generation d'un bilan de sessions. La formation cree un objet \texttt{BilanSessions}, verifie les donnees, traite les evaluations, calcule les statistiques puis appelle un generateur Word. Le resultat final est un document Word exploitable par les utilisateurs.
+}
+
+\section{Scenario IRIS}
+
+\diagram{uml_09_sequence_iris.png}{Sequence IRIS}{
+Ce diagramme montre le traitement d'un export IRIS. L'utilisateur importe un export natif et choisit le type d'export. L'API lance ensuite la creation d'un \texttt{IRIS\_natif}, charge les donnees, cree un export traite dans Excel, puis recharge ce fichier avec \texttt{IRIS\_traite}. Le scenario se termine par un message de resultat.
+}
+
+\section{Scenario FdC}
+
+\diagram{uml_10_sequence_fdc.png}{Sequence FdC}{
+Ce diagramme montre la lecture d'une fiche de couts. L'utilisateur selectionne uniquement le fichier Excel. L'application resout le chemin, choisit automatiquement le lecteur compatible, charge le classeur avec \texttt{FichierExcel}, extrait les champs utiles puis renvoie les donnees structurees a l'interface.
+}
+
+\chapter{Cas d'utilisation}
+
+\section{Cas d'utilisation general}
+
+\diagram{use_case_general.png}{Cas d'utilisation general}{
+Ce diagramme presente les acteurs principaux de CADI Web : l'agent INSTN, le responsable pedagogique et l'administrateur fonctionnel. Il montre les grandes fonctionnalites : traiter EvalStat, traiter IRIS, generer les bilans, gerer les comptes et parametres, utiliser la messagerie et telecharger les fichiers produits. L'action de lecture directe d'une fiche de couts n'apparait plus dans la vue generale, car elle reste un scenario specialise.
+}
+
+\section{Cas d'utilisation EvalStat}
+
+\diagram{use_case_evalstat.png}{Cas d'utilisation EvalStat}{
+Ce diagramme precise le scenario EvalStat cote utilisateur. L'agent saisit le trigramme de la formation, saisit le code IRIS, selectionne les fiches d'evaluation, puis lance le traitement. L'application verifie les fichiers, met a jour le fichier Excel de formation et affiche un message de resultat.
+}
+
+\section{Cas d'utilisation IRIS}
+
+\diagram{use_case_iris.png}{Cas d'utilisation IRIS}{
+Ce diagramme decrit le traitement des exports IRIS. L'utilisateur importe un export natif, choisit le type d'export et lance le traitement. L'application verifie la structure du fichier et produit un fichier IRIS traite. L'action de telechargement a ete retiree du scenario, car elle n'est pas consideree comme une action utilisateur principale pour ce module.
+}
+
+\section{Cas d'utilisation Bilans}
+
+\diagram{use_case_bilans.png}{Cas d'utilisation Bilans}{
+Ce diagramme montre comment un agent ou un responsable pedagogique genere un bilan. Les trois premieres actions, saisir le trigramme, saisir l'annee/periode et choisir le type de bilan, sont representees au meme niveau : elles constituent les informations initiales a fournir avant la verification. L'application verifie ensuite les donnees, charge EvalStat, IRIS, FdC et Specs, puis genere un document Word.
+}
+
+\section{Cas d'utilisation FdC}
+
+\diagram{use_case_fdc.png}{Cas d'utilisation FdC}{
+Ce diagramme presente la lecture d'une fiche de couts. L'utilisateur selectionne uniquement le fichier Excel. La detection de la version et le choix du lecteur compatible sont automatiques, donc ils ne sont plus representes comme des actions utilisateur. L'application extrait les informations principales et signale les champs manquants si necessaire.
+}
+
+\section{Cas d'utilisation Parametres}
+
+\diagram{use_case_parametres.png}{Cas d'utilisation Parametres}{
+Ce diagramme presente les comptes, les parametres et la messagerie. L'utilisateur peut se connecter, s'inscrire, recuperer un mot de passe oublie, modifier son profil et envoyer un message au chef de son unite. Le profil contient notamment le nom, le prenom, le mail, l'unite, le site et le genre. L'administrateur fonctionnel gere les utilisateurs, les chemins et les parametres. La messagerie utilise un message par defaut modifiable, avec possibilite de modifier l'objet, le titre et d'ajouter une piece jointe.
+}
+
+\chapter{Synthese}
+
+Les diagrammes montrent que CADI Web repose sur une separation claire entre :
+
+\begin{itemize}
+  \item le domaine metier existant dans \texttt{vte/} ;
+  \item les classes techniques de lecture et d'ecriture de fichiers ;
+  \item les scenarios de traitement ;
+  \item la future interface web qui expose ces traitements aux utilisateurs.
+\end{itemize}
+
+Cette organisation permet de moderniser l'utilisation de CADI sans reecrire le coeur metier existant.
+
+\end{document}

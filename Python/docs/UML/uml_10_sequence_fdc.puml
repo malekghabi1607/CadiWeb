@@ -1,0 +1,25 @@
+@startuml
+title Diagramme 10 - Sequence FdC
+
+actor Utilisateur as U
+participant "Interface Web\nFdC" as UI
+participant "API / Service\nFdC" as API
+participant FdC as FDC
+participant FdC_Lecteur as L
+participant FichierExcel as FE
+
+U -> UI : selectionner fiche de couts Excel
+UI -> API : POST /api/fdc/lire
+API -> FDC : ouvrir(chemin_fdc, formation)
+FDC -> FDC : _resoudre_chemin()
+FDC -> L : ouvrir(chemin, formation)
+L -> L : est_compatible()
+L -> FE : depuis_fichier()
+L -> L : _charger_fdc()
+L -> L : _lire_champs()
+API -> FDC : __getattr__(nom_formation, couts...)
+FDC --> API : donnees structurees
+API --> UI : JSON fiche de couts
+UI --> U : afficher informations ou erreurs
+
+@enduml

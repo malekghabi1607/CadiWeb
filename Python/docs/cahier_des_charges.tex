@@ -1,0 +1,209 @@
+\documentclass[11pt,a4paper]{report}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage[table]{xcolor}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{tocloft}
+\usepackage{lastpage}
+\usepackage[hidelinks]{hyperref}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+
+\geometry{margin=2.5cm}
+\definecolor{orangeil}{RGB}{230,120,20}
+\definecolor{tablehead}{RGB}{245,226,204}
+\definecolor{tablerow}{RGB}{252,246,239}
+
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\renewcommand{\arraystretch}{1.2}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[C]{\textcolor{orangeil}{Cahier des Charges CADI}}
+\fancyfoot[C]{\thepage\ /\ \pageref{LastPage}}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+\fancypagestyle{plain}{
+  \fancyhf{}
+  \fancyhead[C]{\textcolor{orangeil}{Cahier des Charges CADI}}
+  \fancyfoot[C]{\thepage\ /\ \pageref{LastPage}}
+  \renewcommand{\headrulewidth}{0.4pt}
+  \renewcommand{\footrulewidth}{0.4pt}
+}
+\setlength{\headheight}{15pt}
+
+\titleformat{\chapter}[block]{\Huge\bfseries\color{orangeil}}{\thechapter.}{10pt}{}
+\titleformat{\section}{\Large\bfseries\color{orangeil}}{\thesection}{8pt}{}
+\titleformat{\subsection}{\large\bfseries\color{orangeil}}{\thesubsection}{6pt}{}
+\renewcommand{\contentsname}{\textcolor{orangeil}{Sommaire}}
+
+\begin{document}
+
+\begin{titlepage}
+\begin{center}
+\vspace*{1cm}
+\IfFileExists{logo-cea.png}{\includegraphics[width=4.5cm]{logo-cea.png}\hspace{1.2cm}}{\textbf{CEA}\hspace{1.2cm}}
+\IfFileExists{logo-instn.png}{\includegraphics[width=4.5cm]{logo-instn.png}}{\textbf{INSTN}}
+
+\vspace{1.5cm}
+{\Huge \bfseries Cahier des Charges \par}
+\vspace{0.3cm}
+{\Large Projet de Stage 2026 \par}
+\vspace{0.8cm}
+{\LARGE \textbf{Interface Web pour l'Application CADI} \par}
+\vspace{0.3cm}
+{\LARGE \textbf{Creation Automatique de Documents INSTN} \par}
+
+\vspace{1.5cm}
+{\large CEA -- Institut National des Sciences et Techniques Nucleaires \par}
+{\large \today \par}
+
+\vspace{2cm}
+\begin{tabular}{p{6cm} p{6cm}}
+\textbf{Stagiaire :} & \textbf{Encadrant :} \\
+Malek GHABI & TESTARD Vincent \\
+\\[-2pt]
+\textbf{Universite :} & \textbf{Specialite :} \\
+A completer & Informatique / Genie logiciel \\
+\end{tabular}
+
+\vfill
+{\small CEA / INSTN -- Saclay}
+\end{center}
+\end{titlepage}
+
+\setcounter{page}{1}
+\tableofcontents
+\newpage
+
+\chapter{Introduction}
+
+\section{Contexte general}
+Le CEA est un organisme public de recherche scientifique et technique. L'INSTN, rattache au CEA, assure des formations initiales et continues dans les domaines du nucleaire, de l'energie, du rayonnement et des technologies associees.
+
+Dans ce contexte, les equipes manipulent regulierement des fichiers issus de plusieurs sources : evaluations stagiaires, exports IRIS, fiches de couts, modeles Word et fichiers Excel de suivi. Ces donnees servent a produire des documents administratifs et pedagogiques.
+
+\section{Problematique}
+L'application CADI existe deja sous forme d'interface de bureau et de scripts Python. Cette solution fonctionne, mais elle presente plusieurs limites : installation locale, interface ancienne, retours d'erreur parfois peu lisibles et maintenance plus difficile.
+
+\section{Objectif du cahier des charges}
+Ce cahier des charges definit le cadre du projet de stage visant a developper une interface web pour CADI. Il precise les besoins, le perimetre, les contraintes, les fonctionnalites attendues, les livrables et les criteres d'acceptation.
+
+\chapter{Presentation du besoin}
+
+\section{Objectif general}
+Le projet consiste a creer une application web locale permettant aux agents de l'INSTN d'utiliser les traitements CADI depuis un navigateur. L'objectif n'est pas de reecrire la logique metier existante, mais de construire une couche web moderne au-dessus de la librairie Python \texttt{vte/}.
+
+\section{Besoins utilisateurs}
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{L{0.28\textwidth} L{0.62\textwidth}}
+\toprule
+\rowcolor{tablehead}
+\textbf{Utilisateur} & \textbf{Besoin principal} \\
+\midrule
+Agent INSTN & Lancer des traitements documentaires sans utiliser directement Python. \\
+Responsable pedagogique & Generer ou consulter des bilans exploitables. \\
+Gestionnaire formation & Traiter des exports IRIS, evaluations et fiches de couts. \\
+Administrateur fonctionnel & Gerer les comptes, les parametres et les chemins. \\
+\bottomrule
+\end{longtable}
+
+\chapter{Perimetre du projet}
+
+\section{Perimetre inclus}
+\begin{itemize}
+  \item une application frontend en React ;
+  \item une API backend FastAPI ;
+  \item les modules EvalStat, IRIS, Bilans, FdC, Parametres et Messagerie ;
+  \item la gestion des fichiers en entree et en sortie ;
+  \item l'affichage des messages de succes et d'erreur ;
+  \item une documentation de lancement et de validation.
+\end{itemize}
+
+\section{Perimetre exclu}
+\begin{itemize}
+  \item la reecriture complete de \texttt{vte/} ;
+  \item le deploiement en production ;
+  \item une application mobile ;
+  \item la refonte des modeles Word et Excel metier.
+\end{itemize}
+
+\chapter{Solution cible}
+
+\section{Architecture generale}
+\begin{center}
+\fbox{
+\begin{minipage}{0.92\textwidth}
+\centering
+\textbf{Navigateur} $\rightarrow$ \textbf{React / Vite} $\rightarrow$ \textbf{FastAPI} $\rightarrow$ \textbf{\texttt{vte/}}\\[4pt]
+\textbf{\texttt{vte/}} $\rightarrow$ \textbf{FastAPI} $\rightarrow$ \textbf{React} $\rightarrow$ \textbf{Telechargement ou affichage}
+\end{minipage}
+}
+\end{center}
+
+\section{Modules attendus}
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{L{0.22\textwidth} L{0.54\textwidth} C{0.14\textwidth}}
+\toprule
+\rowcolor{tablehead}
+\textbf{Module} & \textbf{Fonction principale} & \textbf{Priorite} \\
+\midrule
+EvalStat & Traiter les fiches d'evaluation avec trigramme et code IRIS. & Obligatoire \\
+IRIS & Traiter les exports IRIS natifs. & Obligatoire \\
+Bilans & Generer des bilans Word. & Obligatoire \\
+FdC & Lire les fiches de couts. & Souhaitable \\
+Parametres & Gerer comptes, profils, chemins et configuration. & Obligatoire \\
+Messagerie & Envoyer un mail au chef d'unite avec message par defaut modifiable. & Souhaitable \\
+\bottomrule
+\end{longtable}
+
+\chapter{Contraintes}
+
+\section{Contraintes techniques}
+\begin{itemize}
+  \item usage prioritaire sur Windows ;
+  \item compatibilite avec Chrome et Edge ;
+  \item backend Python avec FastAPI ;
+  \item frontend React/Vite ;
+  \item reutilisation du code metier existant ;
+  \item support des fichiers CSV, Excel et Word.
+\end{itemize}
+
+\section{Exigences non fonctionnelles}
+\begin{itemize}
+  \item interface lisible et simple ;
+  \item messages d'erreur comprehensibles ;
+  \item code maintenable ;
+  \item traitements tracables ;
+  \item conservation du coeur metier existant.
+\end{itemize}
+
+\chapter{Planning previsionnel}
+
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{C{0.08\textwidth} L{0.35\textwidth} C{0.14\textwidth} L{0.31\textwidth}}
+\toprule
+\rowcolor{tablehead}
+\textbf{Phase} & \textbf{Objectif} & \textbf{Semaines} & \textbf{Livrable} \\
+\midrule
+1 & Analyse et cadrage & S1--S2 & Cahier des charges, specifications \\
+2 & Architecture commune et EvalStat & S3--S4 & Premier flux complet \\
+3 & Module IRIS & S5--S6 & Traitement des exports IRIS \\
+4 & Module Bilans & S7--S8 & Generation Word \\
+5 & Parametres, FdC et messagerie & S9--S10 & Application complete \\
+6 & Tests et rapport & S11--S12 & Version finale \\
+\bottomrule
+\end{longtable}
+
+\chapter{Conclusion}
+Ce cahier des charges definit le cadre de la refonte web de CADI. La solution attendue doit moderniser l'acces aux traitements documentaires tout en conservant la logique metier existante.
+
+\end{document}

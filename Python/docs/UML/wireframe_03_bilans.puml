@@ -1,0 +1,55 @@
+@startsalt
+title Wireframe 03 - Module Bilans
+
+{
+{+
+  CADI Web > Bilans | Responsable pedagogique | Pret
+}
+{
+  {T
+  + Accueil
+  + EvalStat
+  + IRIS
+  + Bilans
+  + Fiches de couts
+  + Messagerie
+  + Parametres
+  }
+  |
+  {
+    {^"Generation de bilans"}
+    {
+      {+
+        "Parametres du bilan"
+        Trigramme formation : [ ACI        ]
+        Annee : [ 2026 ]
+        Periode : [ FC2026 ]
+        Type de bilan
+        ( ) Bilan de sessions
+        ( ) Bilan de formation
+      }
+      |
+      {+
+        "Verification des donnees"
+        EvalStat : disponible
+        IRIS sessions : disponible
+        IRIS ventes : disponible
+        Fiche de couts : manquante
+        Specifications : disponible
+        [Verifier les donnees]
+      }
+    }
+    {
+      {+
+        "Generation"
+        [Generer le document Word]
+        Statut : generation possible avec avertissement
+        Sortie : Bilans/ACI_Bilan_2026.docx
+        [Ouvrir le bilan]
+      }
+    }
+  }
+}
+}
+
+@endsalt

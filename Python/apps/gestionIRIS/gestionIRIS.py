@@ -4,6 +4,7 @@ from vte.utils.utils import *
 
 from colorama import init
 
+from vte.services.iris_dumps_services import mettre_a_jour_dumps_depuis_ged
 init(autoreset=True)
 
     
@@ -18,6 +19,37 @@ init(autoreset=True)
 MODE = "console"
 
 depuis_config:bool = False
+
+
+def mettre_a_jour_dumps_ged_console() -> None:
+    """
+    Lance la mise a jour des dumps GED et affiche un bilan lisible en console.
+    """
+    bilan = mettre_a_jour_dumps_depuis_ged()
+
+    print("\n=== Bilan mise a jour dumps GED ===")
+    codes_copie_ged = {"R04301", "R04500"}
+    for code_export, infos in bilan.items():
+        fichier_copie = infos["copie"]
+        fichiers_archives = infos["archives"]
+
+        print(f"\n{code_export}")
+
+        if code_export not in codes_copie_ged:
+            print("  Copie    : non concernee")
+        elif fichier_copie is None:
+            print("  Copie    : aucun fichier recent trouve")
+        else:
+            print(f"  Copie    : {fichier_copie.name}")
+
+        if not fichiers_archives:
+            print("  BAK      : aucun ancien dump archive")
+        else:
+            print("  BAK      :")
+            for fichier_archive in fichiers_archives:
+                print(f"    - {fichier_archive.name}")
+
+
 MENUS = {
     "Tout traiter": {
         "action": IRIS_services.concatener_plusieursTypes,
@@ -49,8 +81,16 @@ MENUS = {
         "kwargs": {"typesExports":"Inscriptions"},
         "demander": ["depuis_config"],
         "indications":"Entrez :\n   - 0 pour sélection manuelle des fichiers (filedialog)\n   - 1 pour sélection automatique (emploi de config_extractsIRIS)"
-    }
+    },
 
+
+
+    "Mettre a jour les dumps GED": {
+    "action": mettre_a_jour_dumps_ged_console,
+    "kwargs": {},
+    "demander": [],
+    "indications": "Copie les derniers dumps R04301 et R04500 depuis la GED et archive les anciens dumps."
+},
     
 }
 

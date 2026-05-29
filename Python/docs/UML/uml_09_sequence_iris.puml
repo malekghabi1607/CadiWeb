@@ -1,0 +1,27 @@
+@startuml
+title Diagramme 9 - Sequence IRIS
+
+actor Utilisateur as U
+participant "Interface Web\nIRIS" as UI
+participant "API / Service\nIRIS" as API
+participant IRIS_natif as IN
+participant IRIS_traite as IT
+participant FichierExcel as FE
+
+U -> UI : importer export IRIS natif
+U -> UI : choisir type d'export
+U -> UI : lancer traitement
+UI -> API : POST /api/iris/traiter
+API -> IN : avec_traitement(typeExport, fichiers)
+IN -> IN : _charger_iris_natifs()
+IN -> IN : _creer_export_IRIS()
+IN -> FE : depuis_modele()
+IN -> FE : set_df_tableau()
+IN -> FE : save()
+API -> IT : ouvrir export traite
+IT -> IT : _charger_excel()
+IT -> IT : _convertit_types_colonnes_df()
+API --> UI : message resultat
+UI --> U : afficher statut
+
+@enduml

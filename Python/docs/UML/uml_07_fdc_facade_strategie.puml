@@ -1,0 +1,121 @@
+@startuml
+title Diagramme 7 - FdC facade + strategie
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+
+class FdC {
+  - _lecteur : FdC_Lecteur
+  --
+  + __init__(lecteur)
+  + ouvrir() : FdC
+  + max_participants() : int
+  + chemin : Path
+  + __getattr__()
+  + __str__() : str
+  - _resoudre_chemin()
+}
+
+abstract class FdC_Lecteur {
+  - _chemin : Path
+  - _fe : FichierExcel
+  - _formation : Formation_protocol
+  --
+  + __init__(chemin, formation, fe)
+  + ouvrir() : FdC_Lecteur
+  + formation : Formation_protocol
+  + fe : FichierExcel
+  + chemin_fe : Path
+  + tableau : TableauExcel
+  + trigramme_formation : str
+  + nom_formation : str
+  + version : str
+  + nom_onglet : str
+  + annee_creationFormation : int
+  + date_creationFormation : date
+  + nb_participants_prevus : int
+  + nb_participants_min : str
+  + nb_participants_min_cea : int
+  + nb_participants_min_ee : int
+  + nb_jours_formation : float
+  + cout_total : float
+  + cout_T1 : int
+  + cout_T2 : int
+  + cout_T3 : int
+  + prix_cea : int
+  + prix_ee : int
+  + prix_min_cea : int
+  + prix_min_ee : int
+  + prix_preconise_ee : int
+  + dossier_plan_classement() : Path
+  + chemin_plan_classement() : Path
+  # _charger_fdc()
+  # _choisir_fdc()
+  # _charger()
+  # _lire_champs()
+}
+
+class FdC_Lecteur_V6_1 {
+  + est_compatible() : bool
+  + nom_onglet : str
+  + nom_formation : str
+  + annee_creationFormation : int
+  + date_creationFormation : date
+  + nb_participants_prevus : int
+  + nb_participants_min_cea : int
+  + nb_participants_min_ee : int
+  + cout_T1 : int
+  + cout_T2 : int
+  + cout_T3 : int
+  + prix_cea : int
+  + prix_ee : int
+  + prix_min_cea : int
+  + prix_min_ee : int
+  + prix_preconise_ee : int
+}
+
+class FdC_Lecteur_V1_4 {
+  + est_compatible() : bool
+  + nom_onglet : str
+  + nom_formation : str
+  + annee_creationFormation : int
+  + date_creationFormation : date
+  + nb_participants_prevus : int
+  + nb_participants_min_cea : int
+  + nb_participants_min_ee : int
+  + cout_T1 : int
+  + cout_T2 : int
+  + cout_T3 : int
+  + prix_cea : int
+  + prix_ee : int
+  + prix_min_cea : int
+  + prix_min_ee : int
+  + prix_preconise_ee : int
+}
+
+class FdC_Lecteur_Defaut {
+  + est_compatible() : bool
+  + nom_onglet : str
+  + nom_formation : str
+  + annee_creationFormation : int
+  + date_creationFormation : date
+  + nb_participants_prevus : int
+  + nb_participants_min_cea : int
+  + nb_participants_min_ee : int
+}
+
+abstract class FichierGenerique {
+  - _chemin : Path
+  --
+  + chemin : Path
+  + ouvrir()
+}
+
+FdC_Lecteur_V6_1 --|> FdC_Lecteur
+FdC_Lecteur_V1_4 --|> FdC_Lecteur
+FdC_Lecteur_Defaut --|> FdC_Lecteur
+FdC_Lecteur --|> FichierGenerique
+
+FdC *-- FdC_Lecteur : _lecteur
+FdC_Lecteur --> FichierExcel : _fe
+
+@enduml

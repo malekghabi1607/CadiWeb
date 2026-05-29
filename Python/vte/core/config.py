@@ -1,5 +1,12 @@
 from pathlib import Path
 
+_RACINE_PROJET = Path(__file__).resolve().parents[2]
+
+
+def _chemin_avec_fallback(chemin_reseau: str, chemin_local: Path) -> Path:
+    chemin = Path(chemin_reseau)
+    return chemin if chemin.exists() else chemin_local
+
 ### --------------------------------------------------------------------
 #  Définitions des constantes de module
 ### --------------------------------------------------------------------
@@ -41,8 +48,14 @@ REGEX_FDC:str = "Fiche de coûts INSTN - .*"
 # === EXTRACT IRIS ===
 ###
 REPERTOIRE_EXTRACT_IRIS_GED:Path = Path("//instnt/HOME/REFERENC/IRIS - rapports de synthese")  # Répertoire extracts originaux
-REPERTOIRE_EXTRACT_IRIS_LOCAL:Path = Path("//harmonie/instn/uem/_Echanges/VTE/Prog/IRIS/Extracts originaux")  # Répertoire local extracts originaux (à causes de 2/3 adaptations d'exports mal fichus/buggés et que je ne pouvais pas mettre moi sur la GED après réparation)
-REPERTOIRE_EXCEL_IRIS_OUTPUT:Path = Path("//harmonie/instn/uem/_Echanges/VTE/Prog/IRIS/Extracts complets")  # Répertoire avec les extracts concaténés et dans les modèles
+REPERTOIRE_EXTRACT_IRIS_LOCAL:Path = _chemin_avec_fallback(
+    "//harmonie/instn/uem/_Echanges/VTE/Prog/IRIS/Extracts originaux",
+    _RACINE_PROJET / "IRIS" / "Extracts originaux",
+)  # Répertoire local extracts originaux (à causes de 2/3 adaptations d'exports mal fichus/buggés et que je ne pouvais pas mettre moi sur la GED après réparation)
+REPERTOIRE_EXCEL_IRIS_OUTPUT:Path = _chemin_avec_fallback(
+    "//harmonie/instn/uem/_Echanges/VTE/Prog/IRIS/Extracts complets",
+    _RACINE_PROJET / "IRIS" / "Extracts complets",
+)  # Répertoire avec les extracts concaténés et dans les modèles
 
 # Propriétés des exports IRIS
 IRIS_SESSIONS_PARAMS = dict(

@@ -1,0 +1,61 @@
+@startuml
+left to right direction
+
+actor "Utilisateur" as User
+actor "Administrateur fonctionnel" as Admin
+
+rectangle "Comptes, parametres et messagerie" {
+  usecase "Se connecter" as UC_LOGIN
+  usecase "S'inscrire" as UC_REGISTER
+  usecase "Mot de passe\noublie" as UC_FORGOT
+  usecase "Modifier son profil" as UC_PROFILE
+  usecase "Renseigner nom,\nprenom et mail" as UC_ID
+  usecase "Renseigner unite,\nsite et genre" as UC_ORG
+  usecase "Administrer les\nutilisateurs" as UC_USERS
+  usecase "Consulter la\nconfiguration" as UC_READ
+  usecase "Modifier un chemin\nou un parametre" as UC_EDIT
+  usecase "Verifier la validite\ndes chemins" as UC_CHECK
+  usecase "Sauvegarder la\nconfiguration" as UC_SAVE
+  usecase "Envoyer un mail au\nchef d'unite" as UC_MAIL
+  usecase "Modifier le message\npar defaut" as UC_TEMPLATE
+  usecase "Modifier l'objet\net le titre" as UC_SUBJECT
+  usecase "Ajouter une\npiece jointe" as UC_ATTACHMENT
+  usecase "Afficher un message\nde resultat" as UC_STATUS
+}
+
+User --> UC_LOGIN
+User --> UC_REGISTER
+User --> UC_FORGOT
+User --> UC_PROFILE
+User --> UC_MAIL
+
+Admin --> UC_READ
+Admin --> UC_EDIT
+Admin --> UC_SAVE
+Admin --> UC_USERS
+Admin --> UC_TEMPLATE
+
+UC_PROFILE ..> UC_ID : <<include>>
+UC_PROFILE ..> UC_ORG : <<include>>
+UC_EDIT ..> UC_CHECK : <<include>>
+UC_SAVE ..> UC_CHECK : <<include>>
+UC_SAVE ..> UC_STATUS : <<include>>
+UC_CHECK ..> UC_STATUS : <<extend>>
+UC_MAIL ..> UC_TEMPLATE : <<include>>
+UC_MAIL ..> UC_SUBJECT : <<include>>
+UC_MAIL ..> UC_ATTACHMENT : <<extend>>
+UC_MAIL ..> UC_STATUS : <<include>>
+
+note right of UC_ORG
+  Exemples de site :
+  Marcoule, Grenoble,
+  Saclay, etc.
+end note
+
+note right of UC_MAIL
+  Le destinataire est
+  uniquement le chef
+  de l'unite.
+end note
+
+@enduml

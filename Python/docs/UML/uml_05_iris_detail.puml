@@ -1,0 +1,118 @@
+@startuml
+title Diagramme 5 - IRIS detail complet
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+
+class InfosExportsIRIS <<dataclass>> {
+  + repertoire : Path
+  + chemin_fichier : Path
+  + nom_onglet : str
+  + nbLignes_avantET : int
+  + ordre_colonne : list
+}
+
+class ConfigExportIRIS {
+  - _nom_typeExport : str
+  - _codeExport : str
+  - _input : InfosExportsIRIS
+  - _modele : InfosExportsIRIS
+  - _output : InfosExportsIRIS
+  --
+  + __init__(nom_typeExport, codeExport, input, modele, output)
+  + __str__()
+}
+
+class IRIS {
+  - _typeExport : str
+  - _fe : FichierExcel
+  - _SESSIONS : ConfigExportIRIS
+  - _FORMATIONS : ConfigExportIRIS
+  - _VENTES : ConfigExportIRIS
+  - _INSCRIPTIONS : ConfigExportIRIS
+  - DICT_EXPORTS_IRIS : dict
+  --
+  + __init__(typeExport)
+  + extraire_infos_numSessionIRIS()
+  + extraire_infos_referenceFormationIRIS()
+  + verifier_code_IRIS()
+  + extraire_code_IRIS_depuis_chemin()
+  + demander_liste_codes_IRIS()
+  + cei : ConfigExportIRIS
+  + typeExport : str
+  + fe : FichierExcel
+  + df : DataFrame
+  + chemin : Path
+  + tableau_donnees_iris : TableauExcel
+  + tableau_fichiers_importes : TableauExcel
+}
+
+class IRIS_natif {
+  + __init__(typeExport)
+  + avec_traitement() : IRIS_natif
+  - _charger_iris_natifs()
+  - _creer_export_IRIS()
+  - _ecrire_et_sauver_df_dans_excel()
+  - _concatener_fichiers_input()
+  + choisir_fichiers() : Path
+  + cei() : ConfigExportIRIS
+}
+
+abstract class IRIS_traite {
+  - _df : DataFrame
+  --
+  + __new__()
+  + __init__(chemin, fe, IRIS_plus_recent)
+  - _load_subclasses()
+  - _charger_excel()
+  - _chemin_IRIS_traite_plus_recent() : Path
+  - _convertit_types_colonnes_df()
+  + df : DataFrame
+  + get_champ_depuis_codes_IRIS()
+  + get_periode_depuis_codes_IRIS()
+  + df_filtre_codes_IRIS()
+  + df_filtre_periode()
+  + affiche_df_colonnes_principales()
+  + nom_colonne_debut_session : str
+  + nom_colonne_statut_session : str
+  + df_prefiltre : DataFrame
+  - _choisir_fichier() : Path
+}
+
+class IRIS_sessions {
+  + depuis_fichier() : IRIS_sessions
+  + demande_sessions_a_retenir() : list
+  + demande_sessions_a_exclure() : list
+  - _convertit_types_colonnes_df()
+  + nom_colonne_debut_session : str
+  + nom_colonne_statut_session : str
+  + df_prefiltre : DataFrame
+}
+
+class IRIS_ventes {
+  + depuis_fichier() : IRIS_ventes
+  - _convertit_types_colonnes_df()
+  + prix_formation_annee_str() : str
+  + df_prix_formation_annee() : DataFrame
+  + nom_colonne_debut_session : str
+  + nom_colonne_statut_session : str
+  + df_prefiltre : DataFrame
+}
+
+note right of IRIS_traite
+  Formations et Inscriptions
+  sont lus via IRIS_traite.
+  Il n'existe pas de classes
+  IRIS_formations / IRIS_inscriptions
+  dans le code actuel.
+end note
+
+IRIS_natif --|> IRIS
+IRIS_traite --|> IRIS
+IRIS_sessions --|> IRIS_traite
+IRIS_ventes --|> IRIS_traite
+
+ConfigExportIRIS *-- InfosExportsIRIS : input / modele / output
+IRIS *-- ConfigExportIRIS : exports
+IRIS --> FichierExcel : _fe
+
+@enduml

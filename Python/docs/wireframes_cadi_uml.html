@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CADI Web - Wireframes adaptes aux UML</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --ink: #172033;
+      --muted: #647084;
+      --line: #cfd6e3;
+      --soft: #edf1f7;
+      --accent: #2563eb;
+      --orange: #e85d2a;
+      --green: #16835f;
+      --warn: #a36b00;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 14px;
+    }
+    header {
+      padding: 28px 32px 18px;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+    }
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: 26px; }
+    header p { margin-top: 8px; color: var(--muted); max-width: 900px; }
+    main { padding: 24px 32px 44px; }
+    .map {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border: 1px solid var(--line);
+      margin-bottom: 28px;
+    }
+    .map th, .map td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+    .map th { background: var(--soft); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+    .board {
+      margin: 0 0 28px;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+    .board-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #eef3fb;
+    }
+    .board-title h2 { font-size: 18px; }
+    .tag { color: var(--muted); font-size: 12px; }
+    .wireframe {
+      display: grid;
+      grid-template-columns: 180px minmax(0, 1fr);
+      min-height: 420px;
+    }
+    .side {
+      border-right: 1px solid var(--line);
+      background: #f8fafc;
+      padding: 14px;
+    }
+    .brand {
+      font-weight: bold;
+      color: var(--orange);
+      margin-bottom: 16px;
+    }
+    .nav {
+      display: grid;
+      gap: 8px;
+    }
+    .nav span {
+      display: block;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+    .nav .active {
+      border-color: var(--accent);
+      color: var(--accent);
+      font-weight: bold;
+    }
+    .content { padding: 16px; }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 14px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .full { grid-column: 1 / -1; }
+    .panel {
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 12px;
+      min-height: 116px;
+    }
+    .panel h3 { font-size: 14px; margin-bottom: 10px; }
+    .field, .line, .button-row {
+      min-height: 28px;
+      border: 1px dashed #aeb8c8;
+      background: #fafcff;
+      margin: 7px 0;
+      padding: 6px 8px;
+      color: var(--muted);
+    }
+    .choice { display: inline-block; margin: 4px 12px 4px 0; color: var(--muted); }
+    .button {
+      display: inline-block;
+      margin: 4px 6px 4px 0;
+      padding: 7px 10px;
+      border: 1px solid var(--ink);
+      background: #fff;
+      color: var(--ink);
+      font-weight: bold;
+    }
+    .primary { border-color: var(--accent); background: #eaf1ff; color: var(--accent); }
+    .ok { color: var(--green); }
+    .warn { color: var(--warn); }
+    .sequence {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+      color: var(--muted);
+    }
+    .step {
+      border: 1px solid var(--line);
+      background: var(--soft);
+      padding: 7px 9px;
+    }
+    @media (max-width: 820px) {
+      main, header { padding-left: 16px; padding-right: 16px; }
+      .wireframe { grid-template-columns: 1fr; }
+      .side { border-right: 0; border-bottom: 1px solid var(--line); }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>CADI Web - dessins de maquette adaptes aux UML</h1>
+    <p>Wireframes basse fidelite alignes avec les cas d'utilisation et diagrammes de classes du dossier <strong>docs/UML</strong>. Chaque ecran reprend la logique UML : selection, verification, execution, resultat.</p>
+  </header>
+
+  <main>
+    <table class="map">
+      <thead>
+        <tr><th>Ecran</th><th>UML source</th><th>Intention</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Accueil</td><td>use_case_general.puml</td><td>Vue des modules, derniers traitements et statuts.</td></tr>
+        <tr><td>IRIS</td><td>use_case_iris.puml, uml_05_iris_detail.puml</td><td>Importer, choisir le type d'export, verifier, produire le fichier traite.</td></tr>
+        <tr><td>EvalStat</td><td>use_case_evalstat.puml, uml_03_sequence_evalstat.puml</td><td>Traiter les fiches d'evaluation a partir du trigramme et du code IRIS.</td></tr>
+        <tr><td>Bilans</td><td>use_case_bilans.puml, uml_06_bilans_detail.puml</td><td>Verifier les sources metier puis generer un document Word.</td></tr>
+        <tr><td>FdC / Parametres</td><td>use_case_fdc.puml, use_case_parametres.puml</td><td>Lire une fiche de couts et administrer chemins, modeles et roles.</td></tr>
+      </tbody>
+    </table>
+
+    <section class="board">
+      <div class="board-title"><h2>Accueil</h2><span class="tag">Acteur : Agent INSTN</span></div>
+      <div class="wireframe">
+        <aside class="side"><div class="brand">CADI Web</div><nav class="nav"><span class="active">Accueil</span><span>EvalStat</span><span>IRIS</span><span>Bilans</span><span>Fiches de couts</span><span>Messagerie</span><span>Parametres</span></nav></aside>
+        <div class="content">
+          <div class="topbar"><strong>Tableau de bord</strong><span>Agent INSTN | Pret</span></div>
+          <div class="grid">
+            <div class="panel"><h3>Raccourcis metier</h3><span class="button primary">Traiter EvalStat</span><span class="button">Traiter IRIS</span><span class="button">Generer bilan</span><span class="button">Lire FdC</span></div>
+            <div class="panel"><h3>Derniers traitements</h3><div class="line ok">Succes - EvalStat ACI / 948</div><div class="line warn">Avertissement - IRIS Inscriptions</div><div class="line ok">Succes - Bilan sessions</div></div>
+            <div class="panel full"><h3>Etat des sources</h3><div class="field">IRIS recent detecte | Modeles Word disponibles | Chemins reseau a verifier</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="board">
+      <div class="board-title"><h2>IRIS</h2><span class="tag">Use case : traiter les exports IRIS</span></div>
+      <div class="wireframe">
+        <aside class="side"><div class="brand">CADI Web</div><nav class="nav"><span>Accueil</span><span>EvalStat</span><span class="active">IRIS</span><span>Bilans</span><span>Fiches de couts</span><span>Parametres</span></nav></aside>
+        <div class="content">
+          <div class="topbar"><strong>Traitement des exports IRIS</strong><span>Agent INSTN | Aucun traitement</span></div>
+          <div class="grid">
+            <div class="panel"><h3>Parametres de l'export</h3><span class="choice">( ) Sessions</span><span class="choice">( ) Formations</span><span class="choice">( ) Ventes</span><span class="choice">( ) Inscriptions</span><div class="field">Fichier source : R04110_Sessions-2026.xlsx</div></div>
+            <div class="panel"><h3>Verification</h3><div class="line">Onglet attendu : Data</div><div class="line">Modele Excel : detecte</div><span class="button">Verifier la structure</span></div>
+            <div class="panel full"><h3>Execution et resultat</h3><span class="button primary">Lancer le traitement IRIS</span><span class="button">Reinitialiser</span><div class="field ok">Fichier traite pret : Extracts complets/R04110_COMPLET.xlsx</div></div>
+          </div>
+          <div class="sequence"><span class="step">Importer</span><span class="step">Choisir type</span><span class="step">Verifier structure</span><span class="step">Produire fichier</span><span class="step">Afficher statut</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="board">
+      <div class="board-title"><h2>EvalStat</h2><span class="tag">Use case : traiter les evaluations</span></div>
+      <div class="wireframe">
+        <aside class="side"><div class="brand">CADI Web</div><nav class="nav"><span>Accueil</span><span class="active">EvalStat</span><span>IRIS</span><span>Bilans</span><span>Fiches de couts</span><span>Parametres</span></nav></aside>
+        <div class="content">
+          <div class="topbar"><strong>Evaluations stagiaires</strong><span>Agent INSTN | Pret</span></div>
+          <div class="grid">
+            <div class="panel"><h3>Informations session</h3><div class="field">Trigramme formation : ACI</div><div class="field">Code IRIS : 948</div></div>
+            <div class="panel"><h3>Fichiers selectionnes</h3><div class="line">Evaluation-Stagiaires-Global-948.xlsx</div><div class="line">Evaluation-Stagiaires-S1-948.xlsx</div></div>
+            <div class="panel full"><h3>Traitement</h3><span class="button">Verifier les fichiers</span><span class="button primary">Lancer EvalStat</span><div class="field ok">Succes : 38 fiches traitees, Excel mis a jour</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="board">
+      <div class="board-title"><h2>Bilans</h2><span class="tag">Acteur : responsable pedagogique</span></div>
+      <div class="wireframe">
+        <aside class="side"><div class="brand">CADI Web</div><nav class="nav"><span>Accueil</span><span>EvalStat</span><span>IRIS</span><span class="active">Bilans</span><span>Fiches de couts</span><span>Parametres</span></nav></aside>
+        <div class="content">
+          <div class="topbar"><strong>Generation de bilans</strong><span>Responsable pedagogique | Pret</span></div>
+          <div class="grid">
+            <div class="panel"><h3>Parametres du bilan</h3><div class="field">Trigramme : ACI</div><div class="field">Annee : 2026 | Periode : FC2026</div><span class="choice">( ) Bilan sessions</span><span class="choice">( ) Bilan formation</span></div>
+            <div class="panel"><h3>Verification des donnees</h3><div class="line ok">EvalStat disponible</div><div class="line ok">IRIS disponible</div><div class="line warn">Fiche de couts manquante</div></div>
+            <div class="panel full"><h3>Generation</h3><span class="button">Verifier les donnees</span><span class="button primary">Generer le document Word</span><div class="field">Sortie : Bilans/ACI_Bilan_2026.docx</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="board">
+      <div class="board-title"><h2>Fiches de couts et Parametres</h2><span class="tag">Acteur : administrateur fonctionnel</span></div>
+      <div class="wireframe">
+        <aside class="side"><div class="brand">CADI Web</div><nav class="nav"><span>Accueil</span><span>EvalStat</span><span>IRIS</span><span>Bilans</span><span class="active">Fiches de couts</span><span>Parametres</span></nav></aside>
+        <div class="content">
+          <div class="topbar"><strong>Administration metier</strong><span>Administrateur | Pret</span></div>
+          <div class="grid">
+            <div class="panel"><h3>Fiche de couts</h3><div class="field">Fichier : FDC_ACI_2026.xlsx</div><span class="button primary">Lire la fiche</span><div class="line">Prix : 1 250 EUR | Duree : 3 jours</div></div>
+            <div class="panel"><h3>Parametres</h3><div class="field">Repertoire IRIS : C:/.../IRIS</div><div class="field">Modele Word bilan : disponible</div><span class="button">Tester les chemins</span><span class="button primary">Enregistrer</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
