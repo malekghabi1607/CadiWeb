@@ -2,3 +2,5 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 ~$*.xlsx
+Python/apps/cadi_web/frontend/node_modules/
+Python/apps/cadi_web/frontend/.tools/

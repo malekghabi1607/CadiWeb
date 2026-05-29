@@ -1,3 +1,10 @@
-// Point d'entrée React.
-// Monte le composant App dans le div#root du fichier index.html.
-// Configure les providers globaux (router, thème).
+import React from "react";
+import { createRoot } from "react-dom/client";
+import App from "./App";
+import "./styles.css";
+
+createRoot(document.getElementById("root") as HTMLElement).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
