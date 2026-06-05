@@ -711,7 +711,7 @@ class IRIS_natif(IRIS):
         super().__init__(typeExport=typeExport)
 
     @classmethod
-    def avec_traitement(cls, typeExport:str, chemins_fichiersInput:Optional[str|Path|Iterable[str|Path]] = None, chemin_fichier_sauv:Optional[Path]=None) -> IRIS_natif:
+    def avec_traitement(cls, typeExport:str, chemins_fichiersInput:Optional[str|Path|Iterable[str|Path]] = None, chemin_fichier_sauv:Optional[Path]=None, progress_callback=None) -> IRIS_natif:
         r"""
         Crée un fichier Excel unique à partir de plusieurs exports IRIS natifs.
 
@@ -744,7 +744,8 @@ class IRIS_natif(IRIS):
         instance = cls(typeExport)
         instance._creer_export_IRIS(
             chemins_fichiersInput=chemins_fichiersInput,
-            chemin_fichier_sauv=chemin_fichier_sauv
+            chemin_fichier_sauv=chemin_fichier_sauv,
+            progress_callback=progress_callback,
             )
         return instance
     
@@ -752,7 +753,7 @@ class IRIS_natif(IRIS):
     # =========================
     # === Méthodes internes ===
     # =========================
-    def _charger_iris_natifs(self, chemins_fichiersInput:Optional[Path|Iterable[Path]]=None) -> tuple[DataFrame, tuple[Path]]:
+    def _charger_iris_natifs(self, chemins_fichiersInput:Optional[Path|Iterable[Path]]=None, progress_callback=None) -> tuple[DataFrame, tuple[Path]]:
         r"""
         Lit le/les extract(s) IRIS et on génère dans un seul dataframe
         On concatène si besoin
@@ -803,30 +804,52 @@ class IRIS_natif(IRIS):
         df_list = [] # Liste des DataFrame qui contiendra chaque fichier Excel séparément
         taille_totale = sum(fichier.stat().st_size for fichier in chemins_fichiersInput) # Calcul taille totale pour barre de progression
 
+        n_fichiers = len(chemins_fichiersInput)
+        if progress_callback: progress_callback(5, f"Lecture de {n_fichiers} fichier(s) Excel...")
+
         print()  # Pour avoir une ligne à écraser avec le tqdm
         with tqdm(total=taille_totale, unit='o', unit_scale=True, desc=Fore.CYAN+"Lecture des fichiers Excel" + Style.RESET_ALL) as pbar:
-            #for i, ifichier in enumerate((os.path.basename(chemin) for chemin in chemins_fichiersInput), 1):
             for i, chemin in enumerate(chemins_fichiersInput, 1):
-                # Données pour tqdm
                 fichier = chemin.name
-                taille = chemin.stat().st_size  # taille en octets 
-                pbar.set_postfix(file=fichier, progress=f"{i}/{len(chemins_fichiersInput)}")  # Affichage dynamique dans la barre
-                
-                df = pd.read_excel(chemin, skiprows=self.cei(self.typeExport)._input.nbLignes_avantET)
-                df_list.append(df)  # On ajoute le DataFrame à notre liste de DataFrame
-                
-                # Mise à jour de la barre avec la taille du fichier
+                taille = chemin.stat().st_size
+                pbar.set_postfix(file=fichier, progress=f"{i}/{n_fichiers}")
+
+                if progress_callback:
+                    pct = int(i / n_fichiers * 45) + 5
+                    progress_callback(pct, f"Lecture {i}/{n_fichiers} : {fichier}")
+
+                if not chemin.exists():
+                    raise FileNotFoundError(
+                        f"Fichier introuvable : {fichier}\n"
+                        f"Vérifiez qu'il est bien présent dans le dossier Extracts originaux."
+                    )
+
+                if taille == 0:
+                    raise ValueError(
+                        f"Fichier vide (0 octet) : {fichier}\n"
+                        "Vérifiez que le fichier n'est pas corrompu."
+                    )
+
+                try:
+                    df = pd.read_excel(chemin, skiprows=self.cei(self.typeExport)._input.nbLignes_avantET)
+                except Exception as exc:
+                    raise ValueError(
+                        f"Impossible de lire '{fichier}' : ce fichier n'est pas un Excel valide "
+                        f"ou son format est corrompu.\nDétail : {exc}"
+                    ) from exc
+
+                df_list.append(df)
                 pbar.update(taille)
 
-        # Concaténation finale (note : toute la fin de la méthode se fait quasi-instantanément)
-        df_concat_iris = pd.concat(df_list, ignore_index=True) 
+        if progress_callback: progress_callback(52, "Concaténation des données...")
+        df_concat_iris = pd.concat(df_list, ignore_index=True)
 
+        if progress_callback: progress_callback(55, "Extraction des colonnes (trigrammes, codes IRIS)...")
 
         # ===
         # === EXTRACTION INFOS DEPUIS N°IRIS ET REFERENCE FORMATION & AJOUT COLONNES ===
         # ===
-        # Extraction des infos depuis "référence formation" ou "n° Iris" (dépend du type d'export)
-        df_colonnes_sup = None  # Si on extrait des données depuis "référence formation" ou "n° Iris", alors on devra ajouter des colonnes au df initial
+        df_colonnes_sup = None
         match self.typeExport:
             # Cas Sessions ou Inscriptions ou Ventes (sensiblement comme 'Inscription R04500' mais groupé par Client (pas de détail de chaque stagiaire))
             case "Sessions" | "Inscriptions" | "Ventes":
@@ -856,7 +879,7 @@ class IRIS_natif(IRIS):
 
         return df_concat_iris, chemins_fichiersInput
 
-    def _ecrire_et_sauver_df_dans_excel(self, df:DataFrame, chemins_natifs_iris:tuple[Path], chemin_fichier_sauv:Optional[Path]=None) -> None:
+    def _ecrire_et_sauver_df_dans_excel(self, df:DataFrame, chemins_natifs_iris:tuple[Path], chemin_fichier_sauv:Optional[Path]=None, progress_callback=None) -> None:
         r"""
         Écrit et sauve un df issu d'extracts IRIS natifs dans un fichier Excel issu d'un modèle.
         Si chemin_fichier_sauv n'est pas donné, alors on emploie la valeur par défaut qui est dans cei.
@@ -871,28 +894,29 @@ class IRIS_natif(IRIS):
             chemins_natifs_iris (tuple[Path]): tuple des chemins ayant servi à faire df
             chemin_fichier_sauv (Optional[Path]): chemin de sauvegarde du fichier. Si chemin_fichier_sauv n'est pas donné, alors on emploie la valeur par défaut qui est dans cei.
         """
-        # Si aucun fichier de sortie n'est donnée, alors on prend le chemin par défaut
         if chemin_fichier_sauv is None:
             chemin_fichier_sauv = self.cei(self.typeExport)._output.chemin_fichier
- 
-        # On ouvre le modèle et tous ses tableaux structurés
+
+        if progress_callback: progress_callback(60, "Ouverture du modèle Excel...")
         self._fe = FichierExcel.depuis_modele(
-                                        chemin_modele=self.cei(self.typeExport)._modele.chemin_fichier, 
+                                        chemin_modele=self.cei(self.typeExport)._modele.chemin_fichier,
                                         chemin_fichier_sauv=chemin_fichier_sauv
                                         )
 
-        # On copie le DataFrame df avec les nouvelles données dans le modèle (on écrase les anciennes données car depuis modèle, donc tableau vide)
+        if progress_callback: progress_callback(70, "Collage des valeurs dans le modèle...")
         self.tableau_donnees_iris.ecrit_dataFrame_dans_tableauStructure(df, supprimeDonneesEtRemplace=True, remplace_df_par_nouveau=True)
 
-        # On écrit les références des fichiers copiés dans le tableau structuré "Imports". Nota : openpyxl ne prend pas en charge les Path donc on passe avec des str
+        if progress_callback: progress_callback(84, "Collage des formats et références sources...")
         df_chemins = DataFrame([str(chemin) for chemin in chemins_natifs_iris], columns=['Chemin fichier'])
         self.tableau_fichiers_importes.ecrit_dataFrame_dans_tableauStructure(df=df_chemins, supprimeDonneesEtRemplace=True, remplace_df_par_nouveau=True)
 
-        #On enregistre et on ferme (par précaution car copieformat xlwings sauvegarde)
-        self._fe.save()    
+        if progress_callback: progress_callback(93, "Sauvegarde du fichier Excel...")
+        self._fe.save()
+
+        if progress_callback: progress_callback(98, "Fermeture du fichier...")
         self._fe.close()
 
-    def _creer_export_IRIS(self, chemins_fichiersInput:Optional[str|Path|Iterable[str|Path]] = None, chemin_fichier_sauv:Optional[Path]=None) -> None:
+    def _creer_export_IRIS(self, chemins_fichiersInput:Optional[str|Path|Iterable[str|Path]] = None, chemin_fichier_sauv:Optional[Path]=None, progress_callback=None) -> None:
         r"""
         Crée un fichier Excel unique à partir de plusieurs exports IRIS natifs.
 
@@ -921,15 +945,19 @@ class IRIS_natif(IRIS):
         .. todo:: Rien du tout.
         """
         
-        # On lit le/les extract(s) IRIS et on le/les charge dans un seul dataframe
-        df_concat_iris, chemins_natifs_iris = self._charger_iris_natifs(chemins_fichiersInput=chemins_fichiersInput)
+        if progress_callback: progress_callback(2, f"Vérification présence fichiers {self.typeExport}...")
 
-        # On écrit et on sauve dans un nouvel Excel issu d'un modèle
+        df_concat_iris, chemins_natifs_iris = self._charger_iris_natifs(
+            chemins_fichiersInput=chemins_fichiersInput,
+            progress_callback=progress_callback,
+        )
+
         self._ecrire_et_sauver_df_dans_excel(
-            df=df_concat_iris, 
-            chemins_natifs_iris=chemins_natifs_iris, 
-            chemin_fichier_sauv=chemin_fichier_sauv
-            ) 
+            df=df_concat_iris,
+            chemins_natifs_iris=chemins_natifs_iris,
+            chemin_fichier_sauv=chemin_fichier_sauv,
+            progress_callback=progress_callback,
+        )
 
 
 
