@@ -8,6 +8,23 @@ from vte.services.iris_dumps_services import mettre_a_jour_dumps_depuis_ged
 init(autoreset=True)
 
     
+# =============================================================================
+# Point d'entree console IRIS
+# =============================================================================
+#
+# Ce script est l'interface historique en console pour traiter les exports IRIS.
+# Il ne contient pas la logique pandas/Excel elle-meme: il construit un menu, puis
+# delegue au package `vte`.
+#
+# Roles principaux:
+# - lancer la consolidation d'un ou plusieurs exports IRIS;
+# - choisir entre selection manuelle de fichiers et configuration automatique;
+# - mettre a jour les dumps locaux depuis la GED pour les exports concernes;
+# - afficher un bilan lisible dans le terminal.
+#
+# La nouvelle interface web `apps/cadi_web` doit appeler les memes services `vte`
+# afin que console et web partagent les memes regles metier.
+
 # === Ecrire nouveaux extracts IRIS complets (qui concatène plusieurs extracts individuels) ===
 # Procédure :
 # IRIS : 
@@ -18,6 +35,8 @@ init(autoreset=True)
 
 MODE = "console"
 
+# Valeur par defaut utilisee par certains menus si l'utilisateur choisit le mode
+# automatique. Le detail de la demande utilisateur est gere par `IHM_console`.
 depuis_config:bool = False
 
 
@@ -25,6 +44,13 @@ def mettre_a_jour_dumps_ged_console() -> None:
     """
     Lance la mise a jour des dumps GED et affiche un bilan lisible en console.
     """
+    # Le service renvoie un dictionnaire par code export:
+    # {
+    #   "R04301": {"copie": Path | None, "archives": [Path, ...]},
+    #   ...
+    # }
+    # Cette fonction transforme ce bilan technique en affichage humain pour la
+    # console, sans changer les regles metier.
     bilan = mettre_a_jour_dumps_depuis_ged()
 
     print("\n=== Bilan mise a jour dumps GED ===")
@@ -51,6 +77,11 @@ def mettre_a_jour_dumps_ged_console() -> None:
 
 
 MENUS = {
+    # Chaque entree suit le contrat attendu par `IHM_console`:
+    # - `action`: fonction appelee quand l'utilisateur choisit l'entree;
+    # - `kwargs`: arguments fixes passes a cette fonction;
+    # - `demander`: arguments a demander dynamiquement a l'utilisateur;
+    # - `indications`: texte d'aide affiche pendant la saisie.
     "Tout traiter": {
         "action": IRIS_services.concatener_plusieursTypes,
         "kwargs": {"typesExports":("Sessions", "Formations", "Ventes", "Inscriptions")},
@@ -95,6 +126,7 @@ MENUS = {
 }
 
 def main():
+    # `vlog` vient de `vte.utils.utils`. Il gere l'affichage colore de la console.
     vlog.print("Info", "*************\nBienvenue dans le script pour concaténer des fichiers IRIS.\n*************", style=["vert clair"])
     """
     ihm = IHM_console({})  # Pas besoin de menu ici
@@ -113,6 +145,9 @@ def main():
 
 
     """
+    # Le menu centralise toutes les actions console. Ajouter une action IRIS
+    # consiste en general a ajouter une entree dans `MENUS`, pas a modifier
+    # `IHM_console`.
     ihm = IHM_console(MENUS)
     ihm.afficher_menu()
 
