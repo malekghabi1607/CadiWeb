@@ -39,6 +39,7 @@ from win32com.client import CDispatch
 import extract_msg
 import os
 import shutil
+import tempfile
 import sys
 import time as time_module     # pour time_module.sleep()
 import copy
@@ -1124,7 +1125,18 @@ class FichierExcel:
     def charger_wb(self) -> None:
         if not self._chemin_fichier:
             vlog.log_erreur("Le chemin du fichier Excel n'est pas défini")
-        self._wb = load_workbook(self._chemin_fichier)
+        try:
+            self._wb = load_workbook(self._chemin_fichier)
+        except PermissionError:
+            # Fichier verrouillé sur le réseau (ex: ouvert dans Excel) — on passe par une copie temporaire
+            tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
+            tmp.close()
+            tmp_path = Path(tmp.name)
+            shutil.copy2(self._chemin_fichier, tmp_path)
+            try:
+                self._wb = load_workbook(tmp_path)
+            finally:
+                tmp_path.unlink(missing_ok=True)
 
     def recharger_workbook_openpyxl(self, recalculerDimensionsTableau: bool = True) -> None:
         """
