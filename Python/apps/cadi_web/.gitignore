@@ -1,0 +1,13 @@
+# Données IRIS — fichiers Excel trop lourds pour git
+Python/IRIS/
+
+# Node
+front/.tools/
+front/node_modules/
+front/dist/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
