@@ -13,7 +13,7 @@ Pour chacun de ces cas, vous pouvez :
 
 """
 
-_tSessions = (
+_tSessions3 = (
     'R04110_Sessions-2011 à 2014 FINAL.xlsx',
     'R04110_Sessions-2015 FINAL.xlsx',
     'R04110_Sessions-2016 FINAL.xlsx',
