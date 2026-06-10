@@ -1,51 +1,65 @@
 /**
- * ======================================================================================
- * CADI Web — COMPOSANT FOOTER (PIED DE PAGE)
- * ======================================================================================
- * 
- * Ce composant représente la barre de pied de page globale et persistante de l'application.
- * Il affiche l'année en cours, la version officielle de CADI Web et les mentions
- * de confidentialité institutionnelles de l'INSTN et du CEA Saclay.
- * 
- * Rôle structurel :
- * - S'adapte dynamiquement à la largeur de la barre latérale (Sidebar) pour conserver l'alignement.
- * - S'ancre au bas du viewport utilisateur avec un design épuré.
- * 
- * @author INSTN / CEA Saclay
- * @version 2.4.1
+ * CADI Web - Footer dashboard compact.
+ *
+ * Pas de navigation metier ici : la sidebar gere deja le dashboard.
+ * Le footer donne seulement les liens d'aide et les informations internes.
  */
+
+import { FileText, HelpCircle, Mail, Scale, ShieldCheck } from 'lucide-react';
+import type { InfoPage } from '../pages/InfoPages';
 
 interface FooterProps {
-  /** Largeur courante de la barre latérale pour ajuster le décalage à gauche (margin-left) */
   sidebarWidth: number;
+  onNavigateInfo: (page: InfoPage) => void;
 }
 
-/**
- * Composant fonctionnel principal pour le Pied de page.
- * 
- * @param props Propriétés du composant s'appuyant sur l'interface FooterProps.
- * @returns Rendu HTML5 sémantique du pied de page.
- */
-export default function Footer({ sidebarWidth }: FooterProps) {
+const links: { page: InfoPage; label: string; Icon: React.ElementType }[] = [
+  { page: 'terms', label: 'Conditions', Icon: FileText },
+  { page: 'privacy', label: 'Confidentialite', Icon: ShieldCheck },
+  { page: 'legal', label: 'Mentions legales', Icon: Scale },
+  { page: 'faq', label: 'FAQ', Icon: HelpCircle },
+  { page: 'contact', label: 'Contact', Icon: Mail },
+];
+
+export default function Footer({ sidebarWidth, onNavigateInfo }: FooterProps) {
   return (
     <footer
-      className="flex items-center justify-between px-6 transition-all duration-200"
+      className="flex items-center justify-between gap-4 px-5 transition-all duration-200"
       style={{
         marginLeft: sidebarWidth,
         borderTop: '1px solid #e8edf2',
         background: '#ffffff',
-        height: 40,
+        minHeight: 48,
         flexShrink: 0,
       }}
     >
-      {/* Mention de copyright dynamique INSTN / CEA */}
-      <span className="text-xs" style={{ color: '#94a3b8' }}>
-        © {new Date().getFullYear()} INSTN / CEA — CADI Web
-      </span>
-      {/* Avertissement de sécurité sur le traitement des données sensibles */}
-      <span className="text-xs" style={{ color: '#94a3b8' }}>
-        Usage interne — données sensibles
-      </span>
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="h-2 w-2 rounded-full" style={{ background: '#f97316' }} />
+        <span className="truncate text-xs font-bold" style={{ color: '#64748b' }}>
+          CADI Web - INSTN / CEA
+        </span>
+      </div>
+
+      <nav className="flex items-center gap-1.5" aria-label="Liens d'aide et mentions">
+        {links.map(({ page, label, Icon }) => (
+          <button
+            key={page}
+            type="button"
+            onClick={() => onNavigateInfo(page)}
+            className="flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-orange-50 hover:text-orange-500"
+            style={{ color: '#94a3b8' }}
+            title={label}
+            aria-label={label}
+          >
+            <Icon size={16} strokeWidth={1.9} />
+          </button>
+        ))}
+      </nav>
+
+      <div className="hidden items-center gap-1.5 text-xs font-semibold sm:flex" style={{ color: '#94a3b8' }}>
+        <ShieldCheck size={14} />
+        Usage interne
+      </div>
     </footer>
   );
 }

@@ -13,6 +13,7 @@ import Bilans from './pages/Bilans';
 import Formations from './pages/Formations';
 import Parametres from './pages/Parametres';
 import Messagerie from './pages/Messagerie';
+import { ContactPage, FAQPage, InfoPage, LegalPage, PrivacyPage, TermsPage } from './pages/InfoPages';
 import { LogOut } from 'lucide-react';
 
 type AuthScreen = 'index' | 'login' | 'register' | 'forgot';
@@ -27,16 +28,29 @@ const screenTitles: Record<Screen, string> = {
   messagerie: 'Messagerie',
 };
 
+const infoTitles: Record<InfoPage, string> = {
+  terms: 'Conditions',
+  privacy: 'Confidentialite',
+  legal: 'Mentions legales',
+  faq: 'FAQ',
+  contact: 'Contact',
+};
+
 export default function App() {
   const [auth, setAuth]           = useState<AuthScreen>('index');
   const [loggedIn, setLoggedIn]   = useState(false);
   const [screen, setScreen]       = useState<Screen>('accueil');
+  const [infoScreen, setInfoScreen] = useState<InfoPage | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [logoutToast, setLogoutToast] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ prenom: string; nom: string; email: string; unite?: string } | null>(null);
 
   const sideW = collapsed ? SIDEBAR_W_COLLAPSED : SIDEBAR_W;
-  const navigate = (s: string) => setScreen(s as Screen);
+  const navigate = (s: string) => {
+    setInfoScreen(null);
+    setScreen(s as Screen);
+  };
+  const navigateInfo = (page: InfoPage) => setInfoScreen(page);
 
   const handleLogout = () => {
     setLoggedIn(false);
@@ -66,6 +80,16 @@ export default function App() {
   }
 
   const renderScreen = () => {
+    if (infoScreen) {
+      switch (infoScreen) {
+        case 'terms': return <TermsPage />;
+        case 'privacy': return <PrivacyPage />;
+        case 'legal': return <LegalPage />;
+        case 'faq': return <FAQPage onNavigate={navigateInfo} />;
+        case 'contact': return <ContactPage />;
+      }
+    }
+
     switch (screen) {
       case 'accueil':    return <Accueil onNavigate={navigate} />;
       case 'iris':       return <IRIS />;
@@ -98,7 +122,7 @@ export default function App() {
 
       <Header
         sidebarWidth={sideW}
-        title={screenTitles[screen]}
+        title={infoScreen ? infoTitles[infoScreen] : screenTitles[screen]}
         onNavigate={navigate}
       />
 
@@ -111,7 +135,10 @@ export default function App() {
         </div>
       </main>
 
-      <Footer sidebarWidth={sideW} />
+      <Footer
+        sidebarWidth={sideW}
+        onNavigateInfo={navigateInfo}
+      />
     </div>
   );
 }

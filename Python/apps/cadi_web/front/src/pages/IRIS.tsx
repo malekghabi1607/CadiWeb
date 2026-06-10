@@ -77,7 +77,7 @@ type VerificationResponse = {
 
 type JobStatus = {
   // Etat du job cote serveur. Tant que `running`, le front continue le polling.
-  status: 'running' | 'done' | 'error';
+  status: 'running' | 'done' | 'error' | 'cancelled';
   // Progression reelle calculee par le back, entre 0 et 100.
   progress?: number;
   // Etape courante affichee sous la barre de progression.
@@ -131,7 +131,7 @@ async function pollJobStatus(
     if (job.statut_codes && onStatuts) onStatuts(job.statut_codes);
     if (job.steps_history && onStepsHistory) onStepsHistory(job.steps_history);
 
-    if (job.status === 'done') return job;
+    if (job.status === 'done' || job.status === 'cancelled') return job;
     if (job.status === 'error') throw new Error(job.message ?? 'Erreur de traitement');
   }
 }
@@ -383,11 +383,17 @@ export default function IRIS() {
         setProgress(100);
         setTargetProgress(100);
         setDone(true);
-        setTreatmentStatus(job.warning ? 'error' : 'success');
-        setTreatmentMessage(job.message ?? 'Traitement terminé.');
-        setCurrentStep(job.warning ? 'Erreur' : 'Traitement terminé ✓');
+        if (job.status === 'cancelled') {
+          setTreatmentStatus('error');
+          setTreatmentMessage(job.message ?? 'Traitement annulé — tu peux relancer.');
+          setCurrentStep('Annulé');
+        } else {
+          setTreatmentStatus(job.warning ? 'error' : 'success');
+          setTreatmentMessage(job.message ?? 'Traitement terminé.');
+          setCurrentStep(job.warning ? 'Erreur' : 'Traitement terminé ✓');
+        }
         setResultRows(job.files ?? []);
-        if (!job.warning) void loadDumps(true);
+        if (job.status !== 'cancelled' && !job.warning) void loadDumps(true);
       })
       .catch(err => {
         if ((err as Error).name !== 'AbortError') {
@@ -624,16 +630,25 @@ export default function IRIS() {
     setResultRows([]);
 
     try {
-      // Etape 1: verification automatique pour les deux modes.
-      // Elle evite de lancer un traitement long si un fichier manque deja.
-      setTargetProgress(10);
-      const verificationOk = await verifyFileStructure(controller.signal);
-      if (!verificationOk) {
-        setDone(true);
-        setTargetProgress(100);
-        setTreatmentStatus('error');
-        setTreatmentMessage('Traitement bloqué — corrigez les fichiers indiqués dans la colonne Vérification.');
-        return;
+      // Etape 1: verification auto uniquement en mode auto.
+      // En mode manuel, les fichiers ont deja ete valides lors de la selection
+      // (Tkinter + _valider_fichier_manuel cote back). Appeler validate-structure
+      // ici bloquerait a tort si un fichier de la config auto est absent alors
+      // que l'utilisateur a fourni ses propres chemins.
+      if (mode === 'auto') {
+        setTargetProgress(10);
+        const verificationOk = await verifyFileStructure(controller.signal);
+        if (!verificationOk) {
+          setDone(true);
+          setTargetProgress(100);
+          setTreatmentStatus('error');
+          setTreatmentMessage('Traitement bloqué — corrigez les fichiers indiqués dans la colonne Vérification.');
+          return;
+        }
+        // La vérification a servi de garde avant lancement. Dès que le traitement
+        // démarre réellement, on retire son bandeau pour ne garder que le suivi job.
+        setVerifyStatus('idle');
+        setVerifyMessage('');
       }
 
       setTargetProgress(25);
@@ -687,6 +702,15 @@ export default function IRIS() {
           }, applyStatuts, setStepsLog);
 
           sessionStorage.removeItem('iris_pending_job'); currentJobIdRef.current = null;
+          if (job.status === 'cancelled') {
+            setTargetProgress(100);
+            setDone(true);
+            setTreatmentStatus('error');
+            setTreatmentMessage(job.message ?? 'Traitement annulé — tu peux relancer.');
+            setCurrentStep('Annulé');
+            setResultRows(allFiles);
+            return;
+          }
           allFiles.push(...(job.files ?? []));
           setCurrentStep(`${dump.type} — terminé ✓`);
         }
@@ -737,6 +761,13 @@ export default function IRIS() {
 
       setTargetProgress(100);
       setDone(true);
+      if (job.status === 'cancelled') {
+        setTreatmentStatus('error');
+        setTreatmentMessage(job.message ?? 'Traitement annulé — tu peux relancer.');
+        setCurrentStep('Annulé');
+        setResultRows(job.files ?? []);
+        return;
+      }
       setTreatmentStatus(job.warning ? 'error' : 'success');
       setTreatmentMessage(job.message ?? 'Traitement IRIS terminé.');
       setCurrentStep(job.warning ? 'Erreur' : 'Traitement terminé ✓');

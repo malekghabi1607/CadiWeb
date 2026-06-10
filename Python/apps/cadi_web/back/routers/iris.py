@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import time
 from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
@@ -53,6 +54,10 @@ router = APIRouter(prefix="/iris", tags=["IRIS"])
 # dans sessionStorage pour reprendre apres refresh, mais on ne cherche pas ici a
 # survivre a un redemarrage complet de FastAPI.
 _jobs: dict[str, dict] = {}
+
+# Les jobs termines restent consultables quelques minutes pour que le front
+# puisse afficher le resultat apres la fin, puis ils sont purges de la memoire.
+JOB_RETENTION_SECONDS = 30 * 60
 
 
 # =============================================================================
@@ -457,7 +462,31 @@ def _run_avec_com(func):
         pythoncom.CoUninitialize()
 
 
-def _valider_fichier_manuel(chemin: Path) -> Path:
+def _now_ts() -> float:
+    """Retourne un timestamp monotone simple pour la gestion des jobs en memoire."""
+    return time.time()
+
+
+def _cleanup_jobs() -> None:
+    """Supprime les jobs termines depuis plus de 30 minutes."""
+    limite = _now_ts() - JOB_RETENTION_SECONDS
+    anciens_jobs = [
+        job_id
+        for job_id, job in _jobs.items()
+        if job.get("status") in {"done", "error", "cancelled"}
+        and job.get("finished_at", float("inf")) < limite
+    ]
+    for job_id in anciens_jobs:
+        _jobs.pop(job_id, None)
+
+
+def _mark_job_finished(job: dict, status: str) -> None:
+    """Marque un job comme termine et memorise l'heure de fin pour le nettoyage."""
+    job["status"] = status
+    job["finished_at"] = _now_ts()
+
+
+def _valider_fichier_manuel(chemin: Path, code_export: str) -> Path:
     """Valide un fichier choisi manuellement avant de le transmettre au metier."""
     if not chemin.exists():
         raise HTTPException(status_code=400, detail=f"Fichier introuvable : {chemin}")
@@ -469,6 +498,12 @@ def _valider_fichier_manuel(chemin: Path) -> Path:
         raise HTTPException(
             status_code=400,
             detail=f"Extension non attendue pour {chemin.name} : attendu .xlsx ou .xls.",
+        )
+
+    if not chemin.name.startswith(code_export):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Mauvais fichier pour {code_export} : {chemin.name}. Le nom doit commencer par {code_export}.",
         )
 
     return chemin
@@ -641,30 +676,18 @@ def open_path(payload: OpenPathRequest) -> dict[str, str]:
     return {"status": "ok", "path": str(path)}
 
 
-@router.post("/select-manual-files")
-async def select_manual_files(payload: SelectManualFilesRequest) -> dict[str, object]:
-    """Ouvre la fenetre Python/Tkinter locale pour choisir des fichiers IRIS.
+def _run_tkinter_selection(code: str, type_export: str) -> list[Path]:
+    """Ouvre la fenetre Tkinter de selection de fichiers IRIS (fonction bloquante sync).
 
-    Cette route remplace le selecteur navigateur `<input type=file>` pour le mode
-    manuel. Avantage: on retrouve le comportement console historique, notamment
-    le titre personnalise de la fenetre de selection.
+    Tkinter doit tourner dans un thread OS, jamais dans l'event loop asyncio.
+    A appeler uniquement via `await asyncio.to_thread(_run_tkinter_selection, ...)`.
     """
-    codes = _normaliser_codes([payload.export])
-    if len(codes) != 1:
-        raise HTTPException(status_code=400, detail="Selectionnez un seul export IRIS valide.")
-
-    code = codes[0]
-    type_export = EXPORTS_IRIS[code]
-    titre = f"Selectionner uniquement des fichiers Extract IRIS {type_export} ({code})"
-
-    # Route locale volontairement bloquante: l'utilisateur doit fermer la fenetre
-    # de selection avant que le front recoive la reponse. On utilise directement
-    # Tkinter pour eviter le popup console qui peut appeler `sys.exit()`.
     import tkinter as tk
     from tkinter import filedialog, messagebox
 
-    # Boucle : la fenetre se rouvre tant que la selection contient des fichiers invalides.
+    titre = f"Selectionner uniquement des fichiers Extract IRIS {type_export} ({code})"
     chemins_valides: list[Path] = []
+
     while True:
         root = tk.Tk()
         root.withdraw()
@@ -681,32 +704,67 @@ async def select_manual_files(payload: SelectManualFilesRequest) -> dict[str, ob
             root.attributes("-topmost", False)
             root.destroy()
 
-        # Annulation : l'utilisateur a ferme sans choisir.
         if not chemins:
             break
 
-        # Controle : uniquement l'extension — le nom du fichier est libre en mode manuel.
-        refus = [Path(c).name for c in chemins if Path(c).suffix.lower() not in {".xlsx", ".xls"}]
+        # Controle strict : Excel uniquement, nom commencant par le code export.
+        refus_extension = [Path(c).name for c in chemins if Path(c).suffix.lower() not in {".xlsx", ".xls"}]
+        refus_code = [
+            Path(c).name
+            for c in chemins
+            if Path(c).suffix.lower() in {".xlsx", ".xls"} and not Path(c).name.startswith(code)
+        ]
+        refus = refus_extension + refus_code
         if refus:
             alerte = tk.Tk()
             alerte.withdraw()
             alerte.attributes("-topmost", True)
             alerte.update()
+            details = []
+            if refus_extension:
+                details.append(
+                    "Ces fichiers ne sont pas des fichiers Excel :\n"
+                    + "\n".join(f"  • {nom}" for nom in refus_extension)
+                )
+            if refus_code:
+                details.append(
+                    f"Ces fichiers ne correspondent pas au code {code} ({type_export}) :\n"
+                    + "\n".join(f"  • {nom}" for nom in refus_code)
+                )
             messagebox.showwarning(
                 title=f"Fichier(s) refusé(s) — {code}",
                 message=(
-                    f"Ces fichiers ne sont pas des fichiers Excel :\n\n"
-                    + "\n".join(f"  • {nom}" for nom in refus)
-                    + "\n\nSélectionnez uniquement des fichiers .xlsx ou .xls."
+                    "\n\n".join(details)
+                    + f"\n\nSélectionnez uniquement des fichiers Excel dont le nom commence par {code}."
                     + "\n\nLa fenêtre de sélection va se rouvrir."
                 ),
                 parent=alerte,
             )
             alerte.destroy()
-            continue  # rouvre la fenetre
+            continue
 
         chemins_valides = [Path(c) for c in chemins]
         break
+
+    return chemins_valides
+
+
+@router.post("/select-manual-files")
+async def select_manual_files(payload: SelectManualFilesRequest) -> dict[str, object]:
+    """Ouvre la fenetre Python/Tkinter locale pour choisir des fichiers IRIS.
+
+    Cette route remplace le selecteur navigateur `<input type=file>` pour le mode
+    manuel. Tkinter est lance dans un thread OS via `asyncio.to_thread` pour ne
+    pas bloquer l'event loop FastAPI pendant que la fenetre de selection est ouverte.
+    """
+    codes = _normaliser_codes([payload.export])
+    if len(codes) != 1:
+        raise HTTPException(status_code=400, detail="Selectionnez un seul export IRIS valide.")
+
+    code = codes[0]
+    type_export = EXPORTS_IRIS[code]
+
+    chemins_valides = await asyncio.to_thread(_run_tkinter_selection, code, type_export)
 
     return {
         "export": code,
@@ -718,6 +776,7 @@ async def select_manual_files(payload: SelectManualFilesRequest) -> dict[str, ob
 @router.get("/job/{job_id}")
 def get_job(job_id: str) -> dict[str, object]:
     """Retourne l'état courant d'un job de traitement IRIS."""
+    _cleanup_jobs()
     job = _jobs.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail=f"Job inconnu : {job_id}")
@@ -727,6 +786,7 @@ def get_job(job_id: str) -> dict[str, object]:
 @router.delete("/job/{job_id}")
 def cancel_job(job_id: str) -> dict[str, str]:
     """Demande l'annulation propre d'un job en cours."""
+    _cleanup_jobs()
     job = _jobs.get(job_id)
     if job and job.get("status") == "running":
         job["cancelled"] = True
@@ -743,6 +803,7 @@ async def traiter(payload: RunTreatmentRequest) -> dict[str, object]:
     Le front peut ensuite interroger GET /job/{job_id} pour suivre la
     progression même après un rechargement de page.
     """
+    _cleanup_jobs()
     codes = _normaliser_codes(payload.exports)
     if not codes:
         raise HTTPException(status_code=400, detail="Aucun export IRIS valide.")
@@ -798,11 +859,13 @@ async def _bg_traitement_auto(job_id: str, codes: list[str], types_exports: tupl
                 job["step"] = label
                 job["steps_history"].append(label)
 
-            # Récupère les chemins depuis la config (même logique que depuis_config=True)
-            chemins = tuple(
-                IRIS_natif.cei(type_export)._input.repertoire / nom
-                for nom in IRIS.DICT_EXPORTS_IRIS["chemins_fichiersInput"][type_export]
+            # Relit le dossier au moment du traitement pour inclure les fichiers
+            # ajoutés depuis le démarrage du backend (évite les listes figées à l'import).
+            noms_fichiers = iris_dumps_services.construire_liste_fichiers_type(
+                config.REPERTOIRE_EXTRACT_IRIS_LOCAL, code
             )
+            repertoire = IRIS_natif.cei(type_export)._input.repertoire
+            chemins = tuple(repertoire / nom for nom in noms_fichiers)
 
             cb(0, f"Vérification de {len(chemins)} fichier(s)...")
 
@@ -834,14 +897,14 @@ async def _bg_traitement_auto(job_id: str, codes: list[str], types_exports: tupl
             except Exception:
                 pass
 
-        job["status"] = "done"
+        _mark_job_finished(job, "done")
         job["progress"] = 100
         job["step"] = "Tous les exports traités ✓"
         job["current_code"] = None
         job["message"] = f"Traitement terminé pour {', '.join(types_exports)}."
 
     except InterruptedError:
-        job["status"] = "cancelled"
+        _mark_job_finished(job, "cancelled")
         job["progress"] = 100
         job["step"] = "Annulé par l'utilisateur"
         job["message"] = "Traitement annulé — tu peux relancer."
@@ -850,7 +913,7 @@ async def _bg_traitement_auto(job_id: str, codes: list[str], types_exports: tupl
         job["statut_codes"] = {code: "gray" for code in job.get("statut_codes", {})}
 
     except Exception as exc:
-        job["status"] = "error"
+        _mark_job_finished(job, "error")
         job["progress"] = 100
         job["step"] = "Erreur"
         job["message"] = str(exc)
@@ -864,6 +927,7 @@ async def _bg_traitement_auto(job_id: str, codes: list[str], types_exports: tupl
 @router.post("/traiter-manuel-chemins")
 async def traiter_manuel_chemins(payload: RunManualPathsRequest) -> dict[str, object]:
     """Lance un traitement manuel depuis des chemins choisis par le backend."""
+    _cleanup_jobs()
     codes = _normaliser_codes([payload.export])
     if len(codes) != 1:
         raise HTTPException(status_code=400, detail="Selectionnez un seul export IRIS valide.")
@@ -875,7 +939,7 @@ async def traiter_manuel_chemins(payload: RunManualPathsRequest) -> dict[str, ob
         raise HTTPException(status_code=400, detail="Aucun fichier fourni.")
 
     tous_les_chemins = tuple(
-        _valider_fichier_manuel(Path(path)) for path in payload.paths
+        _valider_fichier_manuel(Path(path), code) for path in payload.paths
     )
 
     job_id = str(uuid4())
@@ -923,7 +987,7 @@ async def _bg_traitement_manuel(
             )
         )
 
-        job["status"] = "done"
+        _mark_job_finished(job, "done")
         job["progress"] = 100
         job["step"] = f"{type_export} — terminé ✓"
         job["current_code"] = None
@@ -945,7 +1009,7 @@ async def _bg_traitement_manuel(
             pass
 
     except InterruptedError:
-        job["status"] = "cancelled"
+        _mark_job_finished(job, "cancelled")
         job["progress"] = 100
         job["step"] = "Annulé par l'utilisateur"
         job["message"] = "Traitement annulé — tu peux relancer."
@@ -953,7 +1017,7 @@ async def _bg_traitement_manuel(
         job["current_code"] = None
 
     except Exception as exc:
-        job["status"] = "error"
+        _mark_job_finished(job, "error")
         job["progress"] = 100
         job["step"] = "Erreur"
         job["message"] = str(exc)

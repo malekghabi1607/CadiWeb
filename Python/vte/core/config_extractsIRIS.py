@@ -2,9 +2,10 @@
 Mode op
 
 Permet de lister les chemins des fichiers IRIS à concaténer dans le fichier global.
-Les sessions et formations restent renseignées manuellement.
-Les ventes et inscriptions peuvent être générées automatiquement depuis le dossier
-des extracts originaux après la mise à jour GED.
+Les listes sont générées automatiquement depuis le dossier des extracts originaux :
+  - tous les fichiers historiques contenant "FINAL" sont conservés ;
+  - le dernier fichier courant daté est ajouté ;
+  - les anciens fichiers courants sont ignorés.
 
 """
 
@@ -12,24 +13,14 @@ from vte.core.config import REPERTOIRE_EXTRACT_IRIS_LOCAL
 from vte.services.iris_dumps_services import construire_liste_fichiers_type
 
 
-_tSessions = (
-    'R04110_Sessions-2011 à 2014 FINAL.xlsx',
-    'R04110_Sessions-2015 FINAL.xlsx',
-    'R04110_Sessions-2016 FINAL.xlsx',
-    'R04110_Sessions-2017 FINAL.xlsx',
-    'R04110_Sessions-2018 FINAL.xlsx',
-    'R04110_Sessions-2019 FINAL.xlsx',
-    'R04110_Sessions-2020 FINAL.xlsx',
-    'R04110_Sessions-2021 FINAL.xlsx',
-    'R04110_Sessions-2022 FINAL.xlsx',
-    'R04110_Sessions-2023 FINAL.xlsx',
-    'R04110_Sessions-2024 FINAL.xlsx',
-    'R04110_Sessions-2025 FINAL.xlsx',
-    'R04110_Sessions-2026 au 2026.05.20.xlsx',
+_tSessions = construire_liste_fichiers_type(
+    REPERTOIRE_EXTRACT_IRIS_LOCAL,
+    "R04110",
 )
 
-_tFormations = (
-    "R0304_Ref_Formation-Listedesformations-2026.05.20.xlsx",
+_tFormations = construire_liste_fichiers_type(
+    REPERTOIRE_EXTRACT_IRIS_LOCAL,
+    "R0304",
 )
 
 _tVentes = construire_liste_fichiers_type(

@@ -8,7 +8,7 @@
  */
 
 import type { ElementType } from 'react';
-import { BarChart2, Bell, BookOpen, Database, FileText, Home, Mail, Settings } from 'lucide-react';
+import { BarChart2, BookOpen, Database, FileText, HelpCircle, Home, Mail, Scale, Settings, ShieldCheck } from 'lucide-react';
 import { Screen } from './Sidebar';
 
 interface HeaderProps {
@@ -17,7 +17,7 @@ interface HeaderProps {
   onNavigate?: (screen: Screen) => void;
 }
 
-export default function Header({ sidebarWidth, title, onNavigate }: HeaderProps) {
+export default function Header({ sidebarWidth, title }: HeaderProps) {
   const titleIcons: Record<string, ElementType> = {
     'IRIS': Database,
     'EvalStat': BarChart2,
@@ -26,6 +26,11 @@ export default function Header({ sidebarWidth, title, onNavigate }: HeaderProps)
     'Paramètres': Settings,
     'Messagerie': Mail,
     'Tableau de bord': Home,
+    'Conditions': FileText,
+    'Confidentialite': ShieldCheck,
+    'Mentions legales': Scale,
+    'FAQ': HelpCircle,
+    'Contact': Mail,
   };
   const TitleIcon = title ? titleIcons[title] : undefined;
 
@@ -42,13 +47,6 @@ export default function Header({ sidebarWidth, title, onNavigate }: HeaderProps)
     >
       {/* Zone Gauche : Titre dynamique */}
       <div className="flex items-center gap-4 animate-fadeIn min-w-0">
-        <img
-          src="/image.png"
-          alt="CADI"
-          className="flex-shrink-0"
-          style={{ height: 56, width: 150, objectFit: 'contain' }}
-        />
-        <div className="w-1.5 h-4.5 rounded-full flex-shrink-0" style={{ background: '#f97316' }} />
         {TitleIcon && (
           <span className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#fff7ed' }}>
             <TitleIcon size={21} style={{ color: '#f97316' }} strokeWidth={2} />
@@ -61,48 +59,14 @@ export default function Header({ sidebarWidth, title, onNavigate }: HeaderProps)
         )}
       </div>
 
-      {/* Zone Droite : Boutons Raccourcis Directs */}
-      <div className="flex items-center gap-2">
-        {/* Bouton Raccourci : Accueil */}
-        <button
-          onClick={() => onNavigate?.('accueil')}
-          className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors text-slate-400 hover:text-slate-800 hover:bg-slate-50"
-          title="Tableau de bord"
-        >
-          <Home size={17} strokeWidth={1.8} />
-        </button>
-
-        {/* Bouton Raccourci : Messagerie */}
-        <button
-          onClick={() => onNavigate?.('messagerie')}
-          className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors text-slate-400 hover:text-slate-800 hover:bg-slate-50"
-          title="Messagerie (Historique)"
-        >
-          <Mail size={17} strokeWidth={1.8} />
-        </button>
-
-        {/* Bouton Raccourci : Paramètres */}
-        <button
-          onClick={() => onNavigate?.('parametres')}
-          className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors text-slate-400 hover:text-slate-800 hover:bg-slate-50"
-          title="Paramètres"
-        >
-          <Settings size={17} strokeWidth={1.8} />
-        </button>
-
-        {/* Séparateur visuel vertical */}
-        <div className="w-px h-5 mx-1" style={{ background: '#e2e8f0' }} />
-
-        {/* Bouton Notifications */}
-        <button
-          className="relative w-9 h-9 rounded-xl flex items-center justify-center transition-colors text-slate-400 hover:text-slate-800 hover:bg-slate-50"
-          title="Notifications"
-        >
-          <Bell size={17} strokeWidth={1.8} />
-          <span
-            className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full border-2 border-white bg-orange-500"
-          />
-        </button>
+      {/* Zone Droite : Logo CADI */}
+      <div className="flex items-center justify-end flex-shrink-0">
+        <img
+          src="/image.png"
+          alt="CADI"
+          className="flex-shrink-0"
+          style={{ height: 72, width: 230, objectFit: 'contain' }}
+        />
       </div>
     </header>
   );
