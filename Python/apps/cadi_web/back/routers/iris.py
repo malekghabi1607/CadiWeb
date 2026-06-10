@@ -59,6 +59,21 @@ _jobs: dict[str, dict] = {}
 # puisse afficher le resultat apres la fin, puis ils sont purges de la memoire.
 JOB_RETENTION_SECONDS = 30 * 60
 
+# `asyncio.create_task` ne garde qu'une reference faible a la tache cree : si on
+# ne conserve la reference nulle part ailleurs, le ramasse-miettes Python peut
+# detruire (et donc annuler) la tache en plein traitement, typiquement quand le
+# front navigue vers d'autres pages et declenche d'autres appels API. On garde
+# donc une reference forte ici, et on la retire automatiquement a la fin.
+_background_tasks: set[asyncio.Task] = set()
+
+
+def _spawn_job_task(coro) -> asyncio.Task:
+    """Lance une coroutine en tache de fond sans risque de garbage-collection prematuree."""
+    task = asyncio.create_task(coro)
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+    return task
+
 
 # =============================================================================
 # Configuration fonctionnelle IRIS
@@ -828,7 +843,9 @@ async def traiter(payload: RunTreatmentRequest) -> dict[str, object]:
 
     # Le traitement pandas/openpyxl est long et bloquant. On le lance dans une
     # tache asynchrone afin que l'endpoint rende immediatement le job_id.
-    asyncio.create_task(_bg_traitement_auto(job_id, codes, types_exports))
+    # `_spawn_job_task` garde une reference forte pour eviter qu'elle soit
+    # annulee par le garbage collector pendant le traitement.
+    _spawn_job_task(_bg_traitement_auto(job_id, codes, types_exports))
     return {"job_id": job_id}
 
 
@@ -954,7 +971,7 @@ async def traiter_manuel_chemins(payload: RunManualPathsRequest) -> dict[str, ob
         "steps_history": [],
     }
 
-    asyncio.create_task(_bg_traitement_manuel(job_id, code, type_export, tous_les_chemins))
+    _spawn_job_task(_bg_traitement_manuel(job_id, code, type_export, tous_les_chemins))
     return {"job_id": job_id}
 
 

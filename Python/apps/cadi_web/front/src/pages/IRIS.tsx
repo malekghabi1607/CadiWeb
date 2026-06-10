@@ -373,12 +373,40 @@ export default function IRIS() {
 
     const ctrl = new AbortController();
     abortRef.current = ctrl;
+    currentJobIdRef.current = jobId;
     setRunning(true);
     setDone(false);
-    setTargetProgress(10);
     setCurrentStep('Reprise du traitement en cours...');
 
-    pollJobStatus(jobId, ctrl.signal, (p, s) => { setTargetProgress(p); setCurrentStep(s); }, applyStatuts, setStepsLog)
+    // Reprise = on connait deja un job en cours. On recupere son etat reel tout
+    // de suite et on positionne la barre directement dessus (sans animation),
+    // pour eviter qu'elle reparte visuellement de 0 avant de remonter au point
+    // ou le traitement en est vraiment.
+    const reprendreJob = async () => {
+      try {
+        const resp = await fetch(`${API_BASE_URL}/iris/job/${jobId}`, { signal: ctrl.signal });
+        if (resp.ok) {
+          const job = await resp.json() as JobStatus;
+          const p = job.progress ?? 10;
+          setProgress(p);
+          setTargetProgress(p);
+          if (job.step) setCurrentStep(job.step);
+          if (job.statut_codes) applyStatuts(job.statut_codes);
+          if (job.steps_history) setStepsLog(job.steps_history);
+          if (job.status === 'done' || job.status === 'cancelled' || job.status === 'error') {
+            return job;
+          }
+        } else {
+          setTargetProgress(10);
+        }
+      } catch {
+        setTargetProgress(10);
+      }
+
+      return pollJobStatus(jobId, ctrl.signal, (p, s) => { setTargetProgress(p); setCurrentStep(s); }, applyStatuts, setStepsLog);
+    };
+
+    reprendreJob()
       .then(job => {
         setProgress(100);
         setTargetProgress(100);
