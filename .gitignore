@@ -8,3 +8,7 @@ Python/apps/cadi_web/frontend/.tools/
 # Exports IRIS (donnees stagiaires/formations) : fichiers locaux uniquement,
 # ne doivent pas partir sur les remotes (notamment github).
 Python/IRIS/
+
+# Fichiers vides crees accidentellement par redirection de commandes shell
+Python/netstat
+Python/py
