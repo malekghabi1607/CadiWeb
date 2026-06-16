@@ -1,6 +1,7 @@
 
 from __future__ import annotations
 
+import threading
 import sys
 from pathlib import Path
 
@@ -24,7 +25,7 @@ PYTHON_ROOT = Path(__file__).resolve().parents[3]
 if str(PYTHON_ROOT) not in sys.path:
     sys.path.insert(0, str(PYTHON_ROOT))
 
-from .routers import iris
+from .routers import evalstat, iris
 
 
 # =============================================================================
@@ -47,6 +48,8 @@ app.add_middleware(
     allow_origins=[
         "http://127.0.0.1:5173",
         "http://localhost:5173",
+        "http://127.0.0.1:5174",
+        "http://localhost:5174",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -65,6 +68,13 @@ app.add_middleware(
 #   /api/iris/traiter
 #   /api/iris/job/{job_id}
 app.include_router(iris.router, prefix="/api")
+app.include_router(evalstat.router, prefix="/api")
+
+
+@app.on_event("startup")
+def warm_backend_caches() -> None:
+    """Lance les chargements longs en arriere-plan au demarrage de CADI."""
+    threading.Thread(target=evalstat.warm_evalstat_cache, daemon=True).start()
 
 
 @app.get("/api/health")

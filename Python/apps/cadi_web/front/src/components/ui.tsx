@@ -297,13 +297,16 @@ export function TD({
   children,
   mono,
   muted,
+  colSpan,
 }: {
   children: React.ReactNode;
   mono?: boolean;
   muted?: boolean;
+  colSpan?: number;
 }) {
   return (
     <td
+      colSpan={colSpan}
       className={`px-4 py-3 text-sm ${mono ? 'font-mono text-xs' : ''}`}
       style={{ color: muted ? '#64748b' : '#1e293b' }}
     >

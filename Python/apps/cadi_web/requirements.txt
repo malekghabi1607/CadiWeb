@@ -1,3 +1,4 @@
 fastapi
+chardet
 python-multipart
 uvicorn[standard]
